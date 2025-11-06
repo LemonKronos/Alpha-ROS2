@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rviz_contour</name>
+  <version>0.0.1</version>
+  <description>Convert contour to rviz2 marker visualizer</description>
+  <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
+  <license>Propietary</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>ros2_msgs</depend>
+  <depend>global_utils</depend>
+  <!-- <depend>lidar_2d_handler</depend> -->
+
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

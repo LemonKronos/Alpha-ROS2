@@ -1,0 +1,14 @@
+# Ignore
+bags_files/
+build/
+install/
+log/
+pyvenv/*
+link-startSimulation.sh
+link-stopSimulation.sh
+src/px4_msgs
+src/px4_ros_com
+
+# Keep
+!pyvenv/
+!pyvenv/requirements.txt

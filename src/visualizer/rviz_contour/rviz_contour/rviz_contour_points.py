@@ -1,0 +1,85 @@
+import rclpy
+import math
+from rclpy.node import Node
+from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker
+from ros2_msgs.msg import Lidar2dObstacle
+
+
+class RvizContourPoint(Node):
+    def __init__(self):
+        super().__init__('rviz_contour')
+
+        self._setup_contour_pair(
+            sub_topic='/on_drone/sensor/scan/lidar2d/far',
+            pub_topic='/visualizer/contour_marker/far',
+            color=(0.0, 1.0, 0.0),
+            name='far'
+        )
+
+        self._setup_contour_pair(
+            sub_topic='/on_drone/sensor/scan/lidar2d/close',
+            pub_topic='/visualizer/contour_marker/close',
+            color=(1.0, 0.0, 0.0),
+            name='close'
+        )
+
+    def _setup_contour_pair(self, sub_topic, pub_topic, color, name):
+        publisher = self.create_publisher(Marker, pub_topic, 10)
+        callback = lambda msg, pub=publisher, col=color, ns=name: self._contour_callback(msg, pub, col, ns)
+        self.create_subscription(Lidar2dObstacle, sub_topic, callback, 10)
+
+    def _contour_callback(self, msg, publisher, col, ns):
+        data = msg.pointarray
+        if len(data) < 2:
+            return
+
+        points = []
+        for i in range(0, len(data) - 1, 2):
+            arc = data[i]
+            distance = data[i+1]
+            if arc != 69 and distance != 0:
+                x = distance * math.cos(arc)
+                y = distance * math.sin(arc)
+                points.append(Point(x=float(x), y=float(y), z=0.0))
+
+        if len(points) == 0:
+            return
+
+        marker = Marker()
+        marker.header.frame_id = "base_link"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = ns
+        marker.id = 0
+        marker.type = Marker.POINTS
+        marker.action = Marker.ADD
+        marker.pose.orientation.w = 1.0
+        marker.points = points
+
+        if len(points) == 1:
+            marker.scale.x = 0.9
+            marker.scale.y = 0.9  
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0
+            self.get_logger().info(f"[{ns}] Only 1 point detected.")
+        else:
+            marker.scale.x = 0.5
+            marker.scale.y = 0.5
+            marker.color.r, marker.color.g, marker.color.b = col
+            marker.color.a = 1.0
+
+        publisher.publish(marker)
+
+
+def main(args=None):
+        rclpy.init(args=args)
+        node = RvizContourPoint()
+        rclpy.spin(node)
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

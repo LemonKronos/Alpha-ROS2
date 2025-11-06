@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Build Debug ROS2 Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/install/${input:ros2Package}/lib/${input:ros2Package}/${input:ros2Executable}",
+            "args": [
+                "--ros-args",
+                // "--log-level", "DEBUG",
+                // "--log-level", "rcl:=error",
+                // "--log-level", "rclcpp:=error"
+            ],
+            "cwd": "${workspaceFolder}",
+            // "environment": [
+            //     { "name": "RCUTILS_COLORIZED_OUTPUT", "value": "1" },
+            //     { "name": "RCUTILS_CONSOLE_OUTPUT_FORMAT", "value": "[${time}] [${severity}] [${name}]: ${message}" }
+            // ],
+            "MIMode": "gdb",
+            "stopAtEntry": false,
+            "preLaunchTask": "Build ROS2 Single Node Debug"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "ros2Package",
+            "type": "promptString",
+            "description": "Enter ROS2 package name",
+            "default": "finalize_control"
+        },
+        {
+            "id": "ros2Executable",
+            "type": "promptString",
+            "description": "Enter ROS2 executable name",
+            "default": "finalize_control"
+        }
+    ]
+}

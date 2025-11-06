@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lidar_2d_handler</name>
+  <version>0.0.1</version>
+  <description>Process raw data from lidar 2d scan into clustered individual obstacle</description>
+  <license>Proprietary</license>
+  <maintainer email="trongdat4work@gmail.com">Trong Data</maintainer>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Dependencies -->
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>px4_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>ros2_msgs</depend>
+  <depend>global_utils</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
