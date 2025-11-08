@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 # build the library (no main function needed)
 add_library(${PROJECT_NAME}
@@ -19,11 +20,13 @@ target_include_directories(${PROJECT_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+    ${EIGEN3_INCLUDE_DIR}
 )
 
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   std_msgs
+  Eigen3
 )
 
 # export + install the library
@@ -43,8 +46,9 @@ install(
 
 # export info for other packages
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp std_msgs)
+ament_export_dependencies(rclcpp std_msgs Eigen3)
 
+# testing (optional)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

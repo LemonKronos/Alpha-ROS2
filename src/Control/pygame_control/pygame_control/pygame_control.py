@@ -40,7 +40,7 @@ class PygameControlNode:
         # Movement / tuning params
         self.WASD_SPEED = 10.0
         self.WASD_ACCELERATION = 5.0
-        self.YAW_SPEED = 3.141592
+        self.YAW_SPEED = math.pi
         self.YAW_ACCELERATION = 4.0
         self.UP_DOWN_SPEED = 3.0
         self.UP_DOWN_ACCELERATION = 5.0
@@ -243,22 +243,24 @@ class PygameControlNode:
                 msg.control_state = True
 
                 # We'll set them to 0.0 here. If you prefer mapping, change below.
-                msg.roll = 0.0  # rad/s
+                # msg.roll = 0.0  # rad/s
+                msg.roll = float(clamp(right_m_s))
                 msg.pitch = 0.0  # rad/s
                 msg.yaw = float(clamp(yaw_rad_s))
 
                 # Linear velocities (m/s)
                 msg.forward = float(clamp(forward_m_s))
-                msg.right = float(clamp(right_m_s))
+                # msg.right = float(clamp(right_m_s))
                 msg.down = float(clamp(down_m_s))
 
                 # wings mode left unchanged by UI
                 msg.wings_mode = UNCHANGE
 
                 # Publish
-                self.node.get_logger().info(
-                    f"[TEST] publish ControlInterface: forward={msg.forward:.2f} right={msg.right:.2f} down={msg.down:.2f} yaw={msg.yaw:.2f}"
-                )
+                if MODULE_TEST:
+                    self.node.get_logger().info(
+                        f"[TEST] publish ControlInterface: forward={msg.forward:.2f} right={msg.right:.2f} down={msg.down:.2f} yaw={msg.yaw:.2f}"
+                    )
                 self.pub.publish(msg)
 
             # Drawing (kept from original)

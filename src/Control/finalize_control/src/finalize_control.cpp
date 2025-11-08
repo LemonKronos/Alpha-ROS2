@@ -1,5 +1,4 @@
 #include "finalize_control/finalize_control.hpp"
-#include <algorithm>
 
 FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     using namespace std::chrono_literals;
@@ -47,13 +46,15 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     just_change_loop_state = true;
 }
 
-FinalizeControlNode::~FinalizeControlNode() {}
+FinalizeControlNode::~FinalizeControlNode() {
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4);
+    SendDisarmCmd();
+}
 
 /*########################################## Callbacks */
 
 void FinalizeControlNode::FinalCtrlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg) {
     last_final_ctrl = msg;
-    control_state = msg->control_state;
 }
 
 void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg) {
@@ -61,13 +62,31 @@ void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStat
 }
 
 void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
-    last_q = msg->q;
-    last_yaw_W = frame_utils::quaternion_to_yaw(msg->q[1], msg->q[2], msg->q[3], msg->q[0]);
+    last_q = frame_utils::arrayToQuaternion(msg->q);
 }
 
 /*########################################## FSM */
 
 void FinalizeControlNode::NodeLoopCallback() {
+    // Update drone data
+    if(last_final_ctrl != nullptr) {
+        control_state = last_final_ctrl->control_state;
+        if(std::fabs(last_final_ctrl->roll) < 1e-3 && std::fabs(last_final_ctrl->pitch) < 1e-3) {
+            if(offboard_mode != OffboardMode::VELOCITY) {
+                RCLCPP_INFO(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
+            }
+            offboard_mode = OffboardMode::VELOCITY;
+        }
+        else {
+            if(offboard_mode != OffboardMode::ATTITUDE) {
+                RCLCPP_INFO(this->get_logger(), TEAL "Change mode to ATTITUDE" RESET);
+            }
+            offboard_mode = OffboardMode::ATTITUDE;
+        }
+    }
+    yaw_W = frame_utils::quaternionToYaw(last_q);
+
+    // Main FSM loop
     switch(current_loop_state) {
         case NodeLoopState::INIT:
             if(just_change_loop_state) {
@@ -141,10 +160,6 @@ void FinalizeControlNode::NodeLoopCallback() {
 /*########################################## Methods */
 
 void FinalizeControlNode::SendOffboardCmd() {
-    // Update drone data
-    yaw_W = last_yaw_W;
-
-    // Publish offboard command
     PublishOffboardControlMode();
     switch(offboard_mode) {
         case OffboardMode::POSITION:
@@ -176,7 +191,7 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         else vz = last_final_ctrl->down * SPEED_MAX_UP_FW;
 
         msg.position.fill(NO_DATA_f);
-        msg.velocity = frame_utils::frame_FRD_to_NED(vx, vy, vz, yaw_W);
+        msg.velocity = frame_utils::frameFRDtoNED(vx, vy, vz, yaw_W);
         msg.acceleration.fill(NO_DATA_f);
         msg.yaw = NO_DATA_f;
         msg.yawspeed = last_final_ctrl->yaw * M_PI_2f;
@@ -185,31 +200,63 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         // No need to do anything cause trajectory setpoint auto stay still
     }
 
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3f;
     trajectory_set_PUB->publish(msg);
-    RCLCPP_INFO(this->get_logger(), GREEN "Published Trajectory setpoint." RESET);
+    // RCLCPP_INFO(this->get_logger(), GREEN "Published Trajectory setpoint." RESET);
 }
 
 void FinalizeControlNode::PublishAttitudeSetPoint() {
     auto msg = px4_msgs::msg::VehicleAttitudeSetpoint();
 
-    if(last_final_ctrl != nullptr) {
-        // Body rate velocity to Quaternion
-        msg.q_d = frame_utils::euler_to_quaternion(last_final_ctrl->roll, last_final_ctrl->pitch, last_final_ctrl->yaw);
+    if(last_final_ctrl != nullptr) { // Update new rate and thrust
+        // Body rate to world quaternion
+        Eigen::Vector3f omega(
+            last_final_ctrl->roll * M_PIf,
+            last_final_ctrl->pitch * M_PIf,
+            last_final_ctrl->yaw * M_PIf
+        );
+        float angle = omega.norm() * SYSTEM_LOOP_CYCLE;
+        Eigen::Quaternionf dq;
+        if(angle > 1e-6f) dq = Eigen::AngleAxisf(angle, omega.normalized());
+        else dq = Eigen::Quaternionf::Identity();
+        Eigen::Quaternionf q_new = last_q * dq;
+        q_new.normalize();
+        msg.q_d = frame_utils::quaternionToArray(q_new);
 
-        // Body velocity to Thrust
-        msg.thrust_body[0] = last_final_ctrl->forward;
-        msg.thrust_body[1] = last_final_ctrl->right;
-        msg.thrust_body[2] = last_final_ctrl->down;
+        // Body velocity to world thrust
+        Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f);
+        Eigen::Vector3f thrust_body = q_new.inverse() * thrust_world;
+
+        thrust_body[0] += last_final_ctrl->forward;
+        thrust_body[1] += last_final_ctrl->right;
+
+        msg.thrust_body[0] = thrust_body[0];
+        msg.thrust_body[1] = thrust_body[1];
+        msg.thrust_body[2] = thrust_body[2];
     }
-    else {
-        msg.q_d = last_q;
-        msg.thrust_body[2] = -0.5f;
+    else { // Keep rate, hover
+        msg.q_d = frame_utils::quaternionToArray(last_q);
+        
+        Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f);
+        Eigen::Vector3f thrust_body = last_q.inverse() * thrust_world;
+
+        thrust_body[0] += last_final_ctrl->forward;
+        thrust_body[1] += last_final_ctrl->right;
+
+        msg.thrust_body[0] = thrust_body[0];
+        msg.thrust_body[1] = thrust_body[1];
+        msg.thrust_body[2] = thrust_body[2];
     }
 
     msg.yaw_sp_move_rate = NO_DATA_f;
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3f;
     attitude_set_PUB->publish(msg);
+    Eigen::Vector3f rate = frame_utils::quaternionToEuler(msg.q_d);
+    RCLCPP_INFO(
+        this->get_logger(), TEAL "Published Attitude: roll=%0.4f, pith=%0.4f, yaw=%0.4f, thurst= %0.2f, %0.2f, %0.2f." RESET,
+        rate[0], rate[1], rate[2],
+        msg.thrust_body[0], msg.thrust_body[1], msg.thrust_body[2]
+    );
 }
 
 void FinalizeControlNode::PublishOffboardControlMode() {
@@ -238,7 +285,7 @@ void FinalizeControlNode::PublishOffboardControlMode() {
             break;
     }
 
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3f;
     offboard_ctrl_PUB->publish(msg);
 }
 
@@ -252,7 +299,7 @@ void FinalizeControlNode::PublishVehicleCmd(uint16_t command, float param1, floa
 	msg.source_system = 1;
 	msg.source_component = 1;
 	msg.from_external = true;
-	msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3;
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3f;
 	vehicle_cmd_PUB->publish(msg);
 }
 

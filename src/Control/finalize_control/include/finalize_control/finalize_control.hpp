@@ -12,6 +12,8 @@
 #include "px4_msgs/msg/vehicle_attitude_setpoint.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 
+#include <algorithm>
+
 using std::placeholders::_1;
 
 class FinalizeControlNode : public rclcpp::Node {
@@ -40,9 +42,8 @@ private:
     uint8_t offboard_stream_counter = 0;
     bool arming_state = false;
     bool control_state = false;
-    std::array<float, 4> last_q = {0, 0, 0, 1};
+    Eigen::Quaternionf last_q = {1, 0, 0, 0};
     float yaw_W = 0;
-    float last_yaw_W = 0;
 
     enum class OffboardMode {
         POSITION,

@@ -3,6 +3,8 @@
 #include <limits>
 #include <array>
 #include <cmath>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 /* ######################################## Color */
 #define RED     "\033[31m"
@@ -18,6 +20,8 @@ constexpr float NO_DATA_f = std::numeric_limits<float>::quiet_NaN();
 constexpr float NO_DATA_d = std::numeric_limits<float>::quiet_NaN();
 
 /* ########################################## Function*/
+
+// All q in wxyz
 namespace frame_utils {
     inline float angleInWrapped(float angle) {
         while(angle < -M_PI) angle += 2*M_PI;
@@ -31,60 +35,59 @@ namespace frame_utils {
         return angle;
     }
 
-    // q in x, y, z, w
-    inline std::array<float, 4> euler_to_quaternion(const float roll, const float pitch, const float yaw) {
-        float c_roll = cosf(roll/2);
-        float s_roll = sinf(roll/2);
-        float c_pitch = cosf(pitch/2);
-        float s_pitch = sinf(pitch/2);
-        float c_yaw = cosf(yaw/2);
-        float s_yaw = sinf(yaw/2);
+    inline Eigen::Quaternionf eulerToQuaternion(const float roll, const float pitch, const float yaw) {
+        // Create rotation matrices for each axis
+        Eigen::AngleAxisf rollAngle(roll,   Eigen::Vector3f::UnitX());
+        Eigen::AngleAxisf pitchAngle(pitch, Eigen::Vector3f::UnitY());
+        Eigen::AngleAxisf yawAngle(yaw,     Eigen::Vector3f::UnitZ());
 
-        std::array<float, 4> Aq;
-            
-        Aq[0] = s_roll*c_pitch*c_yaw - c_roll*s_pitch*s_yaw;
-        Aq[1] = c_roll*s_pitch*c_yaw + s_roll*c_pitch*s_yaw;
-        Aq[2] = c_roll*c_pitch*s_yaw - s_roll*s_pitch*c_yaw;
-        Aq[3] = c_roll*c_pitch*c_yaw + s_roll*s_pitch*s_yaw;
+        // Combine them in ZYX order (yaw * pitch * roll)
+        Eigen::Quaternionf q = yawAngle * pitchAngle * rollAngle;
+        q.normalize(); // just in case
 
-        return Aq;
+        return q;
     }
 
-    // q in x, y, z, w
-    inline std::array<float, 4> euler_to_quaternion(const std::array<float, 3>& rate) {
-        return euler_to_quaternion(rate[0], rate[1], rate[2]);
+    inline Eigen::Quaternionf eulerToQuaternion(const Eigen::Vector3f& rate) {
+        Eigen::Matrix3f R;
+        R = Eigen::AngleAxisf(rate.z(), Eigen::Vector3f::UnitZ())  // yaw
+        * Eigen::AngleAxisf(rate.y(), Eigen::Vector3f::UnitY())  // pitch
+        * Eigen::AngleAxisf(rate.x(), Eigen::Vector3f::UnitX()); // roll
+        return Eigen::Quaternionf(R);
     }
 
-    // q in x, y, z, w
-    inline std::array<float, 3> quaternion_to_euler(const float x, const float y, const float z, const float w) {
-        std::array<float, 3> euler;
 
-        // roll (x-axis rotation)
-        float sinr_cosp = 2.0f * (w * x + y * z);
-        float cosr_cosp = 1.0f - 2.0f * (x * x + y * y);
-        euler[0] = std::atan2(sinr_cosp, cosr_cosp);
-
-        // pitch (y-axis rotation)
-        float sinp = 2.0f * (w * y - z * x);
-        if (std::abs(sinp) >= 1.0f)
-            euler[1] = copysignf(M_PI / 2.0f, sinp); // use 90 degrees if out of range
-        else
-            euler[1] = std::asin(sinp);
-
-        // yaw (z-axis rotation)
-        float siny_cosp = 2.0f * (w * z + x * y);
-        float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
-        euler[2] = std::atan2(siny_cosp, cosy_cosp);
-
-        return euler;
+    inline Eigen::Quaternionf eulerToQuaternion(const std::array<float, 3>& rate) {
+        return eulerToQuaternion(rate[0], rate[1], rate[2]);
     }
 
-    // q in x, y, z, w
-    inline std::array<float, 3> quaternion_to_euler(const std::array<float, 4> q) {
-        return quaternion_to_euler(q[0], q[1],q[2], q[3]);
+    // Returns Vector3f: roll (x), pitch (y), yaw (z) in radians
+    inline Eigen::Vector3f quaternionToEuler(const Eigen::Quaternionf& q) {
+        Eigen::Vector3f rate;
+        float w = q.w(), x = q.x(), y = q.y(), z = q.z();
+
+        // Roll (x-axis rotation)
+        rate.x() = std::atan2(2.0f*(w*x + y*z), 1.0f - 2.0f*(x*x + y*y));
+        // Pitch (y-axis rotation)
+        rate.y() = std::asin(std::clamp(2.0f*(w*y - z*x), -1.0f, 1.0f));
+        // Yaw (z-axis rotation)
+        rate.z() = std::atan2(2.0f*(w*z + x*y), 1.0f - 2.0f*(y*y + z*z));
+
+        return rate;
     }
 
-    inline std::array<float, 3> frame_FRD_to_NED(const float forward, const float right, const float down, const float yaw_W) {
+    // Returns Vector3f: roll (x), pitch (y), yaw (z) in radians
+    inline Eigen::Vector3f quaternionToEuler(const std::array<float, 4>& q) {
+        return quaternionToEuler(Eigen::Quaternionf(q[0], q[1], q[2], q[3]));
+    }
+
+    // Returns Vector3f: roll (x), pitch (y), yaw (z) in radians
+    inline Eigen::Vector3f quaternionToEuler(const float w, const float x, const float y, const float z) {
+        return quaternionToEuler(Eigen::Quaternionf(w, x, y, z));
+    }
+
+    // Return std::array<float, 3> north, east, depth
+    inline std::array<float, 3> frameFRDtoNED(const float forward, const float right, const float down, const float yaw_W) {
         // 2D rotation by yaw_W (only horizontal plane)
         float c = std::cos(yaw_W);
         float s = std::sin(yaw_W);
@@ -96,18 +99,30 @@ namespace frame_utils {
         return {north, east, depth};
     }
 
-    inline std::array<float, 3> frame_FRD_to_NED(const std::array<float, 3> body, const float yaw_W) {
-        return frame_FRD_to_NED(body[0], body[1], body[2], yaw_W);
+    // Return std::array<float, 3> north, east, depth
+    inline std::array<float, 3> frameFRDtoNED(const std::array<float, 3> body, const float yaw_W) {
+        return frameFRDtoNED(body[0], body[1], body[2], yaw_W);
     }
 
-    // q in x, y, z, w
-    inline float quaternion_to_yaw(const float x, const float y, const float z, const float w) {
+    inline float quaternionToYaw(const float w, const float x, const float y, const float z) {
         float yaw = std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z));
         return angleInWrapped(yaw);
     }
 
-    // q in x, y, z, w
-    inline float quaternion_to_yaw(const std::array<float, 4> q) {
-        return quaternion_to_yaw(q[0], q[1], q[2], q[3]);
+    inline float quaternionToYaw(const std::array<float, 4> q) {
+        return quaternionToYaw(q[0], q[1], q[2], q[3]);
+    }
+
+    inline float quaternionToYaw(const Eigen::Quaternionf& q) {
+        return quaternionToYaw(q.w(), q.x(), q.y(), q.z());
+    }
+
+    inline Eigen::Quaternionf arrayToQuaternion(const std::array<float, 4>& qA) {
+        Eigen::Quaternionf qQ(qA[0], qA[1], qA[2], qA[3]);
+        return qQ;
+    }
+
+    inline std::array<float, 4> quaternionToArray(const Eigen::Quaternionf& qQ) {
+        return {qQ.w(), qQ.x(), qQ.y(), qQ.z()};
     }
 }

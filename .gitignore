@@ -8,6 +8,7 @@ link-startSimulation.sh
 link-stopSimulation.sh
 src/px4_msgs
 src/px4_ros_com
+**/__pycache__/
 
 # Keep
 !pyvenv/
