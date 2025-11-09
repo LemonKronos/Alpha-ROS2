@@ -47,8 +47,8 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
 }
 
 FinalizeControlNode::~FinalizeControlNode() {
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4);
     SendDisarmCmd();
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 1, 1);
 }
 
 /*########################################## Callbacks */
@@ -59,6 +59,9 @@ void FinalizeControlNode::FinalCtrlCallback(const ros2_msgs::msg::ControlInterfa
 
 void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg) {
     arming_state = msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
+    offboard_state = msg->nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
+    last_nav_state = msg->nav_state;
+    // RCLCPP_INFO(this->get_logger(), PINK "current nav_state = %d" RESET, msg->nav_state);
 }
 
 void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
@@ -102,7 +105,7 @@ void FinalizeControlNode::NodeLoopCallback() {
                 offboard_stream_counter++;
             }
 
-            if(offboard_stream_counter >= 10){
+            if(offboard_stream_counter >= 20){
                 current_loop_state = NodeLoopState::ARM;
                 just_change_loop_state = true;
             }
@@ -124,16 +127,28 @@ void FinalizeControlNode::NodeLoopCallback() {
                 just_change_loop_state = false;
             }
 
-            if(!arming_state && control_state) {
-                current_loop_state = NodeLoopState::ARM;
-                just_change_loop_state = true;
+            SendOffboardCmd();
+
+            if(control_state) {
+                if(!arming_state) { // Lost arm
+                    current_loop_state = NodeLoopState::INIT;
+                    just_change_loop_state = true;
+                    RCLCPP_INFO(this->get_logger(), RED "System have been disarm, rearm" RESET);
+                }
+                else if(
+                    last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_RTL ||
+                    last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL
+                ) { // In RTL
+                    current_loop_state = NodeLoopState::INIT;
+                    just_change_loop_state = true;
+                    RCLCPP_INFO(this->get_logger(), RED "System have leave offboard, restart offboard" RESET);
+                }
             }
-            if(!control_state) {
+            else {
                 current_loop_state = NodeLoopState::DISARM;
                 just_change_loop_state = true;
+                RCLCPP_INFO(this->get_logger(), RED "End of control, disarm" RESET);
             }
-            
-            SendOffboardCmd();
         break;
         case NodeLoopState::LOST: // Not deal with yet
             current_loop_state = NodeLoopState::INIT;
@@ -175,7 +190,7 @@ void FinalizeControlNode::SendOffboardCmd() {
 
         break;
     }
-
+    last_final_ctrl = nullptr;
 }
 
 void FinalizeControlNode::PublishTrajectorySetpoint() {
@@ -211,9 +226,9 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
     if(last_final_ctrl != nullptr) { // Update new rate and thrust
         // Body rate to world quaternion
         Eigen::Vector3f omega(
-            last_final_ctrl->roll * M_PIf,
-            last_final_ctrl->pitch * M_PIf,
-            last_final_ctrl->yaw * M_PIf
+            last_final_ctrl->roll * 2*M_PIf,
+            last_final_ctrl->pitch * 2*M_PIf,
+            last_final_ctrl->yaw * 2*M_PIf
         );
         float angle = omega.norm() * SYSTEM_LOOP_CYCLE;
         Eigen::Quaternionf dq;
@@ -223,40 +238,38 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         q_new.normalize();
         msg.q_d = frame_utils::quaternionToArray(q_new);
 
-        // Body velocity to world thrust
-        Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f);
-        Eigen::Vector3f thrust_body = q_new.inverse() * thrust_world;
+        // Compute thrust maintaining world hover
+        Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f); // hover
+        Eigen::Vector3f move_body(
+            last_final_ctrl->forward,
+            last_final_ctrl->right,
+            last_final_ctrl->down
+        );
+        Eigen::Vector3f move_world = q_new * move_body;        // body→world
+        Eigen::Vector3f total_world = thrust_world + move_world;
+        Eigen::Vector3f thrust_body = q_new.inverse() * total_world; // world→body
+        thrust_body.normalize();
 
-        thrust_body[0] += last_final_ctrl->forward;
-        thrust_body[1] += last_final_ctrl->right;
-
-        msg.thrust_body[0] = thrust_body[0];
-        msg.thrust_body[1] = thrust_body[1];
-        msg.thrust_body[2] = thrust_body[2];
+        msg.thrust_body[0] = std::clamp(thrust_body.x(), -0.8f, 0.8f);
+        msg.thrust_body[1] = std::clamp(thrust_body.y(), -0.8f, 0.8f);
+        msg.thrust_body[2] = std::clamp(thrust_body.z(), -0.8f, 0.8f);
     }
-    else { // Keep rate, hover
+    else {
         msg.q_d = frame_utils::quaternionToArray(last_q);
-        
+
+        // Hover thrust (respect current orientation)
         Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f);
         Eigen::Vector3f thrust_body = last_q.inverse() * thrust_world;
+        thrust_body.normalize();
 
-        thrust_body[0] += last_final_ctrl->forward;
-        thrust_body[1] += last_final_ctrl->right;
-
-        msg.thrust_body[0] = thrust_body[0];
-        msg.thrust_body[1] = thrust_body[1];
-        msg.thrust_body[2] = thrust_body[2];
+        msg.thrust_body[0] = std::clamp(thrust_body.x(), -0.8f, 0.8f);
+        msg.thrust_body[1] = std::clamp(thrust_body.y(), -0.8f, 0.8f);
+        msg.thrust_body[2] = std::clamp(thrust_body.z(), -0.8f, 0.8f);
     }
 
     msg.yaw_sp_move_rate = NO_DATA_f;
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1e3f;
     attitude_set_PUB->publish(msg);
-    Eigen::Vector3f rate = frame_utils::quaternionToEuler(msg.q_d);
-    RCLCPP_INFO(
-        this->get_logger(), TEAL "Published Attitude: roll=%0.4f, pith=%0.4f, yaw=%0.4f, thurst= %0.2f, %0.2f, %0.2f." RESET,
-        rate[0], rate[1], rate[2],
-        msg.thrust_body[0], msg.thrust_body[1], msg.thrust_body[2]
-    );
 }
 
 void FinalizeControlNode::PublishOffboardControlMode() {
@@ -311,6 +324,6 @@ bool FinalizeControlNode::SendArmCmd() {
 
 bool FinalizeControlNode::SendDisarmCmd() {
     PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
-	RCLCPP_INFO(this->get_logger(), PINK "Disarm command send" RESET);
+	RCLCPP_INFO(this->get_logger(), RED "Disarm command send" RESET);
     return true;
 }

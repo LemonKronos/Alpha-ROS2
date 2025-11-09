@@ -41,6 +41,8 @@ private:
     // Variables
     uint8_t offboard_stream_counter = 0;
     bool arming_state = false;
+    bool offboard_state = false;
+    uint8_t last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     bool control_state = false;
     Eigen::Quaternionf last_q = {1, 0, 0, 0};
     float yaw_W = 0;
