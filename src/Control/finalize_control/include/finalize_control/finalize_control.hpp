@@ -46,6 +46,7 @@ private:
     bool control_state = false;
     Eigen::Quaternionf last_q = {1, 0, 0, 0};
     float yaw_W = 0;
+    float odo_z_velocity = 0;
 
     enum class OffboardMode {
         POSITION,
@@ -77,7 +78,7 @@ private:
     void NodeLoopCallback();
 
     // Methods
-    void PublishVehicleCmd(uint16_t command, float param1 = 0.0, float param2 = 0.0);
+    void PublishVehicleCmd(uint16_t command, float param1 = 0.0, float param2 = 0.0, float param3 = 0.0);
     bool SendArmCmd();
     bool SendDisarmCmd();
     void SendOffboardCmd();

@@ -13,3 +13,5 @@ constexpr float SPEED_MAX_BACKWARD_FW = 5.0f;
 constexpr float SPEED_MAX_STRAFE = 8.0f;
 constexpr float SPEED_MAX_UP_FW = 5.0f;
 constexpr float SPEED_MAX_DOWN_FW = 2.0f; 
+constexpr float THRUST_SAFE_LIMIT = 0.8f;
+constexpr float HOVER_THRUST = -0.5f;
