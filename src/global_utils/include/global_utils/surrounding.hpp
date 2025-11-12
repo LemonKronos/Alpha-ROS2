@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+
 #include <vector>
 #include <cstdint>
 #include <float.h>
@@ -37,6 +39,7 @@ template <typename T>
 T expoMap(const T& input, const T& in_min, const T& in_max, const T& out_min, const T& out_max, const T& sensitivity);
 
 /* ########################################## Classes*/
+
 struct Point {
     float arc = 0, distance = 0;
     float x = 0, y = 0;
@@ -45,54 +48,45 @@ constexpr float OVER = 69; // arc over 2Pi
 constexpr float CLEAR = 0; // distance clear
 constexpr Point END_TOKEN = {OVER, CLEAR, 0, 0};
 
-class ObstacleArc {
+class Contour {
 public:
-    ObstacleArc();
+    Contour();
     bool tryAddPoint(Point& point); // Clustering here
+    void addPoint(Point& point) { points.push_back(point); }
     const std::vector<Point>& getContour() const;
     float getMinDistance() const;
     bool empty();
 
 private:
-    std::vector<Point> contour;
+    std::vector<Point> points;
     float min_distance = FLT_MAX;
+    void setMinDistance(const float& distance) { min_distance = distance; }
     bool makeStraightLine(const Point& point); // Tolerance scale with distance
     float getDistance2Point(const Point& pointA, const Point& pointB);
+    
+    friend class Obstacle;
 };
 
-class ObstacleMap {
-public:
-    bool tryAddPoint(const Point& point);
-    const std::vector<Point>& getContour() const;
-
-private:
-    std::vector<Point> contour;
-    float tolerance_factor = 5; // I choose for now, linear, reverse scale
-    static constexpr float SIGNIFICANT_DISTANCE = 0.01; // meter
-    bool makeStraightLine(const Point& point); // Tolerance scale with 1/distance
-    bool checkDistanceAddPoint(const Point& point);
-    float getDistance2Point(const Point& pointA, const Point& pointB);
-};
 /**
- * @brief Sector arc stored in Counter Clock-wise Wrapped frame, e.i, from +PI to -PI looking Clock-wise
- * 
+ * @brief Sector stored in Counter Clock-wise Wrapped frame, e.i, from +PI to -PI looking Clock-wise
  * Sector 0 start from -SECTOR_ARC/2 to SECTOR_ARC/2
- * 
  * @note The sector names are also iterated in Couter Clock-wise
  */
-class Sector {
+class Obstacle {
 public:
-    struct Data {
+    struct Sector {
         float sector_angle_start;
         float sector_angle_stop;
         float min_distance = FLT_MAX;
 
-        std::vector<ObstacleArc> obstacle_arc;
+        std::vector<Contour> contours;
     };
     Point origin = {0, 0, 0, 0};
 
-    Sector();
-    void addObstacleArc(const uint8_t& sector_index, ObstacleArc& new_obstacle);
+    Obstacle();
+    void topicToObstacle(const std::vector<ros2_msgs::msg::Lidar2dSector>& obstacle);
+    std::vector<ros2_msgs::msg::Lidar2dSector> obstacleToTopic();
+    void addContour(const uint8_t& sector_index, Contour& new_obstacle);
     uint8_t angleToSector(float angle);
     void sectorItoratorInit(const uint8_t& start_index);
     uint8_t sectorItoratorNext();
@@ -102,24 +96,14 @@ public:
     float getAngleStartSector(const uint8_t& index);
     float getAngleEndSector(const uint8_t& index);
     float getMinDistanceSector(const uint8_t& index);
-    std::vector<ObstacleArc> getObstacles(const uint8_t& index);
+    std::vector<Contour> getObstacles(const uint8_t& index);
 
 private:
-    Data data[SECTOR_NUM];
+    Sector sector[SECTOR_NUM];
     uint16_t obstacles_num = 0;
     uint8_t sector_iterator;
 
     // Helper
     bool sector_iter_init = true;
     int8_t sector_der = 0;
-};
-
-class Map { // This will get refactor to oblivion after finish ReactiveOA, depend by local_mapping node
-public:
-    Map();
-    void convertSectorToMap(Sector& sector);
-    void addObstacle(const ObstacleMap& obstacle);
-private:
-    std::vector<ObstacleMap> obstacle_map_list;
-    Point convertPointArcToMap(const Point& origin, const Point& point_arc);
 };

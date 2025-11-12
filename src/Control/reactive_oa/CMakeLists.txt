@@ -7,9 +7,34 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(ros2_msgs REQUIRED)
+find_package(global_utils REQUIRED)
+
+include_directories(
+  include
+)
+
+# Sources
+add_executable(reactive_oa
+  src/main.cpp
+  src/reactive_oa.cpp
+  )
+
+ament_target_dependencies(reactive_oa
+  rclcpp
+  ros2_msgs
+  global_utils
+)
+
+install(TARGETS
+  reactive_oa
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

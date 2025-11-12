@@ -4,6 +4,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
 from ros2_msgs.msg import Lidar2dObstacle
+from rclpy.qos import qos_profile_sensor_data
 
 
 class RvizContourPoint(Node):
@@ -27,23 +28,18 @@ class RvizContourPoint(Node):
     def _setup_contour_pair(self, sub_topic, pub_topic, color, name):
         publisher = self.create_publisher(Marker, pub_topic, 10)
         callback = lambda msg, pub=publisher, col=color, ns=name: self._contour_callback(msg, pub, col, ns)
-        self.create_subscription(Lidar2dObstacle, sub_topic, callback, 10)
+        self.create_subscription(Lidar2dObstacle, sub_topic, callback, qos_profile_sensor_data)
 
     def _contour_callback(self, msg, publisher, col, ns):
-        data = msg.pointarray
-        if len(data) < 2:
-            return
+        point_array = []
 
-        points = []
-        for i in range(0, len(data) - 1, 2):
-            arc = data[i]
-            distance = data[i+1]
-            if arc != 69 and distance != 0:
-                x = distance * math.cos(arc)
-                y = distance * math.sin(arc)
-                points.append(Point(x=float(x), y=float(y), z=0.0))
+        obstacles = msg.obstacles
+        for sector in obstacles:
+            for contour in sector.contours:
+                for point in contour.points:
+                    point_array.append(Point(x=point.x, y=point.y, z=0.0))
 
-        if len(points) == 0:
+        if len(point_array) == 0:
             return
 
         marker = Marker()
@@ -54,9 +50,9 @@ class RvizContourPoint(Node):
         marker.type = Marker.POINTS
         marker.action = Marker.ADD
         marker.pose.orientation.w = 1.0
-        marker.points = points
+        marker.points = point_array
 
-        if len(points) == 1:
+        if len(point_array) == 1:
             marker.scale.x = 0.9
             marker.scale.y = 0.9  
             marker.color.r = 1.0

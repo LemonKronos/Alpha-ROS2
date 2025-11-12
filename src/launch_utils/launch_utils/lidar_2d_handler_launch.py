@@ -16,4 +16,18 @@ def generate_launch_description():
             arguments=['0', '0', '0', '0', '0', '0',
                        'base_link', 'x500_lidar_2d_0/link/lidar_2d_v2'],
         ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour',
+            name='rviz_contour',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour_points',
+            name='rviz_contour_points',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
     ])

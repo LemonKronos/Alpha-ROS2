@@ -2,7 +2,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/header.hpp"
-#include "global_utils/global.hpp"
+#include "global_utils/surrounding.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h" // Moody Camel MPMC Queue with wait blocking
 #include "px4_msgs/msg/vehicle_local_position.hpp"

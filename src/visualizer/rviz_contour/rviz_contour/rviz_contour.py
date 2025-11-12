@@ -6,6 +6,7 @@ from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 from ros2_msgs.msg import Lidar2dObstacle
+from rclpy.qos import qos_profile_sensor_data
 
 
 class RvizContour(Node):
@@ -31,53 +32,46 @@ class RvizContour(Node):
         """
         publisher = self.create_publisher(MarkerArray, pub_topic, 10)
         callback = lambda msg, pub=publisher, ns=name: self._contour_callback(msg, pub, ns)
-        self.create_subscription(Lidar2dObstacle, sub_topic, callback, 10)
+        self.create_subscription(Lidar2dObstacle, sub_topic, callback, qos_profile_sensor_data)
 
     def _contour_callback(self, msg, publisher, ns):
-        data = msg.pointarray
-        if len(data) < 2:
-            return
-
         marker_array = MarkerArray()
-        points = []
         sum_point = 0
         min_marker_points = 2000
         num_single = 0
         index = 0
-        for i in range(0, len(data) - 1, 2):
-            arc = data[i]        # angle in radians
-            distance = data[i+1] # distance (meters)
-            if arc != 69 and distance != 0:
-                x = distance * math.cos(arc)
-                y = distance * math.sin(arc)
-                points.append(Point(x=float(x), y=float(y), z=0.0))
-            else:
-                marker = Marker()
-                marker.header.frame_id = "base_link"
-                marker.header.stamp = self.get_clock().now().to_msg()
-                marker.ns = ns
-                marker.id = index
-                index += 1
-                marker.type = Marker.LINE_STRIP
-                marker.action = Marker.ADD
-                marker.pose.orientation.w = 1.0
-                marker.points = points
+        obstacles = msg.obstacles
+        for sector in obstacles:
+            point_array = []
+            for contour in sector.contours:
+                for point in contour.points:
+                    point_array.append(Point(x=point.x, y=point.y, z=0.0))
+                
+            marker = Marker()
+            marker.header.frame_id = "base_link"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = ns
+            marker.id = index
+            index += 1
+            marker.type = Marker.LINE_STRIP
+            marker.action = Marker.ADD
+            marker.pose.orientation.w = 1.0
+            marker.points = point_array
 
 
-                if len(points) <= min_marker_points:
-                    if len(points) == 1:
-                        num_single += 1
-                    min_marker_points = len(points)
- 
-                marker.color.r, marker.color.g, marker.color.b = self.giveColor(ns)
-                marker.scale.x = 0.3
-                marker.scale.y = 0.3
+            if len(point_array) <= min_marker_points:
+                if len(point_array) == 1:
+                    num_single += 1
+                min_marker_points = len(point_array)
 
-                marker.color.a = 1.0
-                marker_array.markers.append(marker)
+            marker.color.r, marker.color.g, marker.color.b = self.giveColor(ns)
+            marker.scale.x = 0.3
+            marker.scale.y = 0.3
 
-                sum_point += len(points)
-                points = []
+            marker.color.a = 1.0
+            marker_array.markers.append(marker)
+
+            sum_point += len(point_array)
 
         publisher.publish(marker_array)
         self.get_logger().info(f"Published {len(marker_array.markers)} {ns} obstacle contours, combine {sum_point} points.\n"
