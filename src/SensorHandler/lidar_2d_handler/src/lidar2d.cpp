@@ -198,7 +198,7 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
     rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
     const std::string& publish_dir,
     const std::string& label) {
-    Sector sector;
+    Obstacle obstacle;
     Contour contour;
     uint8_t sector_now = 0, sector_before = 0;
     #if DEBUG_POINT
@@ -218,16 +218,16 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
         #endif
         if(checkPublishSignal(entry)) { // Producer finish!
             if(!contour.empty()) {
-                sector.addContour(sector_before, contour);
+                obstacle.addContour(sector_before, contour);
                 contour = Contour();
             }
-            if(sector.getObstaclesNum() > 0) publishData(pub, sector, label);
-            sector = Sector(); // New scan
+            if(obstacle.getObstaclesNum() > 0) publishData(pub, obstacle, label);
+            obstacle = Obstacle(); // New scan
             new_scan = true;
         }
         else {
             if(entry.distance != CLEAR) { // There are contour
-                sector_now = sector.angleToSector(entry.arc);
+                sector_now = obstacle.angleToSector(entry.arc);
                 if(!new_scan && sector_before != sector_now) {
                     if(!contour.empty()) {
                         #if DEBUG_POINT
@@ -239,7 +239,7 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
                         );
                         printf("Obstacle ended with %ld points\n", contour.getContour().size());
                         #endif
-                        sector.addContour(sector_before, contour);
+                        obstacle.addContour(sector_before, contour);
                         contour = Contour();
                     }
                 }
@@ -270,7 +270,7 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
                     if(cz > 1) printf("Obstacle ended in sector %d with %d point\n", sector_before, cz);
                     else printf(YELLOW "Obstacle ended in sector %d with %d point\n" RESET, sector_before, cz);
                     #endif
-                    sector.addContour(sector_before, contour);
+                    obstacle.addContour(sector_before, contour);
                     contour = Contour();
                 }
             }
@@ -284,18 +284,18 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
  * vector float = [(arc1 distance1 float2 distance2 ... )], each contour end by END_TOKEN (69, 0).
  */
 void Lidar2dHandlerNode::publishData(rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
-    Sector& sector,
+    Obstacle& obstacle,
     const std::string& label) {
-    if(sector.getObstaclesNum() == 0) return;
-    std::vector<ros2_msgs::msg::Lidar2dSector> obstacles = sector.obstacleToTopic();
+    if(obstacle.getObstaclesNum() == 0) return;
+    std::vector<ros2_msgs::msg::Lidar2dSector> obstacles = obstacle.obstacleToTopic();
     if(obstacles.empty()) return;
 
     // Move obstacles to msg and publish
     auto msg = ros2_msgs::msg::Lidar2dObstacle();
     msg.header.stamp = this->get_clock()->now();
     msg.header.frame_id = "base_link";
-    msg.obstacles_num = sector.getObstaclesNum();
+    msg.obstacles_num = obstacle.getObstaclesNum();
     msg.obstacles = obstacles;
     pub->publish(msg);
-    RCLCPP_INFO(this->get_logger(), GREEN "Publish topic %s: %d Obstacle." RESET,label.c_str(), sector.getObstaclesNum());
+    RCLCPP_INFO(this->get_logger(), GREEN "Publish topic %s: %d Obstacle." RESET,label.c_str(), obstacle.getObstaclesNum());
 }

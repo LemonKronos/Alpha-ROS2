@@ -48,7 +48,7 @@ private:
     std::atomic<rcl_time_point_value_t> last_timestamp{0};
     Point movement_current = {0, 0.5, 0, 0}; // forward, safe bubble 0.5 meter
     std::mutex mutex_movement;
-    Sector method_sector;
+    Obstacle method_sector;
     
     // Sensor specs
     bool init_sensor_specs = true;
@@ -68,9 +68,9 @@ private:
     void sendPublishSignal(moodycamel::BlockingConcurrentQueue<Point>& queue);
     bool checkPublishSignal(const Point& point);
     void publishData(rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
-        Sector& sector,
+        Obstacle& obstacle,
         const std::string& label
-    ); // If Sector empty then no publish
+    ); // If Obstacle empty then no publish
 
     // Callbacks
     void ScanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
