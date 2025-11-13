@@ -243,14 +243,14 @@ class PygameControlNode:
                 msg.control_state = True
 
                 # We'll set them to 0.0 here. If you prefer mapping, change below.
-                # msg.roll = 0.0  # rad/s
-                msg.roll = float(clamp(right_m_s))
+                msg.roll = 0.0  # rad/s
+                # msg.roll = float(clamp(right_m_s))
                 msg.pitch = 0.0  # rad/s
                 msg.yaw = float(clamp(yaw_rad_s))
 
                 # Linear velocities (m/s)
                 msg.forward = float(clamp(forward_m_s))
-                # msg.right = float(clamp(right_m_s))
+                msg.right = float(clamp(right_m_s))
                 msg.down = float(clamp(down_m_s))
 
                 # wings mode left unchanged by UI
@@ -312,10 +312,9 @@ def main():
     try:
         pm.run()
     except KeyboardInterrupt:
-        node.get_logger().info("KeyboardInterrupt, shutting down")
+        pass  # Silence Ctrl+C
     finally:
         node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == "__main__":

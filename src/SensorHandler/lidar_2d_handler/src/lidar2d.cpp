@@ -288,15 +288,11 @@ void Lidar2dHandlerNode::publishData(rclcpp::Publisher<ros2_msgs::msg::Lidar2dOb
     Obstacle& obstacle,
     const std::string& label) {
     if(obstacle.getObstaclesNum() == 0) return;
-    std::vector<ros2_msgs::msg::Lidar2dSector> obstacles = obstacle.obstacleToTopic();
-    if(obstacles.empty()) return;
 
     // Move obstacles to msg and publish
-    auto msg = ros2_msgs::msg::Lidar2dObstacle();
+    auto msg = obstacle.obstacleToTopic();
     msg.header.stamp = this->get_clock()->now();
     msg.header.frame_id = "base_link";
-    msg.obstacles_num = obstacle.getObstaclesNum();
-    msg.obstacles = obstacles;
     pub->publish(msg);
     RCLCPP_INFO(this->get_logger(), GREEN "Publish topic %s: %d Obstacle." RESET,label.c_str(), obstacle.getObstaclesNum());
 }

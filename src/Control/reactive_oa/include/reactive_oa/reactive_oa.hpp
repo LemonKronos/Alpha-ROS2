@@ -8,6 +8,11 @@
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
 #include "ros2_msgs/msg/fuse_perception.hpp"
 
+#define VISUALIZE 1
+#ifdef VISUALIZE
+    #include <visualization_msgs/msg/marker.hpp>
+#endif
+
 #include <Eigen/Dense>
 
 using std::placeholders::_1;
@@ -19,6 +24,12 @@ public:
 private:
     // Publisher
     rclcpp::Publisher<ros2_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
+    #ifdef VISUALIZE
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr repulsive_vec_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr correction_vec_PUB;
+    #endif
 
     // Subscriber
     rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
@@ -28,20 +39,33 @@ private:
     // Stored data
     ros2_msgs::msg::ControlInterface::SharedPtr last_input_control = nullptr;
     ros2_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
-    Eigen::Vector3f control_vec; // body frame
-    Eigen::Vector3f control_angular_vec; // body frame
-
+    
     // Variables
     bool last_input = true;
     bool obstacle_encountered = false;
     Obstacle obstacle;
-    Eigen::Vector3f avoidance_vec;
+    Eigen::Vector3f control_vec;
+    Eigen::Vector3f control_angular_vec;
+    Eigen::Vector3f movement_vec;
+    Eigen::Vector3f movement_angular_vec;
+    Eigen::Vector3f repulsive_vec;
+    Eigen::Vector3f correction_vec;
     float safe_distance = HAZARD_DISTANCE;
+    float speed_2d = 0.0f;
 
     // Methods
-    void computeAvoidanceVector();
+    void computeControlVector();
     void computeMovementVector();
+    void computeRepulsiveVector();
+    void computeCorrectionVector();
     void computeSafeDistance();
+    #ifdef VISUALIZE
+        void publishVectorArrow(
+            const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
+            const Eigen::Vector3f& vec,
+            float r, float g, float b
+        );
+    #endif
 
     // Timer
     rclcpp::TimerBase::SharedPtr node_loop_TIME;

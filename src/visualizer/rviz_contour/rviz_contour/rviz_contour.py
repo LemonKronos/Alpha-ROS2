@@ -94,10 +94,12 @@ class RvizContour(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = RvizContour()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass  # Silence Ctrl+C
+    finally:
+        node.destroy_node()
 
 if __name__ == '__main__':
     main()

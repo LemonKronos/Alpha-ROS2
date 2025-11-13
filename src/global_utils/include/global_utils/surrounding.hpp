@@ -76,8 +76,8 @@ public:
     Point origin = {0, 0, 0, 0};
 
     Obstacle();
-    void topicToObstacle(const std::vector<ros2_msgs::msg::Lidar2dSector>& obstacle);
-    std::vector<ros2_msgs::msg::Lidar2dSector> obstacleToTopic();
+    void topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
+    ros2_msgs::msg::Lidar2dObstacle obstacleToTopic();
     void addContour(const uint8_t& sector_index, Contour& new_contour);
     uint8_t angleToSector(float angle);
     void sectorItoratorInit(const uint8_t& start_index);
@@ -89,7 +89,7 @@ public:
     float getAngleStartSector(const uint8_t& index);
     float getAngleEndSector(const uint8_t& index);
     float getMinDistanceSector(const uint8_t& index);
-    std::vector<Contour> getObstacles(const uint8_t& index);
+    std::vector<Contour> getContours(const uint8_t& index);
 
 private:
     Sector sector[SECTOR_NUM];

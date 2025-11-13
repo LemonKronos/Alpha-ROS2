@@ -174,26 +174,27 @@ Obstacle::Obstacle() {
         sector[i].sector_angle_start = floor(angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC * (i - 1)) * 1e6) / 1e6;
         sector[i].sector_angle_stop = floor(angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC* i) * 1e6) / 1e6;
     }
-    sector->min_distance = 0;
 }
 
-void Obstacle::topicToObstacle(const std::vector<ros2_msgs::msg::Lidar2dSector>& obstacle) {
+void Obstacle::topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
     // clear all sectors
     for (auto& s : sector)
         s.contours.clear();
 
+    obstacles_num = msg->obstacles_num;
+    min_distance = msg->min_distance;
+
+    const auto& obstacle = msg->obstacles;
     for (const auto& msg_sector : obstacle) {
         if (msg_sector.sector_index >= SECTOR_NUM)
             continue;  // invalid index
 
         auto& internal_sector = sector[msg_sector.sector_index];
-        internal_sector.sector_angle_start = msg_sector.start_angle;
-        internal_sector.sector_angle_stop = msg_sector.end_angle;
         internal_sector.min_distance = msg_sector.min_distance;
 
         for (const auto& msg_contour : msg_sector.contours) {
             Contour contour;
-            contour.setMinDistance(msg_contour.min_distance);
+            // Not contain contour min_distance to reduce data size
             for (const auto& msg_point : msg_contour.points) {
                 Point point;
                 point.arc = msg_point.arc;
@@ -207,19 +208,22 @@ void Obstacle::topicToObstacle(const std::vector<ros2_msgs::msg::Lidar2dSector>&
     }
 }
 
-std::vector<ros2_msgs::msg::Lidar2dSector> Obstacle::obstacleToTopic() {
-    std::vector<ros2_msgs::msg::Lidar2dSector> obstacle;
+ros2_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
+    auto msg = ros2_msgs::msg::Lidar2dObstacle();
+    msg.obstacles_num = this->obstacles_num;
+    msg.min_distance = this->min_distance;
 
+    std::vector<ros2_msgs::msg::Lidar2dSector> obstacles;
     for(uint8_t sector_index = 0; sector_index < SECTOR_NUM; sector_index++) {
+        if(sector[sector_index].contours.empty()) continue;
+
         auto s = ros2_msgs::msg::Lidar2dSector();
         s.sector_index = sector_index;
-        s.start_angle = sector[sector_index].sector_angle_start;
-        s.end_angle = sector[sector_index].sector_angle_stop;
         s.min_distance = sector[sector_index].min_distance;
 
         for(Contour contour : sector[sector_index].contours) {
             auto c = ros2_msgs::msg::Lidar2dContour();
-            c.min_distance = contour.getMinDistance();
+            // Not keep contour min_distance to reduce data size
             for(Point point : contour.getContour()) {
                 auto p = ros2_msgs::msg::Lidar2dPoint();
                 p.arc = point.arc;
@@ -230,9 +234,10 @@ std::vector<ros2_msgs::msg::Lidar2dSector> Obstacle::obstacleToTopic() {
             }
             s.contours.push_back(c);
         }
-        obstacle.push_back(s);
+        obstacles.push_back(s);
     }
-    return obstacle;
+    msg.obstacles = obstacles;
+    return msg;
 }
 
 void Obstacle::addContour(const uint8_t& sector_index, Contour& new_contour) {
@@ -296,7 +301,7 @@ uint8_t Obstacle::sectorItoratorNext() {
     return static_cast<uint8_t>(temp);
 }
 
-std::vector<Contour> Obstacle::getObstacles(const uint8_t& index) {
+std::vector<Contour> Obstacle::getContours(const uint8_t& index) {
     return this->sector[index].contours;
 }
 

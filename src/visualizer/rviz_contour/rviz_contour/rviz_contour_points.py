@@ -70,11 +70,14 @@ class RvizContourPoint(Node):
 
 
 def main(args=None):
-        rclpy.init(args=args)
-        node = RvizContourPoint()
+    rclpy.init(args=args)
+    node = RvizContourPoint()
+    try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass  # Silence Ctrl+C
+    finally:
         node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':
