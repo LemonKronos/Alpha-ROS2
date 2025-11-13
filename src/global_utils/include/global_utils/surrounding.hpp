@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+#include "global_utils/system_config.hpp"
 
 #include <vector>
 #include <cstdint>
@@ -10,15 +11,6 @@
 /* ######################################## Constant */
 constexpr uint8_t SECTOR_NUM = 12;
 constexpr float SECTOR_ARC = 2 * M_PI / SECTOR_NUM;
-constexpr float DEGREE = 0.017453292f;
-
-// Need real data or tinkering
-constexpr float SELF_RADIUS = 0.23f; // radius in meter
-constexpr float UNCERTAINTY = 0.01f;
-constexpr float HAZARD_DISTANCE = SELF_RADIUS + UNCERTAINTY;
-constexpr float REACT_TIME = 0.03f; // ms
-constexpr float DECELERATE_MAX = 4.0f; // m/s^2
-constexpr float SAFE_BUFFER = 0.01f;
 
 /* ########################################## Function*/
 float angleInWrapped(float angle);
@@ -86,13 +78,14 @@ public:
     Obstacle();
     void topicToObstacle(const std::vector<ros2_msgs::msg::Lidar2dSector>& obstacle);
     std::vector<ros2_msgs::msg::Lidar2dSector> obstacleToTopic();
-    void addContour(const uint8_t& sector_index, Contour& new_obstacle);
+    void addContour(const uint8_t& sector_index, Contour& new_contour);
     uint8_t angleToSector(float angle);
     void sectorItoratorInit(const uint8_t& start_index);
     uint8_t sectorItoratorNext();
 
     // get methods
     uint16_t getObstaclesNum();
+    float getMinDistance();
     float getAngleStartSector(const uint8_t& index);
     float getAngleEndSector(const uint8_t& index);
     float getMinDistanceSector(const uint8_t& index);
@@ -101,6 +94,7 @@ public:
 private:
     Sector sector[SECTOR_NUM];
     uint16_t obstacles_num = 0;
+    float min_distance = FLT_MAX;
     uint8_t sector_iterator;
 
     // Helper

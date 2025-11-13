@@ -115,27 +115,27 @@ void FusePerceptionNode::PublishCallback() {
     }
 
     // Obstacle close
-    if(last_close_contour != nullptr) {
-        msg.num_close = last_close_contour->obstacles_num;
-        msg.close_contour_around = last_close_contour->pointarray;
+    if(last_close_obstacle != nullptr) {
+        msg.num_close = last_close_obstacle->obstacles_num;
+        msg.close_obstacles = last_close_obstacle->obstacles;
 
-        last_close_contour = nullptr;
+        last_close_obstacle = nullptr;
     }
     else {
         msg.num_close = 0;
-        msg.close_contour_around.clear();
+        msg.close_obstacles.clear();
     }
 
     // Obstacle far
-    if(last_far_contour != nullptr) {
-        msg.num_far = last_far_contour->obstacles_num;
-        msg.far_contour_around = last_far_contour->pointarray;
+    if(last_far_obstacle != nullptr) {
+        msg.num_far = last_far_obstacle->obstacles_num;
+        msg.far_obstacles = last_far_obstacle->obstacles;
 
-        last_far_contour = nullptr;
+        last_far_obstacle = nullptr;
     }
     else {
         msg.num_far = 0;
-        msg.far_contour_around.clear();
+        msg.far_obstacles.clear();
     }
 
     // Depth camera
@@ -179,11 +179,11 @@ void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::Sha
 }
 
 void FusePerceptionNode::CloseContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
-    last_close_contour = msg;
+    last_close_obstacle = msg;
 }
 
 void FusePerceptionNode::FarContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
-    last_far_contour = msg;
+    last_far_obstacle = msg;
 }
 
 void FusePerceptionNode::DepthCamCallback(const sensor_msgs::msg::Image::SharedPtr msg) {

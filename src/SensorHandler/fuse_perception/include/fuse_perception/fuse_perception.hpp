@@ -35,8 +35,8 @@ private:
     px4_msgs::msg::VehicleOdometry::SharedPtr last_odo = nullptr;
     ros2_msgs::msg::ContactSensor::SharedPtr last_contact = nullptr;
     sensor_msgs::msg::LaserScan::SharedPtr last_scan_down = nullptr;
-    ros2_msgs::msg::Lidar2dObstacle::SharedPtr last_close_contour = nullptr;
-    ros2_msgs::msg::Lidar2dObstacle::SharedPtr last_far_contour = nullptr;
+    ros2_msgs::msg::Lidar2dObstacle::SharedPtr last_close_obstacle = nullptr;
+    ros2_msgs::msg::Lidar2dObstacle::SharedPtr last_far_obstacle = nullptr;
     sensor_msgs::msg::Image::SharedPtr last_depth_cam = nullptr;
     sensor_msgs::msg::Image::SharedPtr last_rgb_cam = nullptr;
 

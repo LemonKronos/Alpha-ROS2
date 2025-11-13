@@ -69,8 +69,8 @@ void ContactParserNode::PublisherCallback() {
 
         contact_PUB->publish(msg);
 
-        if(current_critical) RCLCPP_INFO(this->get_logger(), RED "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
-        else if(current_bearable) RCLCPP_INFO(this->get_logger(), YELLOW "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
+        if(current_critical) RCLCPP_WARN(this->get_logger(), RED "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
+        else if(current_bearable) RCLCPP_WARN(this->get_logger(), YELLOW "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
         else RCLCPP_INFO(this->get_logger(), BLUE "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
 
         last_bearable = current_bearable;

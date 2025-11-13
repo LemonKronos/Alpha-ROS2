@@ -235,13 +235,17 @@ std::vector<ros2_msgs::msg::Lidar2dSector> Obstacle::obstacleToTopic() {
     return obstacle;
 }
 
-void Obstacle::addContour(const uint8_t& sector_index, Contour& new_obstacle) {
-    if(new_obstacle.empty()) return;
-    sector[sector_index].contours.push_back(new_obstacle);
+void Obstacle::addContour(const uint8_t& sector_index, Contour& new_contour) {
+    if(new_contour.empty()) return;
+    sector[sector_index].contours.push_back(new_contour);
     obstacles_num++;
     sector[sector_index].min_distance = std::min(
         sector[sector_index].min_distance, 
         sector[sector_index].contours.back().getMinDistance()
+    );
+    min_distance = std::min(
+        min_distance,
+        sector[sector_index].min_distance
     );
 }
 
@@ -253,6 +257,10 @@ uint8_t Obstacle::angleToSector(float angle) {
 
 uint16_t Obstacle::getObstaclesNum() {
     return obstacles_num;
+}
+
+float Obstacle::getMinDistance() {
+    return min_distance;
 }
 
 float Obstacle::getAngleStartSector(const uint8_t& index) {

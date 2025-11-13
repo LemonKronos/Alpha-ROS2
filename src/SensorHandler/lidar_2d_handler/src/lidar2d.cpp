@@ -187,6 +187,7 @@ bool Lidar2dHandlerNode::checkPublishSignal(const Point& point) {
     if(point.arc == END_TOKEN.arc && point.distance == END_TOKEN.distance) return true;
     return false;
 }
+
 void Lidar2dHandlerNode::sendPublishSignal(moodycamel::BlockingConcurrentQueue<Point>& queue) {
     queue.enqueue(END_TOKEN);
 }

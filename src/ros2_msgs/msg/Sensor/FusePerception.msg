@@ -31,8 +31,8 @@ float32 below_distance
 # Lidar around contour
 uint16 num_close    # Number of close contours
 uint16 num_far      # Number of far contours
-float32[] close_contour_around # Close obstacles Sector contours
-float32[] far_contour_around   # Far obstacles Sector contours
+ros2_msgs/Lidar2dSector[] close_obstacles
+ros2_msgs/Lidar2dSector[] far_obstacles
 
 # Depth camera front
 sensor_msgs/Image depth_cam_front
