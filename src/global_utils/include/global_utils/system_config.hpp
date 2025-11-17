@@ -15,7 +15,6 @@ constexpr float SPEED_MAX_BACKWARD_FW = 5.0f;
 constexpr float SPEED_MAX_STRAFE = 8.0f;
 constexpr float SPEED_MAX_UP_FW = 5.0f;
 constexpr float SPEED_MAX_DOWN_FW = 2.0f;
-constexpr float SPEED_MAX_2D = 8.0f;
 constexpr float THRUST_SAFE_LIMIT = 0.8f;
 constexpr float HOVER_THRUST = -0.5f;
 
@@ -23,7 +22,7 @@ constexpr float DEGREE = 0.017453292f;
 
 // Need real data or tinkering
 constexpr float SELF_RADIUS = 1.2f; // radius in meter
-constexpr float UNCERTAINTY = 2.05f; // Buff up for testing
+constexpr float UNCERTAINTY = 0.05f;
 constexpr float HAZARD_DISTANCE = SELF_RADIUS + UNCERTAINTY;
 constexpr float REACT_TIME = 0.03f; // ms
 constexpr float DECELERATE_MAX = 4.0f; // m/s^2

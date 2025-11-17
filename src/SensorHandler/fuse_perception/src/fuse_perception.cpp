@@ -25,18 +25,6 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
         std::bind(&FusePerceptionNode::ScanDownCallback, this, _1)
     );
 
-    contour_close_SUB = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        "/on_drone/sensor/scan/lidar2d/close",
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::CloseContourCallback, this, _1)
-    );
-
-    contour_far_SUB = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        "/on_drone/sensor/scan/lidar2d/far",
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::FarContourCallback, this, _1)
-    );
-
     depth_cam_SUB =  this->create_subscription<sensor_msgs::msg::Image>(
         "sensor/depth_cam/image",
         rclcpp::SensorDataQoS(),
@@ -114,30 +102,6 @@ void FusePerceptionNode::PublishCallback() {
         msg.below_distance = NO_DATA_f;
     }
 
-    // Obstacle close
-    if(last_close_obstacle != nullptr) {
-        msg.num_close = last_close_obstacle->obstacles_num;
-        msg.close_obstacles = last_close_obstacle->obstacles;
-
-        last_close_obstacle = nullptr;
-    }
-    else {
-        msg.num_close = 0;
-        msg.close_obstacles.clear();
-    }
-
-    // Obstacle far
-    if(last_far_obstacle != nullptr) {
-        msg.num_far = last_far_obstacle->obstacles_num;
-        msg.far_obstacles = last_far_obstacle->obstacles;
-
-        last_far_obstacle = nullptr;
-    }
-    else {
-        msg.num_far = 0;
-        msg.far_obstacles.clear();
-    }
-
     // Depth camera
     if(last_depth_cam != nullptr) {
         msg.depth_cam_front = *last_depth_cam;
@@ -176,14 +140,6 @@ void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::Sh
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
-}
-
-void FusePerceptionNode::CloseContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
-    last_close_obstacle = msg;
-}
-
-void FusePerceptionNode::FarContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
-    last_far_obstacle = msg;
 }
 
 void FusePerceptionNode::DepthCamCallback(const sensor_msgs::msg::Image::SharedPtr msg) {

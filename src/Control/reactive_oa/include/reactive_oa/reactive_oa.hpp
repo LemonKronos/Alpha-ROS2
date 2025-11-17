@@ -17,6 +17,8 @@
 
 using std::placeholders::_1;
 
+constexpr uint8_t OBSTACLE_CLEAR_COUNT_THRESHOLD = 6;
+
 class ReactiveOANode : public rclcpp::Node{
 public:
     ReactiveOANode();
@@ -50,15 +52,16 @@ private:
     Eigen::Vector3f movement_angular_vec;
     Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f correction_vec;
+    Eigen::Vector3f correction_angular_vec;
     float safe_distance = HAZARD_DISTANCE;
-    float speed_2d = 0.0f;
+    uint8_t obstacle_clear_counter = 0;
 
     // Methods
     void computeControlVector();
     void computeMovementVector();
     void computeRepulsiveVector();
     void computeCorrectionVector();
-    void computeSafeDistance();
+    void resetVectors();
     #ifdef VISUALIZE
         void publishVectorArrow(
             const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,

@@ -76,6 +76,7 @@ public:
     Point origin = {0, 0, 0, 0};
 
     Obstacle();
+    float safe_distance = FLT_MAX;
     void topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
     ros2_msgs::msg::Lidar2dObstacle obstacleToTopic();
     void addContour(const uint8_t& sector_index, Contour& new_contour);

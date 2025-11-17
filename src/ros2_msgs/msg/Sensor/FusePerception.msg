@@ -28,12 +28,6 @@ bool critical_contact
 # Lidar down
 float32 below_distance
 
-# Lidar around contour
-uint16 num_close    # Number of close contours
-uint16 num_far      # Number of far contours
-ros2_msgs/Lidar2dSector[] close_obstacles
-ros2_msgs/Lidar2dSector[] far_obstacles
-
 # Depth camera front
 sensor_msgs/Image depth_cam_front
 

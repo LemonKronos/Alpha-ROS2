@@ -35,6 +35,14 @@ class RvizContour(Node):
         self.create_subscription(Lidar2dObstacle, sub_topic, callback, qos_profile_sensor_data)
 
     def _contour_callback(self, msg, publisher, ns):
+        # Clear all markers first
+        clear_array = MarkerArray()
+        clear_marker = Marker()
+        clear_marker.header.stamp = self.get_clock().now().to_msg()
+        clear_marker.action = Marker.DELETEALL
+        clear_array.markers.append(clear_marker)
+        publisher.publish(clear_array)
+
         marker_array = MarkerArray()
         sum_point = 0
         min_marker_points = 2000

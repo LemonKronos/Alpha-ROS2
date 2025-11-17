@@ -183,6 +183,7 @@ void Obstacle::topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr 
 
     obstacles_num = msg->obstacles_num;
     min_distance = msg->min_distance;
+    safe_distance = msg->safe_distance;
 
     const auto& obstacle = msg->obstacles;
     for (const auto& msg_sector : obstacle) {
@@ -212,6 +213,7 @@ ros2_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
     auto msg = ros2_msgs::msg::Lidar2dObstacle();
     msg.obstacles_num = this->obstacles_num;
     msg.min_distance = this->min_distance;
+    msg.safe_distance = this->safe_distance;
 
     std::vector<ros2_msgs::msg::Lidar2dSector> obstacles;
     for(uint8_t sector_index = 0; sector_index < SECTOR_NUM; sector_index++) {

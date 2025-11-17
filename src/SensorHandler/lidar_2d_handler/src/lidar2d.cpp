@@ -227,6 +227,10 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
             new_scan = true;
         }
         else {
+            if(new_scan) {
+                std::lock_guard<std::mutex> lock(mutex_movement);
+                obstacle.safe_distance = movement_current.distance;
+            }
             if(entry.distance != CLEAR) { // There are contour
                 sector_now = obstacle.angleToSector(entry.arc);
                 if(!new_scan && sector_before != sector_now) {
