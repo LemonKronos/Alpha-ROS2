@@ -6,87 +6,6 @@
 #include <csignal>
 #endif
 
-/* ########################################## Function*/
-float angleInWrapped(float angle) {
-    while(angle < -M_PI) angle += 2*M_PI;
-    while(angle > M_PI) angle -= 2*M_PI;
-    return angle;
-}
-
-float angleInPolar(float angle) {
-    while(angle < 0) angle += 2*M_PI;
-    while(angle > 2*M_PI) angle -=2*M_PI;
-    return angle;
-}
-
-template <typename T>
-T linearMap(const T& input, 
-    const T& in_min, const T& in_max, 
-    const T& out_min, const T& out_max
-) {
-    if(in_min == in_max) return (out_max - out_min)/2;
-    else if(in_min < in_max) {
-        T ratio = (input - in_min) / (in_max - in_min);
-        if(ratio < 0) ratio = 0;
-        if(ratio > 1) ratio = 1;
-        return out_min + ratio*(out_max - out_min);
-    }
-    else {
-        T ratio = (input - in_max) / (in_min - in_max);
-        if(ratio < 0) ratio = 0;
-        if(ratio > 1) ratio = 1;
-        return out_min + (1 - ratio)*(out_max - out_min);
-    }
-}
-
-template <typename T>
-T duoLinearMap(
-    const T& inA, const T& inA_min, const T& inA_max,
-    const T& inB, const T& inB_min, const T& inB_max,
-    const T& out_min, const T& out_max  
-) {
-    auto normalize = [](T x, T minv, T maxv) {
-        if (minv == maxv) return T(0);  // Avoid division-by-zero
-
-        // If inverted range: swap interpolation direction
-        if (minv < maxv) {
-            return (x - minv) / (maxv - minv);  // normal
-        } else {
-            return (minv - x) / (minv - maxv);  // inverted
-        }
-    };
-
-    T scaleA = normalize(inA, inA_min, inA_max);
-    T scaleB = normalize(inB, inB_min, inB_max);
-
-    // Clamp to [0, 1]
-    if (scaleA < 0) scaleA = 0; else if (scaleA > 1) scaleA = 1;
-    if (scaleB < 0) scaleB = 0; else if (scaleB > 1) scaleB = 1;
-
-    T ratio = scaleA * scaleB;
-
-#if DEBUG
-    printf("scaleA = %f, scaleB = %f, ratio = %f\n",
-           (double)scaleA, (double)scaleB, (double)ratio);
-#endif
-
-    return out_min + ratio * (out_max - out_min);
-}
-
-
-template <typename T>
-T expoMap(const T& input, const T& in_min, const T& in_max, const T& out_min, const T& out_max, const T& sensitivity) {
-    if (in_max <= in_min)
-        return out_min;
-
-    T ratio = (input - in_min) / (in_max - in_min);
-    if(ratio < 0) ratio = 0;
-    if(ratio > 1) ratio = 1;
-
-    T expo_ratio = pow(ratio, sensitivity);
-    return out_min + expo_ratio * (out_max - out_min);
-}
-
 // ##################################### Class Contour
 Contour::Contour() {
     points.clear();
@@ -126,15 +45,15 @@ bool Contour::empty() {
 bool Contour::makeStraightLine(const Point& point) {
     const int cz = points.size();
     if(cz <= 1) return true;
-    const float &x1 = points[cz - 2].x;
-    const float &y1 = points[cz - 2].y;
-    const float &x2 = points.back().x;
-    const float &y2 = points.back().y;
-    const float &x3 = point.x;
-    const float &y3 = point.y;
+    const float x1 = points[cz - 2].x;
+    const float y1 = points[cz - 2].y;
+    const float x2 = points.back().x;
+    const float y2 = points.back().y;
+    const float x3 = point.x;
+    const float y3 = point.y;
     const float derivate = fabs((y3 - y2)*(x2 - x1) - (y2 - y1)*(x3 - x2));
 
-    const float threshold = linearMap(
+    const float threshold = math_utils::linearMap(
         point.distance, 0.01f, 30.0f,
         0.017455f, 0.176327f
     );
@@ -171,8 +90,8 @@ Obstacle::Obstacle() {
     sector[0].sector_angle_start = -SECTOR_ARC/2;
     sector[0].sector_angle_stop = SECTOR_ARC/2;
     for(uint8_t i = 1; i < SECTOR_NUM; i++) {
-        sector[i].sector_angle_start = floor(angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC * (i - 1)) * 1e6) / 1e6;
-        sector[i].sector_angle_stop = floor(angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC* i) * 1e6) / 1e6;
+        sector[i].sector_angle_start = floor(math_utils::angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC * (i - 1)) * 1e6) / 1e6;
+        sector[i].sector_angle_stop = floor(math_utils::angleInWrapped(SECTOR_ARC/2 + SECTOR_ARC* i) * 1e6) / 1e6;
     }
 }
 
@@ -223,10 +142,10 @@ ros2_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
         s.sector_index = sector_index;
         s.min_distance = sector[sector_index].min_distance;
 
-        for(Contour contour : sector[sector_index].contours) {
+        for(const Contour& contour : sector[sector_index].contours) {
             auto c = ros2_msgs::msg::Lidar2dContour();
             // Not keep contour min_distance to reduce data size
-            for(Point point : contour.getContour()) {
+            for(const Point& point : contour.getContour()) {
                 auto p = ros2_msgs::msg::Lidar2dPoint();
                 p.arc = point.arc;
                 p.distance = point.distance;
@@ -257,7 +176,7 @@ void Obstacle::addContour(const uint8_t& sector_index, Contour& new_contour) {
 }
 
 uint8_t Obstacle::angleToSector(float angle) {
-    angle = angleInPolar(angle + SECTOR_ARC/2) + 0.0004f;
+    angle = math_utils::angleInPolar(angle + SECTOR_ARC/2) + 0.0004f;
     float result = floor(angle / SECTOR_ARC);
     return static_cast<uint8_t>(result) % SECTOR_NUM;
 }

@@ -52,15 +52,15 @@ ReactiveOANode::~ReactiveOANode(){}
 
 void ReactiveOANode::computeControlVector(){
     control_vec = Eigen::Vector3f(
-        last_input_control->forward * SPEED_MAX_FORWARD_FW,
-        last_input_control->right * SPEED_MAX_STRAFE,
+        last_input_control->forward * SPEED_MAX_FORWARD,
+        last_input_control->left * SPEED_MAX_STRAFE,
         0
     ); // body frame
 
     control_angular_vec = Eigen::Vector3f(
         last_input_control->roll,
         last_input_control->pitch,
-        0
+        last_input_control->yaw
     ); // body frame
 }
 
@@ -76,7 +76,7 @@ void ReactiveOANode::computeMovementVector(){
     movement_angular_vec = Eigen::Vector3f(
         last_perception->angular_velocity[0],
         last_perception->angular_velocity[1],
-        0
+        last_perception->angular_velocity[2]
     ); // world frame
     movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
@@ -95,7 +95,7 @@ void ReactiveOANode::computeRepulsiveVector(){
 
                 if(dist <= HAZARD_DISTANCE) { // Emergency very close obstacle
                     if(dist < SELF_RADIUS) continue; // Something wrong with data, ignore
-                    point_vec = point_vec.normalized() * SPEED_MAX_FORWARD_FW * 5.0f;
+                    point_vec = point_vec.normalized() * SPEED_MAX_FORWARD * 5.0f;
                     repulsive_vec += point_vec;
                     continue;
                 }
@@ -114,10 +114,10 @@ void ReactiveOANode::computeRepulsiveVector(){
     }
 
     // Scale repulsive vector based on control and movement magnitude
+    constexpr float E_TUNE = 0.67f;
     float control_magnitude = control_vec.head<2>().norm();
     float movement_magnitude = movement_vec.head<2>().norm();
     float scale = std::max(control_magnitude, movement_magnitude);
-    constexpr float E_TUNE = 0.67f;
     float min_escape_speed = (safe_distance - obstacle.getMinDistance()) * E_TUNE;
     if(scale < min_escape_speed) {
         repulsive_vec = repulsive_vec.normalized() * min_escape_speed;
@@ -139,7 +139,7 @@ void ReactiveOANode::computeCorrectionVector() {
 
     // Clamp correction vector to max speed
     correction_vec = Eigen::Vector3f(
-        std::clamp(correction_vec.x(), -SPEED_MAX_FORWARD_FW, SPEED_MAX_FORWARD_FW),
+        std::clamp(correction_vec.x(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
         std::clamp(correction_vec.y(), -SPEED_MAX_STRAFE, SPEED_MAX_STRAFE),
         0
     );
@@ -213,9 +213,9 @@ void ReactiveOANode::nodeLoopCallback() {
     }
     obstacle_encountered = false;
     
-    msg.forward = correction_vec.x() / SPEED_MAX_FORWARD_FW;
-    msg.right = correction_vec.y() / SPEED_MAX_STRAFE;
-    // msg.down = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
+    msg.forward = correction_vec.x() / SPEED_MAX_FORWARD;
+    msg.left = correction_vec.y() / SPEED_MAX_STRAFE;
+    // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
     if(last_input_control != nullptr) { // Still meaningful for changing mode, etc.
         if(!last_input) {
@@ -225,7 +225,7 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.roll = last_input_control->roll;
         msg.pitch = last_input_control->pitch;
         msg.yaw = last_input_control->yaw; // Still in 2D
-        msg.down = last_input_control->down; // Still in 2D
+        msg.up = last_input_control->up; // Still in 2D
         msg.wings_mode = last_input_control->wings_mode;
     }
     else {

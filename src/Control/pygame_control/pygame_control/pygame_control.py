@@ -126,10 +126,10 @@ class PygameControlNode:
                 offset_y = -joystick_radius
             elif keys[pygame.K_s] and not keys[pygame.K_w]:
                 offset_y = joystick_radius
-            if keys[pygame.K_q] and not keys[pygame.K_e]:
-                offset_x = -joystick_radius
-            elif keys[pygame.K_e] and not keys[pygame.K_q]:
+            if keys[pygame.K_e] and not keys[pygame.K_q]:
                 offset_x = joystick_radius
+            elif keys[pygame.K_q] and not keys[pygame.K_e]:
+                offset_x = -joystick_radius
             # Joystick position
             if offset_x != 0 or offset_y != 0:
                 length = (offset_x ** 2 + offset_y ** 2) ** 0.5
@@ -179,10 +179,10 @@ class PygameControlNode:
                 drone_slider1_x = hslider_target_x
 
             # Vertical slider (Space and Shift keys)
-            if keys[pygame.K_SPACE] and not (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]):
-                vslider_square_y = vslider_min_y
-            elif (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) and not keys[pygame.K_SPACE]:
+            if keys[pygame.K_LSHIFT] and not keys[pygame.K_SPACE]:
                 vslider_square_y = vslider_max_y
+            elif keys[pygame.K_SPACE] and not keys[pygame.K_LSHIFT]:
+                vslider_square_y = vslider_min_y
             else:
                 vslider_square_y = vslider_origin[1] - vslider_square_size // 2
             # Vertical indicator smoothing
@@ -246,20 +246,20 @@ class PygameControlNode:
                 msg.roll = 0.0  # rad/s
                 # msg.roll = float(clamp(right_m_s))
                 msg.pitch = 0.0  # rad/s
-                msg.yaw = float(clamp(yaw_rad_s))
+                msg.yaw = -float(clamp(yaw_rad_s)) # frame FLU temporary fix
 
                 # Linear velocities (m/s)
                 msg.forward = float(clamp(forward_m_s))
-                msg.right = float(clamp(right_m_s))
-                msg.down = float(clamp(down_m_s))
+                msg.left = -float(clamp(right_m_s)) # frame FLU temporary fix
+                msg.up = -float(clamp(down_m_s)) # frame FLU temporary fix
 
                 # wings mode left unchanged by UI
                 msg.wings_mode = UNCHANGE
 
                 # Publish
-                if MODULE_TEST:
+                if MODULE_TEST or False:
                     self.node.get_logger().info(
-                        f"[TEST] publish ControlInterface: forward={msg.forward:.2f} right={msg.right:.2f} down={msg.down:.2f} yaw={msg.yaw:.2f}"
+                        f"[TEST] publish ControlInterface: forward={msg.forward:.2f} left={msg.left:.2f} up={msg.up:.2f} yaw={msg.yaw:.2f}"
                     )
                 self.pub.publish(msg)
 

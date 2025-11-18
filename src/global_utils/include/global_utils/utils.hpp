@@ -21,7 +21,7 @@ constexpr float NO_DATA_d = std::numeric_limits<float>::quiet_NaN();
 
 /* ########################################## Function*/
 
-// All q in wxyz
+// All q in Eigen::Quaternionf
 namespace frame_utils {
     inline float angleInWrapped(float angle) {
         while(angle < -M_PI) angle += 2*M_PI;
@@ -47,7 +47,6 @@ namespace frame_utils {
 
         return q;
     }
-
     inline Eigen::Quaternionf eulerToQuaternion(const Eigen::Vector3f& rate) {
         Eigen::Matrix3f R;
         R = Eigen::AngleAxisf(rate.z(), Eigen::Vector3f::UnitZ())  // yaw
@@ -55,8 +54,6 @@ namespace frame_utils {
         * Eigen::AngleAxisf(rate.x(), Eigen::Vector3f::UnitX()); // roll
         return Eigen::Quaternionf(R);
     }
-
-
     inline Eigen::Quaternionf eulerToQuaternion(const std::array<float, 3>& rate) {
         return eulerToQuaternion(rate[0], rate[1], rate[2]);
     }
@@ -75,44 +72,78 @@ namespace frame_utils {
 
         return rate;
     }
-
-    // Returns Vector3f: roll (x), pitch (y), yaw (z) in radians
     inline Eigen::Vector3f quaternionToEuler(const std::array<float, 4>& q) {
         return quaternionToEuler(Eigen::Quaternionf(q[0], q[1], q[2], q[3]));
     }
-
-    // Returns Vector3f: roll (x), pitch (y), yaw (z) in radians
     inline Eigen::Vector3f quaternionToEuler(const float w, const float x, const float y, const float z) {
         return quaternionToEuler(Eigen::Quaternionf(w, x, y, z));
     }
 
-    // Return std::array<float, 3> north, east, depth
-    inline std::array<float, 3> frameFRDtoNED(const float forward, const float right, const float down, const float yaw_W) {
-        // 2D rotation by yaw_W (only horizontal plane)
-        float c = std::cos(yaw_W);
-        float s = std::sin(yaw_W);
-
-        float north = c * forward- s * right;
-        float east = s * forward+ c * right;
-        float depth = down;
-
-        return {north, east, depth};
+    // Return std::array<float, 3> East, North, Up
+    inline std::array<float, 3> frameFLUtoENU(float forward, float left, float up, float yaw_rad) {
+        float c = cosf(yaw_rad);
+        float s = sinf(yaw_rad);
+        float E = forward * c - left * s;
+        float N = forward * s + left * c;
+        return {E, N, up};
+    }
+    inline std::array<float, 3> frameFLUtoENU(const std::array<float, 3> body, const float yaw_W) {
+        return frameFLUtoENU(body[0], body[1], body[2], yaw_W);
     }
 
-    // Return std::array<float, 3> north, east, depth
-    inline std::array<float, 3> frameFRDtoNED(const std::array<float, 3> body, const float yaw_W) {
-        return frameFRDtoNED(body[0], body[1], body[2], yaw_W);
+    // From PX4 NED frame to ROS2 ENU frame
+    inline std::array<float, 3> frameNEDtoENU(const std::array<float, 3>& pos) {
+        return {pos[1], pos[0] , -pos[2]};
+    }
+
+    // From ROS2 ENU frame to PX4 NED frame
+    inline std::array<float, 3> frameENUtoNED(const std::array<float, 3>& pos) {
+        return {pos[1], pos[0], -pos[2]};
+    }
+
+    // From PX4 FRD frame to ROS2 FLU frame
+    inline std::array<float, 3> frameFRDtoFLU(const float forward, const float right, const float down) {
+        return {forward, -right, -down};
+    }
+    inline std::array<float, 3> frameFRDtoFLU(const std::array<float, 3>& vec) {
+        return frameFRDtoFLU(vec[0], vec[1], vec[2]);
+    }
+    
+    // From ROS2 FLU frame to PX4 FRD frame
+    inline std::array<float, 3> frameFLUtoFRD(const float forward, const float left, const float up) {
+        return {forward, -left, -up};
+    }
+    inline std::array<float, 3> frameFLUtoFRD(const std::array<float, 3>& vec) {
+        return frameFLUtoFRD(vec[0], vec[1], vec[2]);
+    }
+    inline std::array<float, 3> frameFLUtoFRD(const Eigen::Vector3f& vec) {
+        return frameFLUtoFRD(vec.x(), vec.y(), vec.z());
+    }
+
+    // Quaternion wxyz from PX4 NED frame to ROS2 ENU frame
+    inline Eigen::Quaternionf quaternionNEDtoENU(const Eigen::Quaternionf& q) { // in wxyz
+        Eigen::Quaternionf q_transform(0, M_SQRT1_2f, M_SQRT1_2f, 0);
+        return q_transform * q;
+    }
+    inline Eigen::Quaternionf quaternionNEDtoENU(const std::array<float, 4>& qA) {
+        Eigen::Quaternionf qQ(qA[0], qA[1], qA[2], qA[3]);
+        Eigen::Quaternionf q_transform(0, M_SQRT1_2f, M_SQRT1_2f, 0);
+        return q_transform * qQ;
+    }
+    
+    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame
+    inline Eigen::Quaternionf quaternionENUtoNED(const Eigen::Quaternionf& q) {
+        Eigen::Quaternionf q_transform(0, -M_SQRT1_2f, -M_SQRT1_2f, 0);
+        return q_transform * q;
     }
 
     inline float quaternionToYaw(const float w, const float x, const float y, const float z) {
         float yaw = std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z));
         return angleInWrapped(yaw);
     }
-
     inline float quaternionToYaw(const std::array<float, 4> q) {
         return quaternionToYaw(q[0], q[1], q[2], q[3]);
     }
-
     inline float quaternionToYaw(const Eigen::Quaternionf& q) {
         return quaternionToYaw(q.w(), q.x(), q.y(), q.z());
     }
@@ -125,4 +156,44 @@ namespace frame_utils {
     inline std::array<float, 4> quaternionToArray(const Eigen::Quaternionf& qQ) {
         return {qQ.w(), qQ.x(), qQ.y(), qQ.z()};
     }
-}
+
+} // namespace frame_utils
+
+namespace math_utils {
+    inline float angleInWrapped(float angle) {
+        while(angle < -M_PI) angle += 2*M_PI;
+        while(angle > M_PI) angle -= 2*M_PI;
+        return angle;
+    }
+
+    inline float angleInPolar(float angle) {
+        while(angle < 0) angle += 2*M_PI;
+        while(angle > 2*M_PI) angle -=2*M_PI;
+        return angle;
+    }
+
+    inline float linearMap(const float& input, const float& in_min, const float& in_max, const float& out_min, const float& out_max) {
+        if(in_min == in_max) return (out_max - out_min)/2;
+        else if(in_min < in_max) {
+            float ratio = (input - in_min) / (in_max - in_min);
+            ratio = std::clamp(ratio, 0.0f, 1.0f);
+            return out_min + ratio*(out_max - out_min);
+        }
+        else {
+            float ratio = (input - in_max) / (in_min - in_max);
+            ratio = std::clamp(ratio, 0.0f, 1.0f);
+            return out_min + (1 - ratio)*(out_max - out_min);
+        }
+    }
+
+    inline float expoMap(const float& input, const float& in_min, const float& in_max, const float& out_min, const float& out_max, const float& sensitivity) {
+        if (in_max <= in_min)
+            return out_min;
+
+        float ratio = (input - in_min) / (in_max - in_min);
+        ratio = std::clamp(ratio, 0.0f, 1.0f);
+
+        float expo_ratio = pow(ratio, sensitivity);
+        return out_min + expo_ratio * (out_max - out_min);
+    }
+} // namespace math_utils

@@ -4,9 +4,9 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
 #include "ros2_msgs/msg/control_interface.hpp"
+#include "ros2_msgs/msg/fuse_perception.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp"
-#include "px4_msgs/msg/vehicle_odometry.hpp"
 // #include "px4_msgs/msg/vehicle_command_ack.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/vehicle_attitude_setpoint.hpp"
@@ -32,7 +32,7 @@ private:
     rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr final_ctrl_SUB;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_SUB;
     // rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
-    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odo_SUB;
+    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
 
 
     // Stored SharedPtr
@@ -74,7 +74,7 @@ private:
     // Callbacks
     void FinalCtrlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
     void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
-    void OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
+    void FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
     void NodeLoopCallback();
 
     // Methods

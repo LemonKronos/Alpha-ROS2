@@ -154,7 +154,7 @@ void Lidar2dHandlerNode::LocalPositionCallback(const px4_msgs::msg::VehicleLocal
     float speed = sqrt(msg->vx * msg->vx + msg->vy * msg->vy + msg->vz * msg->vz);
     {
         std::lock_guard<std::mutex> lock(mutex_movement);
-        if(speed > 0.05) movement_current.arc = atan2(msg->vy, msg->vx) - msg->heading;
+        if(speed > 0.05) movement_current.arc = -(atan2(msg->vy, msg->vx) - msg->heading); // FLU
         else movement_current.arc = 0;
         movement_current.distance = HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX));
     }

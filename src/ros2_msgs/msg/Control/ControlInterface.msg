@@ -1,4 +1,4 @@
-# Control input in FRD
+# Control input in FLU
 # This act as the interface for both human and AI control
 
 std_msgs/Header header
@@ -18,8 +18,8 @@ float32 yaw
 
 # Velocity m/s
 float32 forward
-float32 right
-float32 down
+float32 left
+float32 up
 
 # Wings mode
 uint8 UNCHANGE = 0

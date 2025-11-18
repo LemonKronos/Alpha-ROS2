@@ -2,6 +2,7 @@
 
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
 #include "global_utils/system_config.hpp"
+#include "global_utils/utils.hpp"
 
 #include <vector>
 #include <cstdint>
@@ -11,24 +12,6 @@
 /* ######################################## Constant */
 constexpr uint8_t SECTOR_NUM = 12;
 constexpr float SECTOR_ARC = 2 * M_PI / SECTOR_NUM;
-
-/* ########################################## Function*/
-float angleInWrapped(float angle);
-float angleInPolar(float angle);
-
-template <typename T>
-T linearMap(const T& input, const T& in_min, const T& in_max, const T& out_min, const T& out_max);
-
-// Linear mapping for 2 value, can be invertedly scale
-template <typename T>
-T duoLinearMap(
-    const T& inA, const T& inA_min, const T& inA_max,
-    const T& inB, const T& inB_min, const T& inB_max,
-    const T& out_min, const T& out_max  
-);
-
-template <typename T>
-T expoMap(const T& input, const T& in_min, const T& in_max, const T& out_min, const T& out_max, const T& sensitivity);
 
 /* ########################################## Classes*/
 
@@ -44,7 +27,7 @@ class Contour {
 public:
     Contour();
     bool tryAddPoint(Point& point); // Clustering here
-    void addPoint(Point& point) { points.push_back(point); }
+    void addPoint(Point& point) { points.push_back(point); } // Use for obstacleToTopic method
     const std::vector<Point>& getContour() const;
     float getMinDistance() const;
     bool empty();
@@ -60,7 +43,7 @@ private:
 };
 
 /**
- * @brief Sector stored in Counter Clock-wise Wrapped frame, e.i, from +PI to -PI looking Clock-wise
+ * @brief Sector stored in FLU Wrapped frame
  * Sector 0 start from -SECTOR_ARC/2 to SECTOR_ARC/2
  * @note The sector names are also iterated in Couter Clock-wise
  */

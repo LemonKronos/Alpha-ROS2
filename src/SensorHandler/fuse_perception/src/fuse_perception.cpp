@@ -62,15 +62,14 @@ float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::Shar
  */
 void FusePerceptionNode::PublishCallback() {
     auto msg = ros2_msgs::msg::FusePerception();
-    msg.header.stamp = this->get_clock()->now();
     
     // Odometry
     if(last_odo != nullptr) {
-        msg.frame = last_odo->pose_frame;
-        msg.position = last_odo->position;
-        msg.q = last_odo->q;
-        msg.velocity = last_odo->velocity;
-        msg.angular_velocity = last_odo->angular_velocity;
+        msg.frame = last_odo->pose_frame; // auto parse from PX4 to ROS2 frame
+        msg.position = frame_utils::frameNEDtoENU(last_odo->position);
+        msg.q = frame_utils::quaternionToArray(frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(last_odo->q)));
+        msg.velocity = frame_utils::frameNEDtoENU(last_odo->velocity);
+        msg.angular_velocity = frame_utils::frameFRDtoFLU(last_odo->angular_velocity);
 
         last_odo = nullptr;
     }
@@ -79,7 +78,7 @@ void FusePerceptionNode::PublishCallback() {
         msg.position.fill(NO_DATA_f);
         msg.q.fill(NO_DATA_f);
     }
-
+    
     // Contact sensor
     if(last_contact != nullptr) {
         msg.bearable_contact = last_contact->bearable_contact;
@@ -113,7 +112,7 @@ void FusePerceptionNode::PublishCallback() {
         msg.depth_cam_front.width = 0;
         msg.depth_cam_front.height = 0;
     }
-
+    
     // RGB camera
     if(last_rgb_cam != nullptr) {
         msg.rgb_cam_front = *last_rgb_cam;
@@ -125,7 +124,8 @@ void FusePerceptionNode::PublishCallback() {
         msg.rgb_cam_front.width = 0;
         msg.rgb_cam_front.height = 0;
     }
-
+    
+    msg.header.stamp = this->get_clock()->now();
     fuse_PUB->publish(msg);
     RCLCPP_INFO(this->get_logger(), GREEN "Published" RESET);
 }

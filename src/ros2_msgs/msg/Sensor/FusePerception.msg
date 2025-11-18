@@ -1,12 +1,12 @@
 # Combine all necessary date for intermediate node
-# Include Odometry, Contact, Lidar down, Lidar 2d, Depth camera and RGB camera
+# Include Odometry, Contact, Lidar down
 
 std_msgs/Header header
 
 # Frame
 uint8 POSE_FRAME_UNKNOWN = 0
-uint8 POSE_FRAME_NED     = 1
-uint8 POSE_FRAME_FRD     = 2
+uint8 POSE_FRAME_ENU     = 1
+uint8 POSE_FRAME_FLU     = 2
 uint8 frame
 
 # Position

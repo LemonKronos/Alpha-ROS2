@@ -16,10 +16,10 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
         std::bind(&FinalizeControlNode::VehicleStatusCallback, this, _1)
     );
 
-    odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-        "/fmu/out/vehicle_odometry",
+    fuse_perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
+        "/on_drone/sensor/fuse_perception",
         rclcpp::SensorDataQoS(),
-        std::bind(&FinalizeControlNode::OdometryCallback, this, _1)
+        std::bind(&FinalizeControlNode::FusePerceptionCallback, this, _1)
     );
 
     // Create Publisher
@@ -65,9 +65,9 @@ void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStat
     // RCLCPP_INFO(this->get_logger(), PINK "current nav_state = %d" RESET, msg->nav_state);
 }
 
-void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
+void FinalizeControlNode::FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg) {
     last_q = frame_utils::arrayToQuaternion(msg->q);
-    odo_z_velocity = msg->velocity[2]; 
+    odo_z_velocity = msg->velocity[2];
 }
 
 /*########################################## FSM */
@@ -230,17 +230,17 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
 
     if(last_final_ctrl != nullptr) {
         float vx = 0;
-        if(last_final_ctrl->forward > 0) vx = last_final_ctrl->forward * SPEED_MAX_FORWARD_FW;
-        else vx = last_final_ctrl->forward * SPEED_MAX_BACKWARD_FW;
-        float vy = last_final_ctrl->right * SPEED_MAX_STRAFE;
+        if(last_final_ctrl->forward > 0) vx = last_final_ctrl->forward * SPEED_MAX_FORWARD;
+        else vx = last_final_ctrl->forward * SPEED_MAX_BACKWARD;
+        float vy = last_final_ctrl->left * SPEED_MAX_STRAFE;
         float vz = 0;
-        if(last_final_ctrl->down > 0) vz = last_final_ctrl->down * SPEED_MAX_DOWN_FW;
-        else vz = last_final_ctrl->down * SPEED_MAX_UP_FW;
+        if(last_final_ctrl->up > 0) vz = last_final_ctrl->up * SPEED_MAX_UP;
+        else vz = last_final_ctrl->up * SPEED_MAX_DOWN;
 
         msg.position.fill(NO_DATA_f);
-        msg.velocity = frame_utils::frameFRDtoNED(vx, vy, vz, yaw_W);
+        msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
         msg.yaw = NO_DATA_f;
-        msg.yawspeed = last_final_ctrl->yaw * M_PI_2f;
+        msg.yawspeed = -last_final_ctrl->yaw * M_PI_2f; // frame FLU to FRD
     }
     else {
         // No need to do anything cause trajectory setpoint auto stay still
@@ -267,7 +267,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         else dq = Eigen::Quaternionf::Identity();
         Eigen::Quaternionf q_new = last_q * dq;
         q_new.normalize();
-        msg.q_d = frame_utils::quaternionToArray(q_new);
+        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
 
         // Compute thrust maintaining world hover
         Eigen::Vector3f euler = q_new.toRotationMatrix().eulerAngles(0, 1, 2);
@@ -275,32 +275,29 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         float pitch = euler.y();
         float hover_thrust = HOVER_THRUST / (cosf(roll) * cosf(pitch));
         // There shouldn't be any velocity gain for hover and it should not lose altitude
-        hover_thrust -= std::clamp(odo_z_velocity / SPEED_MAX_UP_FW, -1.0f, 0.0f);
+        hover_thrust += std::clamp(odo_z_velocity / SPEED_MAX_UP, -1.0f, 0.0f);
 
         Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust); // hover
 
         Eigen::Vector3f move_world(
             last_final_ctrl->forward, // Should not matter when there are raw pitch control
-            last_final_ctrl->right, // Should not matter when there are raw roll control
-            last_final_ctrl->down
+            last_final_ctrl->left, // Should not matter when there are raw roll control
+            last_final_ctrl->up
         );
         Eigen::Vector3f move_body = q_new.inverse() * move_world;
 
         Eigen::Vector3f total_thurst = hover_body + move_body;
-        msg.thrust_body[0] = std::clamp(total_thurst.x(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
-        msg.thrust_body[1] = std::clamp(total_thurst.y(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
-        msg.thrust_body[2] = std::clamp(total_thurst.z(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
+        total_thurst = total_thurst.cwiseMax(-THRUST_SAFE_LIMIT).cwiseMin(THRUST_SAFE_LIMIT);
+        msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst);
     }
     else {
-        msg.q_d = frame_utils::quaternionToArray(last_q);
+        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(last_q));
 
         // Hover thrust (respect current orientation)
-        Eigen::Vector3f thrust_world(0.0f, 0.0f, -0.5f);
+        Eigen::Vector3f thrust_world(0.0f, 0.0f, HOVER_THRUST);
         Eigen::Vector3f thrust_body = last_q.inverse() * thrust_world;
 
-        msg.thrust_body[0] = std::clamp(thrust_body.x(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
-        msg.thrust_body[1] = std::clamp(thrust_body.y(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
-        msg.thrust_body[2] = std::clamp(thrust_body.z(), -THRUST_SAFE_LIMIT, THRUST_SAFE_LIMIT);
+        msg.thrust_body = frame_utils::frameFLUtoFRD(thrust_body);
     }
 
     msg.yaw_sp_move_rate = NO_DATA_f;

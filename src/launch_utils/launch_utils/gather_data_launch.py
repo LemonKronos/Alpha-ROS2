@@ -58,12 +58,5 @@ def generate_launch_description():
             name='rviz_contour_points',
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
-        ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='lidar_static_tf',
-            arguments=['0', '0', '0', '0', '0', '0',
-                       'base_link', 'x500_lidar_2d_0/link/lidar_2d_v2'],
-        ),
+        )
     ])

@@ -84,7 +84,8 @@
         "shared_mutex": "cpp",
         "stop_token": "cpp",
         "thread": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "geometry": "cpp"
     },
     "python.defaultInterpreterPath": "${workspaceFolder}/pyvenv/bin/python",
     "python.autoComplete.extraPaths": [
