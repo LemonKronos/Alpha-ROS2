@@ -1,5 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+import launch.logging
+
+launch.logging.get_logger().setLevel('WARN')
 
 def generate_launch_description():
     return LaunchDescription([

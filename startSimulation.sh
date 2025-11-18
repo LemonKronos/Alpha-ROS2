@@ -2,7 +2,8 @@
 
 WORLD_NAME="grasslands"
 
-DRONE_NAME="gz_alpha_minus_1"
+# DRONE_NAME="gz_alpha_minus_1"
+DRONE_NAME="gz_alpha_minus_2"
 # DRONE_NAME="gz_standard_vtol"
 # DRONE_NAME="gz_tiltrotor"
 
@@ -27,11 +28,11 @@ cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
-# PX4_SIM_SPEED_FACTOR=0.5 \\
+PX4_SIM_SPEED_FACTOR=0.5 \\
 PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=101 \\
-PX4_GZ_MODEL_POSE="0,0,8.5" \\
+PX4_GZ_MODEL_POSE="0,0,13" \\
 make px4_sitl "$DRONE_NAME"
 exec zsh
 EOF
