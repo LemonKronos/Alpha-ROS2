@@ -23,7 +23,7 @@ constexpr float DEGREE = 0.017453292f;
 // Need real data or tinkering
 constexpr float SELF_RADIUS = 1.2f; // radius in meter
 constexpr float UNCERTAINTY = 0.05f;
-constexpr float SAFE_BUFFER = 0.1f;
+constexpr float SAFE_BUFFER = 0.05f;
 constexpr float HAZARD_DISTANCE = SELF_RADIUS + SAFE_BUFFER + UNCERTAINTY;
 constexpr float REACT_TIME = 0.033333f; // ms
 constexpr float DECELERATE_MAX = 5.0f; // m/s^2
