@@ -51,6 +51,7 @@ private:
     Eigen::Vector3f movement_vec;
     Eigen::Vector3f movement_angular_vec;
     Eigen::Vector3f repulsive_vec;
+    float repulsive_damp_unit = 0;
     Eigen::Vector3f correction_vec;
     Eigen::Vector3f correction_angular_vec;
     float safe_distance = HAZARD_DISTANCE;
