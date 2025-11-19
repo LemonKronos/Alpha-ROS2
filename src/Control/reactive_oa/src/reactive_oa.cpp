@@ -42,7 +42,6 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     movement_vec = Eigen::Vector3f::Zero();
     movement_angular_vec = Eigen::Vector3f::Zero();
     repulsive_vec = Eigen::Vector3f::Zero();
-    repulsive_damp_unit = 0;
     correction_vec = Eigen::Vector3f::Zero();
     correction_angular_vec = Eigen::Vector3f::Zero();
     obstacle_clear_counter = 0;
@@ -54,7 +53,7 @@ ReactiveOANode::~ReactiveOANode(){}
 void ReactiveOANode::computeControlVector(){
     control_vec = Eigen::Vector3f(
         last_input_control->forward * SPEED_MAX_FORWARD,
-        last_input_control->left * SPEED_MAX_FORWARD,
+        last_input_control->left * SPEED_MAX_STRAFE,
         0
     ); // body frame
 
@@ -83,49 +82,63 @@ void ReactiveOANode::computeMovementVector(){
 }
 
 void ReactiveOANode::computeRepulsiveVector(){
+    constexpr float K = 1.2f;
+    constexpr float EXPO = 2.2f;
+
     // Compute repulsive vector by combining all obstacle points' influence
-    repulsive_vec = Eigen::Vector3f::Zero();
+    Eigen::Vector3f current_repulsive_vec = Eigen::Vector3f::Zero();
     for(uint8_t index = 0; index < SECTOR_NUM; index++) {
         for(const auto& contour : obstacle.getContours(index)) {
             for(const auto& point : contour.getContour()) {
                 Eigen::Vector3f point_vec(point.x, point.y, 0);
-                const float factor = (safe_distance - point_vec.norm()); // Cut depth magnitude
+                float dist = point_vec.norm();
+
+                if(dist <= HAZARD_DISTANCE) { // Emergency very close obstacle
+                    if(dist < SELF_RADIUS) continue; // Something wrong with data, ignore
+                    point_vec = point_vec.normalized() * SPEED_MAX_FORWARD * 69.0f;
+                    current_repulsive_vec -= point_vec;
+                    continue;
+                }
+
+                float factor = K * std::exp(EXPO * (safe_distance - dist)); // Cut depth exponential growth
                 point_vec = point_vec.normalized() * factor;
-                repulsive_vec -= point_vec;
+                current_repulsive_vec -= point_vec;
             }
         }
     }
+    if(current_repulsive_vec.isZero(1e-4f)) current_repulsive_vec.setZero(); // Snap to zero
+    constexpr float BIAS = 0.7f;
+    if(repulsive_vec.isZero(1e-4f)) repulsive_vec = current_repulsive_vec;
+    else repulsive_vec = (1.0f - BIAS)*repulsive_vec + BIAS*current_repulsive_vec;
 
-    // Snap to 0
-    if(repulsive_vec.isZero(1e-4f)) {
-        repulsive_vec.setZero();
-        return;
+    // Scale repulsive vector based on control and movement magnitude
+    constexpr float E_TUNE = 2.3f;
+    float control_magnitude = control_vec.head<2>().norm();
+    float movement_magnitude = movement_vec.head<2>().norm();
+    float scale = std::max(control_magnitude, movement_magnitude);
+    float min_escape_speed = (safe_distance - obstacle.getMinDistance()) * E_TUNE;
+    if(scale < min_escape_speed) {
+        repulsive_vec = repulsive_vec.normalized() * min_escape_speed;
     }
-
-    // Scale repulsive vector to try to maintain safe bubble
-    const float x = (safe_distance - obstacle.getMinDistance()) / safe_distance;
-    // const float scale = x * x * (3 - 2 * x); // Smooth S scale
-    // const float scale = sqrtf(x);
-    const float scale = 2.0f * x; // Linear is best
-    repulsive_vec = repulsive_vec.normalized() * (scale * SPEED_MAX_FORWARD);
+    else repulsive_vec = repulsive_vec.normalized() * scale * 1.2f;
 }
 
 void ReactiveOANode::computeCorrectionVector() {
     correction_vec = control_vec + repulsive_vec;
 
     // Ensure correction vector is at most parallel to obstacle
-    if (!repulsive_vec.isZero(1e-4f)) {
-        Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        float dot = repulsive_dir.dot(correction_vec);
+    if (repulsive_vec.norm() > 1e-4f) {
+        Eigen::Vector3f rep = repulsive_vec.normalized();
+        float dot = rep.dot(correction_vec);
         if (dot < 0.0f) {
-            correction_vec -= dot * repulsive_dir;
+            correction_vec = correction_vec - dot * rep;
         }
     }
 
     // Clamp correction vector to max speed
     correction_vec = Eigen::Vector3f(
         std::clamp(correction_vec.x(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
-        std::clamp(correction_vec.y(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
+        std::clamp(correction_vec.y(), -SPEED_MAX_STRAFE, SPEED_MAX_STRAFE),
         0
     );
     correction_angular_vec = control_angular_vec;
@@ -136,16 +149,9 @@ void ReactiveOANode::resetVectors(){
     control_angular_vec = Eigen::Vector3f::Zero();
     movement_vec = Eigen::Vector3f::Zero();
     movement_angular_vec = Eigen::Vector3f::Zero();
-
-    if(obstacle_clear_counter == 1) repulsive_damp_unit = repulsive_vec.norm() / OBSTACLE_CLEAR_COUNT_THRESHOLD;
     if(obstacle_clear_counter >= OBSTACLE_CLEAR_COUNT_THRESHOLD) {
         repulsive_vec = Eigen::Vector3f::Zero();
     }
-    else {
-        const float scale = repulsive_vec.norm() - repulsive_damp_unit * obstacle_clear_counter;
-        repulsive_vec = repulsive_vec.normalized() * scale;
-    }
-
     correction_vec = Eigen::Vector3f::Zero();
     correction_angular_vec = Eigen::Vector3f::Zero();
 }
@@ -206,7 +212,7 @@ void ReactiveOANode::nodeLoopCallback() {
     obstacle_encountered = false;
     
     msg.forward = correction_vec.x() / SPEED_MAX_FORWARD;
-    msg.left = correction_vec.y() / SPEED_MAX_FORWARD;
+    msg.left = correction_vec.y() / SPEED_MAX_STRAFE;
     // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
     if(last_input_control != nullptr) { // Still meaningful for changing mode, etc.

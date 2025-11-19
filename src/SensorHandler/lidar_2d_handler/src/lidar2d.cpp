@@ -156,7 +156,7 @@ void Lidar2dHandlerNode::LocalPositionCallback(const px4_msgs::msg::VehicleLocal
         std::lock_guard<std::mutex> lock(mutex_movement);
         if(speed > 0.05) movement_current.arc = -(atan2(msg->vy, msg->vx) - msg->heading); // FLU
         else movement_current.arc = 0;
-        movement_current.distance = 2.0f * (HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX)));
+        movement_current.distance = HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX));
     }
     RCLCPP_DEBUG(this->get_logger(), "Local Position Call back timestamp %lu: speed= %0.2f; direction= %0.2f; safe distance= %0.2f."
         ,msg->timestamp, speed, movement_current.arc, movement_current.distance
