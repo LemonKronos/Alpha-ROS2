@@ -25,18 +25,6 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
         std::bind(&FusePerceptionNode::ScanDownCallback, this, _1)
     );
 
-    depth_cam_SUB =  this->create_subscription<sensor_msgs::msg::Image>(
-        "sensor/depth_cam/image",
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::DepthCamCallback, this, _1)
-    );
-
-    rgb_cam_SUB = this->create_subscription<sensor_msgs::msg::Image>(
-        "sensor/cam/image",
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::RGBCamCallback, this, _1)
-    );
-
     // Create wall timers
     publish_TIM = this->create_wall_timer(
         std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
@@ -100,30 +88,6 @@ void FusePerceptionNode::PublishCallback() {
     else {
         msg.below_distance = NO_DATA_f;
     }
-
-    // Depth camera
-    if(last_depth_cam != nullptr) {
-        msg.depth_cam_front = *last_depth_cam;
-
-        last_depth_cam = nullptr;
-    }
-    else {
-        msg.depth_cam_front.data.clear();
-        msg.depth_cam_front.width = 0;
-        msg.depth_cam_front.height = 0;
-    }
-    
-    // RGB camera
-    if(last_rgb_cam != nullptr) {
-        msg.rgb_cam_front = *last_rgb_cam;
-
-        last_rgb_cam = nullptr;
-    }
-    else {
-        msg.rgb_cam_front.data.clear();
-        msg.rgb_cam_front.width = 0;
-        msg.rgb_cam_front.height = 0;
-    }
     
     msg.header.stamp = this->get_clock()->now();
     fuse_PUB->publish(msg);
@@ -140,12 +104,4 @@ void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::Sh
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
-}
-
-void FusePerceptionNode::DepthCamCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
-    last_depth_cam = msg;
-}
-
-void FusePerceptionNode::RGBCamCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
-    last_rgb_cam = msg;
 }

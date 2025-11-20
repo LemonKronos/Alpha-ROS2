@@ -42,6 +42,12 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
         std::chrono::nanoseconds(PUBLISH_CYCLE),
         std::bind(&ContactParserNode::PublisherCallback, this)
     );
+
+    // Init variables
+    bearable = false;
+    last_bearable = false;
+    critical = false;
+    last_critical = false;
 };
 
 ContactParserNode::~ContactParserNode() {
@@ -69,9 +75,9 @@ void ContactParserNode::PublisherCallback() {
 
         contact_PUB->publish(msg);
 
-        if(current_critical) RCLCPP_WARN(this->get_logger(), RED "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
-        else if(current_bearable) RCLCPP_WARN(this->get_logger(), YELLOW "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
-        else RCLCPP_INFO(this->get_logger(), BLUE "Contact Sensor critical %d, bearable %d" RESET, current_critical, current_bearable);
+        if(current_critical) RCLCPP_WARN(this->get_logger(), RED "Contact Sensor critical" RESET);
+        else if(current_bearable) RCLCPP_WARN(this->get_logger(), YELLOW "Contact Sensor bearable" RESET);
+        else RCLCPP_INFO(this->get_logger(), BLUE "Contact Sensor safe" RESET);
 
         last_bearable = current_bearable;
         last_critical = current_critical;

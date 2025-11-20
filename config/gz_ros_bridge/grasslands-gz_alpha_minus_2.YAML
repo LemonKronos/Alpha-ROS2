@@ -60,7 +60,7 @@
 # Depth camera
 - gz_topic_name: "/alpha_depth_cam/camera/image"
   gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/depth_cam/image"
+  ros_topic_name: "sensor/depth_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   lazy: true
   direction: GZ_TO_ROS
@@ -68,7 +68,7 @@
 # RGB Camera
 - gz_topic_name: "/alpha_cam/camera/image"
   gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/cam/image"
+  ros_topic_name: "sensor/rgb_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   lazy: true
   direction: GZ_TO_ROS
@@ -76,7 +76,15 @@
 # Gimbal camera
 - gz_topic_name: "/gimbal/camera/image"
   gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/gimbal_cam/image"
+  ros_topic_name: "sensor/gimbal_cam/camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  lazy: true
+  direction: GZ_TO_ROS
+
+  # Overview camera
+- gz_topic_name: "/alpha_cam_overview/camera/image"
+  gz_type_name: "gz.msgs.Image"
+  ros_topic_name: "sensor/overview_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   lazy: true
   direction: GZ_TO_ROS
