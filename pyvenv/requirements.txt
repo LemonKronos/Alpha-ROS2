@@ -48,7 +48,7 @@ launch==3.4.7
 launch-ros==0.26.9
 launch-testing==3.4.7
 launch-testing-ros==0.26.9
--e git+https://github.com/LemonKronos/ROS2@c25761e24af7629970d9680184ef9e964490764c#egg=launch_utils&subdirectory=build/launch_utils
+-e git+https://github.com/LemonKronos/ROS2@6da42db011ffa5bbec54ac394df2ace7e16cf7c9#egg=launch_utils&subdirectory=build/launch_utils
 launch-xml==3.4.7
 launch-yaml==3.4.7
 lifecycle-msgs==2.0.3
@@ -64,7 +64,7 @@ pendulum-msgs==0.33.7
 px4_msgs==2.0.1
 px4_ros_com==0.1.0
 pygame==2.6.1
--e git+https://github.com/LemonKronos/ROS2@c25761e24af7629970d9680184ef9e964490764c#egg=pygame_control&subdirectory=build/pygame_control
+-e git+https://github.com/LemonKronos/ROS2@6da42db011ffa5bbec54ac394df2ace7e16cf7c9#egg=pygame_control&subdirectory=build/pygame_control
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 python-qt-binding==2.2.2
@@ -136,7 +136,7 @@ rqt-service-caller==1.2.1
 rqt-shell==1.2.2
 rqt-srv==1.2.2
 rqt-topic==1.7.3
--e git+https://github.com/LemonKronos/ROS2@c25761e24af7629970d9680184ef9e964490764c#egg=rviz_contour
+-e git+https://github.com/LemonKronos/ROS2@6da42db011ffa5bbec54ac394df2ace7e16cf7c9#egg=rviz_contour
 sensor-msgs==5.3.6
 sensor-msgs-py==5.3.6
 service-msgs==2.0.3

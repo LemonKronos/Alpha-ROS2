@@ -1,4 +1,13 @@
-# add_noob_control_node.py
+#!/usr/bin/env python3
+"""
+add_noob_control_node.py
+
+ROS2 Node to add the noob control input after record an episode
+There can be multiple noob control for a single expert action
+This node playback the overview camera feed and adding input control as noob control, sync by camera frame and meta data
+
+TODO: Update the code to do what we describe above
+"""
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+<title>Alpha Control Minus 2</title>
+<style>
+    /* === CORE UI === */
+    body {
+        background-color: #111;
+        color: #00f3ff;
+        font-family: 'Courier New', Courier, monospace;
+        margin: 0;
+        overflow: hidden;
+        touch-action: none; 
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    /* === LOADING OVERLAY === */
+    #loader {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: #000;
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #00f3ff;
+        font-size: 20px;
+        transition: opacity 0.5s;
+    }
+
+    /* === STATUS BAR === */
+    #hud-top {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 45px;
+        background: linear-gradient(to bottom, rgba(0, 30, 30, 0.95), transparent);
+        border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 100;
+        padding: 0 10px;
+        box-sizing: border-box;
+    }
+
+    .hud-group { display: flex; align-items: center; gap: 15px; }
+    .hud-group.center { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
+
+    /* === BUTTONS === */
+    .hud-btn {
+        background: none;
+        border: 1px solid rgba(0, 243, 255, 0.3);
+        border-radius: 5px;
+        width: 36px; height: 36px;
+        display: flex; justify-content: center; align-items: center;
+        cursor: pointer;
+        fill: #00f3ff;
+    }
+    .hud-btn:active { background: rgba(0, 243, 255, 0.2); transform: scale(0.95); }
+    
+    #btn-record.recording {
+        border-color: #ff3333; fill: #ff3333;
+        background: rgba(255, 51, 51, 0.1);
+        box-shadow: 0 0 10px #ff3333;
+        animation: pulse 2s infinite;
+    }
+    
+    /* NEW: Hide pause button by default */
+    #btn-pause { display: none; }
+    #btn-pause.paused { fill: #ffaa00; border-color: #ffaa00; }
+
+    #status-text {
+        font-size: 14px; letter-spacing: 2px;
+        text-shadow: 0 0 5px #00f3ff; font-weight: bold;
+    }
+
+    /* === JOYSTICKS === */
+    .joy-container {
+        position: absolute;
+        bottom: 8%; 
+        height: 65vh; width: 65vh;  
+        max-width: 45vw; max-height: 45vw; 
+        z-index: 50;
+    }
+    #zone-left { left: 5vw; }
+    #zone-right { right: 5vw; }
+
+    canvas {
+        width: 100%; height: 100%; display: block;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+    }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div id="loader">INITIALIZING SYSTEMS...</div>
+
+<div id="hud-top">
+    <div class="hud-group left">
+        <div class="hud-btn" id="btn-record"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /></svg></div>
+        <div class="hud-btn" id="btn-pause">
+            <svg id="icon-pause" width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+            <svg id="icon-play" width="20" height="20" viewBox="0 0 24 24" style="display:none"><path d="M8 5v14l11-7z" /></svg>
+        </div>
+    </div>
+    <div class="hud-group center"><span id="status-text">WAITING...</span></div>
+    <div class="hud-group right">
+        <div class="hud-btn" id="btn-fs"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></div>
+    </div>
+</div>
+
+<div id="zone-left" class="joy-container"><canvas id="canvasLeft"></canvas></div>
+<div id="zone-right" class="joy-container"><canvas id="canvasRight"></canvas></div>
+
+<script>
+// ========================
+// CONFIGURATION
+// ========================
+const WS_URL = "ws://10.64.30.129:8765";
+const SEND_RATE_MS = 33; 
+const GYRO_RANGE = 45; 
+
+// ========================
+// SYSTEM BOOT
+// ========================
+window.addEventListener('load', () => {
+    try {
+        initApp();
+        const loader = document.getElementById('loader');
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 500);
+    } catch (e) {
+        console.error("Boot failed", e);
+        document.getElementById('loader').innerText = "BOOT ERROR. RELOADING...";
+        setTimeout(() => location.reload(), 1000);
+    }
+});
+
+setTimeout(() => {
+    if (document.getElementById('loader')) location.reload(); 
+}, 3000); 
+
+// ========================
+// APP LOGIC
+// ========================
+let stickLeft, stickRight;
+let ws;
+
+function initApp() {
+    
+    // --- UI Setup ---
+    const statusEl = document.getElementById("status-text");
+    const btnRecord = document.getElementById("btn-record");
+    const btnPause = document.getElementById("btn-pause");
+    const btnFs = document.getElementById("btn-fs");
+    let flags = { record: false, pause: false };
+
+    btnRecord.addEventListener("click", () => {
+        flags.record = !flags.record;
+        
+        if (flags.record) {
+            // START RECORDING
+            btnRecord.classList.add("recording");
+            statusEl.innerText = "REC ●";
+            statusEl.style.color = "#ff3333";
+            
+            // SHOW Pause Button (Use flex to keep alignment)
+            btnPause.style.display = "flex";
+            
+        } else {
+            // STOP RECORDING
+            btnRecord.classList.remove("recording");
+            statusEl.innerText = "STANDBY";
+            statusEl.style.color = "#00f3ff";
+            
+            // HIDE Pause Button
+            btnPause.style.display = "none";
+            
+            // RESET Pause State if active
+            if (flags.pause) {
+                flags.pause = false;
+                btnPause.classList.remove("paused");
+                document.getElementById("icon-pause").style.display = "block";
+                document.getElementById("icon-play").style.display = "none";
+            }
+        }
+    });
+
+    btnPause.addEventListener("click", () => {
+        flags.pause = !flags.pause;
+        if (flags.pause) {
+            btnPause.classList.add("paused");
+            document.getElementById("icon-pause").style.display = "none";
+            document.getElementById("icon-play").style.display = "block";
+            statusEl.innerText = "PAUSED";
+            statusEl.style.color = "#ffaa00";
+        } else {
+            btnPause.classList.remove("paused");
+            document.getElementById("icon-pause").style.display = "block";
+            document.getElementById("icon-play").style.display = "none";
+            statusEl.innerText = "REC ●"; // If unpausing, we must be recording
+            statusEl.style.color = "#ff3333";
+        }
+    });
+
+    btnFs.addEventListener("click", () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>{});
+        else if (document.exitFullscreen) document.exitFullscreen();
+    });
+
+    // --- WebSocket ---
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => { statusEl.innerText = "CONNECTED"; statusEl.style.color = "#00f3ff"; };
+    ws.onclose = () => { statusEl.innerText = "DISCONNECTED"; statusEl.style.color = "#ff3333"; };
+
+    // --- Joysticks ---
+    stickLeft = new Joystick("canvasLeft", "rgba(255, 160, 0, 0.8)");
+    stickRight = new Joystick("canvasRight", "rgba(0, 240, 255, 0.8)");
+
+    // --- Loop ---
+    setInterval(() => gameLoop(flags, ws), SEND_RATE_MS);
+}
+
+// ========================
+// LOGIC HELPERS
+// ========================
+let controlsActive = false;
+let gyroBase = { roll: 0, pitch: 0 };
+let gyroRaw = { beta: 0, gamma: 0 };
+let output = { x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0 };
+
+const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+const round = (val) => Math.round(val * 100) / 100;
+
+function getShortestDiff(current, base) {
+    let diff = current - base;
+    while (diff > 180) diff -= 360;
+    while (diff < -180) diff += 360;
+    return diff;
+}
+
+window.addEventListener("deviceorientation", e => {
+    gyroRaw.beta = e.beta || 0;
+    gyroRaw.gamma = e.gamma || 0;
+});
+
+function activateGyro(statusEl) {
+    if (!controlsActive) {
+        controlsActive = true;
+        gyroBase.roll = gyroRaw.beta;
+        gyroBase.pitch = gyroRaw.gamma;
+        if(statusEl && statusEl.innerText === "WAITING...") statusEl.innerText = "ACTIVE";
+    }
+}
+
+function checkIdle(statusEl, flags) {
+    if (stickLeft.touchId === null && stickRight.touchId === null) {
+        controlsActive = false;
+        // Don't overwrite REC/PAUSE status text
+        if (statusEl && !flags.record && !flags.pause) {
+            statusEl.innerText = "READY";
+            statusEl.style.color = "#00f3ff";
+        }
+    }
+}
+
+class Joystick {
+    constructor(canvasId, color) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext("2d");
+        this.color = color;
+        this.touchId = null;
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.pos = { x: this.center, y: this.center };
+        this.val = { x: 0, y: 0 };
+        this.initEvents();
+        this.draw();
+    }
+
+    resize() {
+        const rect = this.canvas.getBoundingClientRect();
+        if (rect.width === 0) return;
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        this.size = rect.width;
+        this.center = this.size / 2;
+        this.radius = this.size / 2;
+        this.pos = { x: this.center, y: this.center };
+        this.draw();
+    }
+
+    initEvents() {
+        const start = (e) => {
+            e.preventDefault();
+            activateGyro(document.getElementById("status-text"));
+            if (this.touchId === null) {
+                this.touchId = e.changedTouches[0].identifier;
+                this.update(e.changedTouches[0]);
+            }
+        };
+        const move = (e) => {
+            e.preventDefault();
+            for (let t of e.changedTouches) if (t.identifier === this.touchId) this.update(t);
+        };
+        const end = (e) => {
+            e.preventDefault();
+            for (let t of e.changedTouches) if (t.identifier === this.touchId) {
+                this.touchId = null;
+                this.reset();
+                // Pass current flags to avoid overwriting status
+                const isRec = document.getElementById("btn-record").classList.contains("recording");
+                const isPaused = document.getElementById("btn-pause").classList.contains("paused");
+                checkIdle(document.getElementById("status-text"), {record: isRec, pause: isPaused});
+            }
+        };
+        this.canvas.addEventListener("touchstart", start);
+        this.canvas.addEventListener("touchmove", move);
+        this.canvas.addEventListener("touchend", end);
+        this.canvas.addEventListener("touchcancel", end);
+    }
+
+    update(touch) {
+        const rect = this.canvas.getBoundingClientRect();
+        const dx = (touch.clientX - rect.left) - this.center;
+        const dy = (touch.clientY - rect.top) - this.center;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const maxDist = this.radius - 35;
+        let drawX = dx, drawY = dy;
+        if (dist > maxDist) {
+            const ratio = maxDist / dist;
+            drawX *= ratio;
+            drawY *= ratio;
+        }
+        this.pos.x = this.center + drawX;
+        this.pos.y = this.center + drawY;
+        this.val.x = drawX / maxDist;
+        this.val.y = drawY / maxDist;
+        this.draw(true);
+    }
+
+    reset() {
+        this.pos.x = this.center;
+        this.pos.y = this.center;
+        this.val.x = 0;
+        this.val.y = 0;
+        this.draw(false);
+    }
+
+    draw(active) {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.size, this.size);
+        ctx.beginPath();
+        ctx.arc(this.center, this.center, this.radius - 2, 0, Math.PI*2);
+        ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, 30, 0, Math.PI*2);
+        ctx.fillStyle = active ? this.color : "#444"; ctx.fill();
+        ctx.strokeStyle = active ? "#fff" : "#666"; ctx.lineWidth = 2; ctx.stroke();
+    }
+}
+
+// ========================
+// GAME LOOP
+// ========================
+function gameLoop(flags, ws) {
+    output.x = -stickLeft.val.y;
+    output.y = -stickLeft.val.x;
+    output.z = -stickRight.val.y;
+    output.yaw = -stickRight.val.x;
+
+    if (controlsActive) {
+        let rollDiff = getShortestDiff(gyroRaw.beta, gyroBase.roll);
+        let pitchDiff = getShortestDiff(gyroRaw.gamma, gyroBase.pitch);
+        output.roll = clamp(rollDiff / GYRO_RANGE, -1, 1);
+        output.pitch = clamp(pitchDiff / GYRO_RANGE, -1, 1);
+    } else {
+        output.roll = 0;
+        output.pitch = 0;
+    }
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            x: round(output.x),
+            y: round(output.y),
+            z: round(output.z),
+            yaw: round(output.yaw),
+            roll: round(output.roll),
+            pitch: round(output.pitch),
+            record: flags.record,
+            pause: flags.pause
+        }));
+    }
+}
+</script>
+</body>
+</html>

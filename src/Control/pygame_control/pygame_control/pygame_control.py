@@ -2,7 +2,7 @@
 """
 pygame_control.py
 
-ROS2 node that runs Pygame virtual joystick UI and publishes ros2_msgs::msg::ControlInterface messages to topic "control/final".
+ROS2 node that runs Pygame virtual joystick UI and publishes ros2_msgs::msg::ControlInterface messages to topic "control/input"
 """
 import math
 import time

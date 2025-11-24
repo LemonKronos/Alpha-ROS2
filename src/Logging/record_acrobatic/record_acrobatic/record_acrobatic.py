@@ -1,4 +1,30 @@
-# record_acrobatic_node.py
+#!/usr/bin/env python3
+"""
+record_acrobatic.py
+
+ROS2 node to record and ouput dataset for AcrobaticOA
+
+episode structure:
+    episode_0001/
+    ├─ state.npy
+    ├─ action.npy
+    ├─ noob_01.npy
+    ├─ overview.mp4
+    └─ meta.json
+
+ - state.npy: sensor data, also include camera feed
+ - action.npy: expert control
+ - noob_xx.npy: noob control - also a state data, will later be concatenate to state.npy, can have multiple noob control for a expert action
+ - overview.mp4: video record of the whole episode, use as a reference for adding nood control and a overview of the movement
+ - meta.json: include meta data for the episode:
+    - manuever: name for such expert action
+    - fps: system rate
+    - start: timestamp start episode
+    - end: timestamp end episode
+
+TODO: Update the code to do what we describe above
+"""
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
