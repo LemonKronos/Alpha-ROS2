@@ -24,6 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'record_acrobatic = record_acrobatic.record_acrobatic:main',
+            'add_nood_control = record_acrobatic.add_noob_control:main'
         ],
     },
 )

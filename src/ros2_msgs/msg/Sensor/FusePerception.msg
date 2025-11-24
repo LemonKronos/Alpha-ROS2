@@ -28,8 +28,3 @@ bool critical_contact
 # Lidar down
 float32 below_distance
 
-# Depth camera front
-sensor_msgs/Image depth_cam_front
-
-# RGB camera front
-sensor_msgs/Image rgb_cam_front
