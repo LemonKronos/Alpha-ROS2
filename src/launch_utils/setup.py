@@ -13,8 +13,9 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch_utils/lidar_2d_handler_launch.py',
             'launch_utils/pygame_control_launch.py',
-            'launch_utils/phone_control_launch.py',
-            'launch_utils/gather_data_launch.py',
+            'launch_utils/advance_control_launch.py',
+            'launch_utils/record_acrobatic_expert.py',
+            'launch_utils/record_acrobatic_noob.py',
         ]),
     ],
     install_requires=['setuptools'],

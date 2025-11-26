@@ -14,6 +14,8 @@
 
 #include <algorithm>
 
+constexpr float ATTITUDE_THRESHOLD = 0.25f;
+
 using std::placeholders::_1;
 
 class FinalizeControlNode : public rclcpp::Node {

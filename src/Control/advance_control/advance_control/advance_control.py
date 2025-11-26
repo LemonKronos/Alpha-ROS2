@@ -5,7 +5,7 @@
 advance_control.py
 
 ROS2 node for advance 6 DoF input from a phone through web socket
-ros2_msgs::msg::ControlInterface messages to topic "control/input"
+ros2_msgs::msg::ControlInterface messages to topic "control/final"
 """
 import rclpy
 from rclpy.node import Node
@@ -58,8 +58,7 @@ class AdvanceControlNode(Node):
 
         self.control_interface_PUB.publish(control_msg)
         if True:
-            if control_msg.forward != 0 or control_msg.left != 0 or control_msg.up != 0 or control_msg.roll != 0 or control_msg.pitch != 0 or control_msg.yaw != 0:
-                self.get_logger().info(f"🎮Forward:{control_msg.forward:> 6.2f} Left: {control_msg.left:> 6.2f} Up: {control_msg.up:> 6.2f} Roll: {control_msg.roll:> 6.2f} Pitch: {control_msg.pitch:> 6.2f} Yaw: {control_msg.yaw:> 6.2f}🛩️")
+            self.get_logger().info(f"🎮Forward:{control_msg.forward:> 6.2f} Left: {control_msg.left:> 6.2f} Up: {control_msg.up:> 6.2f} Roll: {control_msg.roll:> 6.2f} Pitch: {control_msg.pitch:> 6.2f} Yaw: {control_msg.yaw:> 6.2f}🛩️")
 
         # Record msg, publish when change
         new_record = commands.get('record', False)

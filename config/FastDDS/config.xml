@@ -1,61 +1,38 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<profiles xmlns="http://www.eprosima.com">
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
 
-  <!-- 1) create an SHM transport descriptor (tweak sizes for your sensor payloads) -->
-  <transport_descriptors>
-    <transport_descriptor>
-      <transport_id>shm_transport</transport_id>
-      <type>SHM</type>
-      <!-- segment_size = total bytes for the shared memory segment (increase for large images) -->
-      <segment_size>268435456</segment_size> <!-- 256 MB -->
-      <!-- port_queue_capacity = ring buffer depth for descriptors -->
-      <port_queue_capacity>1024</port_queue_capacity>
-      <!-- optional: rtps_dump_file to trace SHM traffic for debugging -->
-      <!-- <rtps_dump_file>/tmp/fastdds_shm_dump.txt</rtps_dump_file> -->
-    </transport_descriptor>
-  </transport_descriptors>
+    <transport_descriptors>
+        <transport_descriptor>
+            <transport_id>shm_transport</transport_id>
+            <type>SHM</type>
+            <segment_size>268435456</segment_size>
+            <port_queue_capacity>1024</port_queue_capacity>
+        </transport_descriptor>
+    </transport_descriptors>
 
-  <!-- 2) participant profile that links the SHM transport and enables data-sharing where possible -->
-  <participant profile_name="SHMParticipant" is_default_profile="true">
-    <rtps>
-      <!-- keep builtin transports enabled (discovery usually needs UDP) -->
-      <useBuiltinTransports>true</useBuiltinTransports>
+    <participant profile_name="SHMParticipant" is_default_profile="true">
+        <rtps>
+            <useBuiltinTransports>true</useBuiltinTransports>
+            <userTransports>
+                <transport_id>shm_transport</transport_id>
+            </userTransports>
+        </rtps>
+    </participant>
 
-      <!-- register user transport (the SHM descriptor above) -->
-      <userTransports>
-        <transport_id>shm_transport</transport_id>
-      </userTransports>
-    </rtps>
+    <data_writer profile_name="SHMDataWriter" is_default_profile="true">
+        <qos>
+            <data_sharing>
+                <kind>AUTO</kind>
+            </data_sharing>
+        </qos>
+    </data_writer>
 
-    <!-- default publisher QoS (applies if you don't set a per-topic profile) -->
-    <publisher>
-      <qos>
-        <!-- let Fast-DDS auto-enable data-sharing for compatible topics -->
-        <data_sharing>
-          <kind>AUTO</kind>
-        </data_sharing>
-
-        <!-- example history: adapt depth to your case -->
-        <history>
-          <kind>KEEP_LAST</kind>
-          <depth>5</depth>
-        </history>
-
-        <!-- resource limits: tune for many subscribers or many queued samples -->
-        <resourceLimits>
-          <allocated_samples>64</allocated_samples>
-        </resourceLimits>
-      </qos>
-    </publisher>
-
-    <!-- default subscriber QoS -->
-    <subscriber>
-      <qos>
-        <data_sharing>
-          <kind>AUTO</kind>
-        </data_sharing>
-      </qos>
-    </subscriber>
-  </participant>
+    <data_reader profile_name="SHMDataReader" is_default_profile="true">
+        <qos>
+            <data_sharing>
+                <kind>AUTO</kind>
+            </data_sharing>
+        </qos>
+    </data_reader>
 
 </profiles>

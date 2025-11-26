@@ -7,19 +7,26 @@ DRONE_NAME="gz_alpha_minus_2"
 # DRONE_NAME="gz_standard_vtol"
 # DRONE_NAME="gz_tiltrotor"
 
+# Data stays on laptop. No "Air Bytes".
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+export ROS_STATIC_PEERS=""
+
+FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
+
 # === No1: Custom Gazebo world ===
 cd ~/MyCode/Project/Drone/Gazebo 
 python3 simulation-gazebo --world "$WORLD_NAME" > /dev/null 2>&1 & disown &&
 printf "\033[92m[GZ SIM] running...\033[0m\n"
 
-# === No2: Micro XRCE-DDS Agent ===
+# === No2: Micro XRCE-DDS Agent (Optimized) ===
 (
   cd ~/MyCode/Project/Drone/Micro-XRCE-DDS-Agent
   source /opt/ros/jazzy/setup.bash
   export PATH=$PATH:$HOME/MyCode/Project/Drone/Micro-XRCE-DDS-Agent/build
+  source "$FAST_DDS_SETUP"
   MicroXRCEAgent udp4 -p 8888 -l 127.0.0.1 > /dev/null 2>&1
 ) & echo $! >> /tmp/sim_pids.txt &&
-printf "\033[92m[MicroXRCEAgent] Running silently on UDP port 8888...\033[0m\n"
+printf "\033[92m[MicroXRCEAgent] Running silently on UDP 8888 (Shared Memory Enabled)...\033[0m\n"
 
 
 # === No3: PX4 SITL with Gazebo RTPS , stand alone mode ===
@@ -28,7 +35,7 @@ cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
-PX4_SIM_SPEED_FACTOR=0.5 \\
+# PX4_SIM_SPEED_FACTOR=0.5 \\
 PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=101 \\
@@ -49,6 +56,8 @@ printf "[ROS 2] Launching sourced terminal..." ;
 source /opt/ros/jazzy/setup.zsh ;
 cd ~/MyCode/Project/Drone/ROS2 &&
 source install/setup.zsh ;
+source '$FAST_DDS_SETUP';
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST;
 source /home/mr_lemon/MyCode/Project/Drone/ROS2/pyvenv/bin/activate;
 export PYTHONNOUSERSITE=1;
 exec zsh' & echo $! >> /tmp/sim_pids.txt &&
@@ -59,6 +68,8 @@ printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
   source /opt/ros/jazzy/setup.bash
   cd ~/MyCode/Project/Drone/ROS2
   source install/setup.bash
+  source "$FAST_DDS_SETUP"
+  export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
   
   # Wait for clock to ensure GZ is up
   until gz topic -l | grep -q "/clock"; do sleep 1; done
@@ -78,16 +89,6 @@ printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
   fi
 ) & echo $! >> /tmp/sim_pids.txt &&
 printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
-
-
-# === No7: Run Rviz2 ===
-# kitty --detach --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c '
-# source /opt/ros/jazzy/setup.zsh &&
-# cd ~/MyCode/Project/Drone/ROS2 &&
-# source install/setup.zsh ;
-# rNvidia rviz2' & echo $! >> /tmp/sim_pids.txt &&
-# printf "\033[92m[ROS2 Rviz2] running...\033[0m\n"
-
 
 sleep 5
 echo "Run $DRONE_NAME with world $WORLD_NAME" | lolcat

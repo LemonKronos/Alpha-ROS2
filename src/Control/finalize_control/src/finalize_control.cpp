@@ -78,7 +78,7 @@ void FinalizeControlNode::NodeLoopCallback() {
     // Update drone data
     if(last_final_ctrl != nullptr) {
         control_state = last_final_ctrl->control_state;
-        if(!ALLOW_ATTITUDE || (last_final_ctrl->roll == 0.0f && last_final_ctrl->pitch == 0.0f)) {
+        if(!ALLOW_ATTITUDE || (last_final_ctrl->roll < ATTITUDE_THRESHOLD && last_final_ctrl->pitch < ATTITUDE_THRESHOLD)) {
             if(offboard_mode != OffboardMode::VELOCITY) {
                 RCLCPP_INFO(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
             }

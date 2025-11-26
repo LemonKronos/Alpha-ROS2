@@ -20,7 +20,7 @@ include_directories(
 add_executable(finalize_control
   src/main.cpp
   src/finalize_control.cpp
-  )
+)
 
 ament_target_dependencies(finalize_control
   rclcpp
