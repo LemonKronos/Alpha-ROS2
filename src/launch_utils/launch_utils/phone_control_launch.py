@@ -4,11 +4,11 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='pygame_control',
-            executable='pygame_control',
+            package='advance_control',
+            executable='advance_control',
             name='pygame_control_node',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            # arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='finalize_control',
@@ -18,13 +18,20 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
-            package='reactive_oa',
-            executable='reactive_oa',
-            name='reactive_oa_node',
+            package='lidar_2d_handler',
+            executable='lidar_2d_handler',
+            name='lidar_2d_handler_node',
             output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'warn']
         ),
-                Node(
+        Node(
+            package='contact_parser',
+            executable='contact_parser',
+            name='contact_parser_node',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
             package='fuse_perception',
             executable='fuse_perception',
             name='fuse_perception_node',

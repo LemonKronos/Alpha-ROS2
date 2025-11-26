@@ -12,6 +12,8 @@ import rclpy
 from rclpy.node import Node
 from ros2_msgs.msg import ControlInterface, RecordControl, FusePerception, Lidar2dObstacle
 from sensor_msgs.msg import Image
+from ros_gz_interfaces.srv import ControlWorld
+from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
 import numpy as np
 import cv2
@@ -36,6 +38,7 @@ class RecordAcrobaticNode(Node):
 
         # State Variables
         self.recording = False
+        self.pausing = False
         self.episode_dir = None
         self.state_list = []
         self.action_list = []
@@ -70,14 +73,19 @@ class RecordAcrobaticNode(Node):
         self.create_subscription(ControlInterface, "control/input", self.expert_action_callback, 10)
         
         # Sensors
-        self.create_subscription(FusePerception, "/on_drone/sensor/fuse_perception", self.perception_callback, 10)
-        self.create_subscription(Lidar2dObstacle, "/on_drone/sensor/scan/lidar2d/close", self.lidar_close_callback, 10)
-        self.create_subscription(Lidar2dObstacle, "/on_drone/sensor/scan/lidar2d/far", self.lidar_far_callback, 10)
+        self.create_subscription(FusePerception, "/on_drone/sensor/fuse_perception", self.perception_callback, qos_profile_sensor_data)
+        self.create_subscription(Lidar2dObstacle, "/on_drone/sensor/scan/lidar2d/close", self.lidar_close_callback, qos_profile_sensor_data)
+        self.create_subscription(Lidar2dObstacle, "/on_drone/sensor/scan/lidar2d/far", self.lidar_far_callback, qos_profile_sensor_data)
         
         # Cameras
         self.create_subscription(Image, "sensor/depth_cam/camera/image", self.depth_cam_callback, 10)
         self.create_subscription(Image, "sensor/rgb_cam/camera/image", self.rgb_cam_callback, 10)
         self.create_subscription(Image, "sensor/overview_cam/camera/image", self.overview_cam_callback, 10)
+
+        # --- Service ---
+        self.client = self.create_client(ControlWorld, '/world/grasslands/control')
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for GZ Control service...')
 
         # Heartbeat Timer (30Hz)
         self.timer = self.create_timer(SYSTEM_CYCLE, self.node_loop_callback)
@@ -85,7 +93,7 @@ class RecordAcrobaticNode(Node):
 
     # ------------------ Node Loop (30Hz Heartbeat) -----------------------#
     def node_loop_callback(self):
-        if not self.recording:
+        if not self.recording or self.pausing:
             return
 
         now = time.time()
@@ -196,12 +204,39 @@ class RecordAcrobaticNode(Node):
         try: self.cache['img_overview'] = self.bridge.imgmsg_to_cv2(msg, "bgr8")
         except: pass
 
+    def pause_callback(self, rep):
+        try:
+            response = rep.result()
+            if response.success:
+                self.pausing = True
+                self.get_logger().info('Simulation Paused.')
+            else:
+                self.get_logger().error('Simulation not Paused.')
+        except Exception as e:
+            self.get_logger().error(f'Service call pause failed: {e}')
+
+    def unpause_callback(self, rep):
+        try:
+            response = rep.result()
+            if response.success:
+                self.pausing = False
+                self.get_logger().info('Simulation Continue.')
+            else:
+                self.get_logger().error('Simulation still Paused.')
+        except Exception as e:
+            self.get_logger().error(f'Service call pause failed: {e}')
+
     # ------------------ Record Management ------------------ #
     def record_control_callback(self, msg):
         if msg.record and not self.recording:
             self.start_episode()
         elif not msg.record and self.recording:
             self.finish_episode()
+        
+        if msg.pause and not self.pausing:
+            self.start_pause()
+        elif not msg.pause and self.pausing:
+            self.stop_pause()
 
     def start_episode(self):
         ts = int(time.time())
@@ -253,6 +288,20 @@ class RecordAcrobaticNode(Node):
             json.dump(meta, f, indent=2)
             
         self.get_logger().info(f"REC: Saved episode_{int(self.start_timestamp)}. Frames: {len(self.state_list)}")
+
+    def start_pause(self):
+        req = ControlWorld.Request()
+        req.world_control.pause = True
+
+        rep = self.client.call_async(req)
+        rep.add_done_callback(self.pause_callback)
+
+    def stop_pause(self):
+        req = ControlWorld.Request()
+        req.world_control.pause = False
+
+        rep = self.client.call_async(req)
+        rep.add_done_callback(self.unpause_callback)
 
 def main(args=None):
     rclpy.init(args=args)

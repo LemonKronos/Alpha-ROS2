@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # --- Example ROS2 Node Integration ---
 """
 
@@ -24,7 +25,7 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # Publisher
-        self.control_interface_PUB = self.create_publisher(ControlInterface, "control/input", 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, "control/final", 10)
         self.record_control_PUB = self.create_publisher(RecordControl, "logger/record_control", 10)
         
         # Subscriber
@@ -56,7 +57,7 @@ class AdvanceControlNode(Node):
         control_msg.header.stamp = self.get_clock().now().to_msg()
 
         self.control_interface_PUB.publish(control_msg)
-        if False:
+        if True:
             if control_msg.forward != 0 or control_msg.left != 0 or control_msg.up != 0 or control_msg.roll != 0 or control_msg.pitch != 0 or control_msg.yaw != 0:
                 self.get_logger().info(f"🎮Forward:{control_msg.forward:> 6.2f} Left: {control_msg.left:> 6.2f} Up: {control_msg.up:> 6.2f} Roll: {control_msg.roll:> 6.2f} Pitch: {control_msg.pitch:> 6.2f} Yaw: {control_msg.yaw:> 6.2f}🛩️")
 

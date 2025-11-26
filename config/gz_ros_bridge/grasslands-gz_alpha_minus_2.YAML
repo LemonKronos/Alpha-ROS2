@@ -81,7 +81,7 @@
   lazy: true
   direction: GZ_TO_ROS
 
-  # Overview camera
+# Overview camera
 - gz_topic_name: "/alpha_cam_overview/camera/image"
   gz_type_name: "gz.msgs.Image"
   ros_topic_name: "sensor/overview_cam/camera/image"

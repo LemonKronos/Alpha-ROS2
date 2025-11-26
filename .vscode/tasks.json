@@ -29,7 +29,7 @@
         {
             "label": "Colcon Build Full ROS2 Workspace",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo",
+            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo; else echo \"Cancelled\"; fi",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -49,7 +49,7 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
+            }
         }
     ],
     "inputs": [
@@ -58,6 +58,13 @@
             "type": "promptString",
             "description": "Enter ROS2 package to build",
             "default": "finalize_control"
+        },
+        {
+            "id": "confirmFullBuild",
+            "type": "pickString",
+            "description": "Dude U sure want to re-build full ROS2 workspace?",
+            "options": ["Yes", "No"],
+            "default": "Yes"
         }
     ]
 }

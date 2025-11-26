@@ -1,5 +1,7 @@
 #include "finalize_control/finalize_control.hpp"
 
+#define ALLOW_ATTITUDE true
+
 FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     using namespace std::chrono_literals;
 
@@ -76,7 +78,7 @@ void FinalizeControlNode::NodeLoopCallback() {
     // Update drone data
     if(last_final_ctrl != nullptr) {
         control_state = last_final_ctrl->control_state;
-        if(last_final_ctrl->roll == 0.0f && last_final_ctrl->pitch == 0.0f) {
+        if(!ALLOW_ATTITUDE || (last_final_ctrl->roll == 0.0f && last_final_ctrl->pitch == 0.0f)) {
             if(offboard_mode != OffboardMode::VELOCITY) {
                 RCLCPP_INFO(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
             }
@@ -267,37 +269,35 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         else dq = Eigen::Quaternionf::Identity();
         Eigen::Quaternionf q_new = last_q * dq;
         q_new.normalize();
-        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
-
+        
         // Compute thrust maintaining world hover
         Eigen::Vector3f euler = q_new.toRotationMatrix().eulerAngles(0, 1, 2);
-        float roll = euler.x();
+        float roll  = euler.x();
         float pitch = euler.y();
         float hover_thrust = HOVER_THRUST / (cosf(roll) * cosf(pitch));
-        // There shouldn't be any velocity gain for hover and it should not lose altitude
-        hover_thrust += std::clamp(odo_z_velocity / SPEED_MAX_UP, -1.0f, 0.0f);
-
-        Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust); // hover
-
-        Eigen::Vector3f move_world(
+        Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust);
+        
+        Eigen::Vector3f move_body(
             last_final_ctrl->forward, // Should not matter when there are raw pitch control
             last_final_ctrl->left, // Should not matter when there are raw roll control
             last_final_ctrl->up
         );
-        Eigen::Vector3f move_body = q_new.inverse() * move_world;
-
+        
         Eigen::Vector3f total_thurst = hover_body + move_body;
         total_thurst = total_thurst.cwiseMax(-THRUST_SAFE_LIMIT).cwiseMin(THRUST_SAFE_LIMIT);
+        
+        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst);
     }
-    else {
-        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(last_q));
+    else { // Hover still
+        // Set body rate to flat, respect current yaw
+        Eigen::Quaternionf flat_q = frame_utils::eulerToQuaternion(0.0f, 0.0f, yaw_W);
 
-        // Hover thrust (respect current orientation)
-        Eigen::Vector3f thrust_world(0.0f, 0.0f, HOVER_THRUST);
-        Eigen::Vector3f thrust_body = last_q.inverse() * thrust_world;
+        // Hover thrust, respect current body rate
+        Eigen::Vector3f hover_body(0.0f, 0.0f, HOVER_THRUST);
 
-        msg.thrust_body = frame_utils::frameFLUtoFRD(thrust_body);
+        msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(flat_q));
+        msg.thrust_body = frame_utils::frameFLUtoFRD(hover_body);
     }
 
     msg.yaw_sp_move_rate = NO_DATA_f;

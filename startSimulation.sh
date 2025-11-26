@@ -50,6 +50,7 @@ source /opt/ros/jazzy/setup.zsh ;
 cd ~/MyCode/Project/Drone/ROS2 &&
 source install/setup.zsh ;
 source /home/mr_lemon/MyCode/Project/Drone/ROS2/pyvenv/bin/activate;
+export PYTHONNOUSERSITE=1;
 exec zsh' & echo $! >> /tmp/sim_pids.txt &&
 printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
 
@@ -58,10 +59,18 @@ printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
   source /opt/ros/jazzy/setup.bash
   cd ~/MyCode/Project/Drone/ROS2
   source install/setup.bash
+  
+  # Wait for clock to ensure GZ is up
   until gz topic -l | grep -q "/clock"; do sleep 1; done
+  
   CONFIG_FILE="$HOME/MyCode/Project/Drone/ROS2/config/gz_ros_bridge/${WORLD_NAME}-${DRONE_NAME}.YAML"
+  
+  SERVICE_BRIDGE="/world/${WORLD_NAME}/control@ros_gz_interfaces/srv/ControlWorld"
+
   if [[ -f "$CONFIG_FILE" ]]; then
-    ros2 run ros_gz_bridge parameter_bridge --ros-args -p config_file:="$CONFIG_FILE"
+    ros2 run ros_gz_bridge parameter_bridge \
+      "$SERVICE_BRIDGE" \
+      --ros-args -p config_file:="$CONFIG_FILE"
   else
     printf "\033[33m[GZ_ROS2_BRIDGE] No config file for this run!\033[0m\n"
     echo "$WORLD_NAME-$DRONE_NAME.YAML - file = $CONFIG_FILE"

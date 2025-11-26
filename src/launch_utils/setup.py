@@ -12,7 +12,8 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
             'launch_utils/lidar_2d_handler_launch.py',
-            'launch_utils/virtual_control_launch.py',
+            'launch_utils/pygame_control_launch.py',
+            'launch_utils/phone_control_launch.py',
             'launch_utils/gather_data_launch.py',
         ]),
     ],

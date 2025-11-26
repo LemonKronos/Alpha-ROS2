@@ -7,11 +7,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
 <title>Alpha Control Minus 2</title>
 <style>
-    /* === CORE UI === */
+    /* === CORE UI: SCI-FI GREEN === */
     body {
-        background-color: #111;
-        color: #00f3ff;
-        font-family: 'Courier New', Courier, monospace;
+        background-color: #050505;
+        color: #00ff41; /* Neon Green */
+        font-family: 'Consolas', 'Courier New', monospace; /* Tech font */
         margin: 0;
         overflow: hidden;
         touch-action: none; 
@@ -21,6 +21,12 @@
         width: 100vw;
         user-select: none;
         -webkit-user-select: none;
+        
+        /* Subtle Grid Background */
+        background-image: 
+            linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+        background-size: 30px 30px;
     }
 
     /* === LOADING OVERLAY === */
@@ -32,8 +38,11 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        color: #00f3ff;
-        font-size: 20px;
+        color: #00ff41;
+        font-size: 24px;
+        letter-spacing: 4px;
+        text-shadow: 0 0 10px #00ff41;
+        font-weight: bold;
         transition: opacity 0.5s;
     }
 
@@ -42,66 +51,77 @@
         position: absolute;
         top: 0; left: 0;
         width: 100%;
-        height: 45px;
-        background: linear-gradient(to bottom, rgba(0, 30, 30, 0.95), transparent);
-        border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        height: 50px;
+        background: linear-gradient(to bottom, rgba(0, 20, 0, 0.95), rgba(0,0,0,0));
+        border-bottom: 2px solid rgba(0, 255, 65, 0.3);
         display: flex;
         justify-content: space-between;
         align-items: center;
         z-index: 100;
-        padding: 0 10px;
+        padding: 0 15px;
         box-sizing: border-box;
+        box-shadow: 0 5px 15px rgba(0, 255, 65, 0.05);
     }
 
-    .hud-group { display: flex; align-items: center; gap: 15px; }
+    .hud-group { display: flex; align-items: center; gap: 20px; }
     .hud-group.center { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
 
     /* === BUTTONS === */
     .hud-btn {
-        background: none;
-        border: 1px solid rgba(0, 243, 255, 0.3);
-        border-radius: 5px;
-        width: 36px; height: 36px;
+        background: rgba(0, 20, 0, 0.6);
+        border: 1px solid #00ff41;
+        border-radius: 4px; /* Slightly squarer for tech look */
+        width: 40px; height: 40px;
         display: flex; justify-content: center; align-items: center;
         cursor: pointer;
-        fill: #00f3ff;
+        fill: #00ff41;
+        box-shadow: 0 0 5px rgba(0, 255, 65, 0.1);
+        transition: all 0.2s;
     }
-    .hud-btn:active { background: rgba(0, 243, 255, 0.2); transform: scale(0.95); }
+    .hud-btn:active { 
+        background: rgba(0, 255, 65, 0.2); 
+        box-shadow: 0 0 15px #00ff41;
+        transform: scale(0.95); 
+    }
     
     #btn-record.recording {
         border-color: #ff3333; fill: #ff3333;
-        background: rgba(255, 51, 51, 0.1);
+        background: rgba(255, 0, 0, 0.1);
         box-shadow: 0 0 10px #ff3333;
-        animation: pulse 2s infinite;
+        animation: pulse 1.5s infinite;
     }
-    
-    /* NEW: Hide pause button by default */
-    #btn-pause { display: none; }
-    #btn-pause.paused { fill: #ffaa00; border-color: #ffaa00; }
+    #btn-pause.paused { fill: #ffcc00; border-color: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
 
     #status-text {
-        font-size: 14px; letter-spacing: 2px;
-        text-shadow: 0 0 5px #00f3ff; font-weight: bold;
+        font-size: 16px; letter-spacing: 3px;
+        text-shadow: 0 0 8px #00ff41; font-weight: bold;
+        text-transform: uppercase;
     }
 
     /* === JOYSTICKS === */
     .joy-container {
         position: absolute;
-        bottom: 8%; 
-        height: 65vh; width: 65vh;  
+        bottom: 10%; 
+        height: 60vh; width: 60vh;  
         max-width: 45vw; max-height: 45vw; 
         z-index: 50;
     }
-    #zone-left { left: 5vw; }
-    #zone-right { right: 5vw; }
+    #zone-left { left: 6vw; }
+    #zone-right { right: 6vw; }
 
     canvas {
         width: 100%; height: 100%; display: block;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+        /* Radar / Scope Look */
+        background: 
+            radial-gradient(circle, rgba(0, 255, 65, 0.1) 0%, transparent 60%),
+            linear-gradient(0deg, transparent 49%, rgba(0, 255, 65, 0.2) 50%, transparent 51%),
+            linear-gradient(90deg, transparent 49%, rgba(0, 255, 65, 0.2) 50%, transparent 51%);
+        border: 1px solid rgba(0, 255, 65, 0.3);
+        box-shadow: 0 0 15px rgba(0, 255, 65, 0.1) inset;
     }
 
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    @keyframes pulse { 0% { opacity: 1; box-shadow: 0 0 10px #ff3333; } 50% { opacity: 0.6; box-shadow: 0 0 2px #ff3333; } 100% { opacity: 1; box-shadow: 0 0 10px #ff3333; } }
 </style>
 </head>
 <body>
@@ -175,27 +195,12 @@ function initApp() {
             // START RECORDING
             btnRecord.classList.add("recording");
             statusEl.innerText = "REC ●";
-            statusEl.style.color = "#ff3333";
-            
-            // SHOW Pause Button (Use flex to keep alignment)
-            btnPause.style.display = "flex";
-            
+            statusEl.style.color = "#ff3333";           
         } else {
             // STOP RECORDING
             btnRecord.classList.remove("recording");
             statusEl.innerText = "STANDBY";
             statusEl.style.color = "#00f3ff";
-            
-            // HIDE Pause Button
-            btnPause.style.display = "none";
-            
-            // RESET Pause State if active
-            if (flags.pause) {
-                flags.pause = false;
-                btnPause.classList.remove("paused");
-                document.getElementById("icon-pause").style.display = "block";
-                document.getElementById("icon-play").style.display = "none";
-            }
         }
     });
 
@@ -221,10 +226,29 @@ function initApp() {
         else if (document.exitFullscreen) document.exitFullscreen();
     });
 
-    // --- WebSocket ---
-    ws = new WebSocket(WS_URL);
-    ws.onopen = () => { statusEl.innerText = "CONNECTED"; statusEl.style.color = "#00f3ff"; };
-    ws.onclose = () => { statusEl.innerText = "DISCONNECTED"; statusEl.style.color = "#ff3333"; };
+    // --- WebSocket (Auto-Reconnect) ---
+    function connect() {
+        ws = new WebSocket(WS_URL);
+        
+        ws.onopen = () => { 
+            statusEl.innerText = "CONNECTED"; 
+            statusEl.style.color = "#00f3ff"; 
+        };
+        
+        ws.onclose = () => { 
+            statusEl.innerText = "RECONNECTING..."; 
+            statusEl.style.color = "#ffaa00"; 
+            // Try to reconnect in 1 second
+            setTimeout(connect, 1000);
+        };
+        
+        ws.onerror = (e) => {
+            ws.close(); // Close to trigger onclose and retry
+        };
+    }
+    
+    // Initial connection
+    connect();
 
     // --- Joysticks ---
     stickLeft = new Joystick("canvasLeft", "rgba(255, 160, 0, 0.8)");

@@ -3,12 +3,18 @@ Contain ROS2 logic for Alpha
 
 BUGs:
 - ReactiveOA node:
-    - Unstable
-    - Lose altitude after Reactive OA take control
+    - Unstable: cause lidar 2D read drone 2D
 - Record Arobatic:
-    - It work with python run but not ROS2 run, cause pypackage: ros2 cv bridge
+    - Depth cam just black
+    - It take too much network banwidth
+- Finalize Control:
+    - Attitude setpoint never good enough
+
 
 TODOs:
-- Record Acrobatic
-    - Needed pause that pause Gazebo
-    - Try fix py dependency
+- Record Acrobatic:
+    - Name episode to numerically increase, not a timebase name
+    - Release network banwidth
+    - Fix depth cam record
+- Finalize Control:
+    - Try refine Attitude setpoint
