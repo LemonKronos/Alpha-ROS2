@@ -78,7 +78,7 @@ void FinalizeControlNode::NodeLoopCallback() {
     // Update drone data
     if(last_final_ctrl != nullptr) {
         control_state = last_final_ctrl->control_state;
-        if(!ALLOW_ATTITUDE || (last_final_ctrl->roll < ATTITUDE_THRESHOLD && last_final_ctrl->pitch < ATTITUDE_THRESHOLD)) {
+        if(!ALLOW_ATTITUDE || (abs(last_final_ctrl->roll) <= ATTITUDE_THRESHOLD && abs(last_final_ctrl->pitch) <= ATTITUDE_THRESHOLD)) {
             if(offboard_mode != OffboardMode::VELOCITY) {
                 RCLCPP_INFO(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
             }
@@ -260,7 +260,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         // Body rate to world quaternion
         Eigen::Vector3f omega(
             last_final_ctrl->roll * 2*M_PIf,
-            last_final_ctrl->pitch * 2*M_PIf,
+            -last_final_ctrl->pitch * 2*M_PIf, // No idea why!
             last_final_ctrl->yaw * 2*M_PIf
         );
         float angle = omega.norm() * SYSTEM_LOOP_CYCLE;
@@ -278,16 +278,16 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust);
         
         Eigen::Vector3f move_body(
-            last_final_ctrl->forward, // Should not matter when there are raw pitch control
-            last_final_ctrl->left, // Should not matter when there are raw roll control
-            last_final_ctrl->up
+            last_final_ctrl->forward, // Do not matter in acrobatic control for multicopter
+            last_final_ctrl->left,  // Do not matter in acrobatic control for multicopter
+            last_final_ctrl->up // See as throttle in acrobatic control for multicopter
         );
         
         Eigen::Vector3f total_thurst = hover_body + move_body;
         total_thurst = total_thurst.cwiseMax(-THRUST_SAFE_LIMIT).cwiseMin(THRUST_SAFE_LIMIT);
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
-        msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst);
+        msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw

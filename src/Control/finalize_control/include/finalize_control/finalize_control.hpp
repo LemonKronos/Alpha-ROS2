@@ -14,7 +14,7 @@
 
 #include <algorithm>
 
-constexpr float ATTITUDE_THRESHOLD = 0.25f;
+constexpr float ATTITUDE_THRESHOLD = 0.01f;
 
 using std::placeholders::_1;
 

@@ -13,6 +13,11 @@ from advance_control.web_socket_controller import WebSocketController # Web cont
 from ros2_msgs.msg import RecordControl # Record flag
 from ros2_msgs.msg import ControlInterface # Control interface
 
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+
 # Constants
 SYSTEM_CYCLE = 1/30
 
@@ -37,6 +42,8 @@ class AdvanceControlNode(Node):
         # Init variable
         self.last_record = False
         self.last_pause = False
+        self.no_input = True # For Logging
+        self.no_input_log = True # For Logging
 
     def timer_callback(self):
         # Call web control to get lastest control input
@@ -58,7 +65,17 @@ class AdvanceControlNode(Node):
 
         self.control_interface_PUB.publish(control_msg)
         if True:
-            self.get_logger().info(f"🎮Forward:{control_msg.forward:> 6.2f} Left: {control_msg.left:> 6.2f} Up: {control_msg.up:> 6.2f} Roll: {control_msg.roll:> 6.2f} Pitch: {control_msg.pitch:> 6.2f} Yaw: {control_msg.yaw:> 6.2f}🛩️")
+            if self.no_input_log and self.no_input:
+                self.get_logger().info(" Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
+                self.no_input_log = False
+
+            if control_msg.forward != 0 or control_msg.left != 0 or control_msg.up != 0 or control_msg.roll != 0 or control_msg.pitch != 0 or control_msg.yaw != 0:
+                self.get_logger().info(f" Forwar{control_msg.forward:> 5.2f}🔼   Left{control_msg.left:> 5.2f}◀️   Up{control_msg.up:> 5.2f}⬆️   Roll{control_msg.roll:> 5.2f}🔄   Pitch{control_msg.pitch:> 5.2f}↕️   Yaw{control_msg.yaw:> 5.2f}↔️")
+                self.no_input = False
+                self.no_input_log = True
+
+            else:
+                self.no_input = True
 
         # Record msg, publish when change
         new_record = commands.get('record', False)
@@ -76,14 +93,14 @@ class AdvanceControlNode(Node):
             self.last_pause  = new_pause
 
             if new_record:
-                self.get_logger().info("Start record")
+                self.get_logger().info( f"{GREEN}Start record{RESET}")
             else:
-                self.get_logger().info("Stop record")
+                self.get_logger().info(f"{GREEN}Stop record{RESET}")
 
             if new_pause:
-                self.get_logger().info("Pause record...")
+                self.get_logger().info(f"{YELLOW}Pause record...{RESET}")
             else:
-                self.get_logger().info("Continue record...")
+                self.get_logger().info(f"{YELLOW}Continue record...{RESET}")
 
     def destroy_node(self):
         # Stop the background thread when the node shuts down

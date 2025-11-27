@@ -131,9 +131,9 @@ namespace frame_utils {
         return q_transform * qQ;
     }
     
-    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame
+    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame THIS COULD BE WRONG!
     inline Eigen::Quaternionf quaternionENUtoNED(const Eigen::Quaternionf& q) {
-        Eigen::Quaternionf q_transform(0, -M_SQRT1_2f, -M_SQRT1_2f, 0);
+        Eigen::Quaternionf q_transform(0, M_SQRT1_2f, M_SQRT1_2f, 0);
         return q_transform * q;
     }
 

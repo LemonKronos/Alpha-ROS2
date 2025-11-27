@@ -16,7 +16,7 @@ constexpr float SPEED_MAX_STRAFE = 8.0f;
 constexpr float SPEED_MAX_UP = 5.0f;
 constexpr float SPEED_MAX_DOWN = 2.0f;
 constexpr float THRUST_SAFE_LIMIT = 0.8f;
-constexpr float HOVER_THRUST = -0.5f; // Thrust opposite with moving direction, so in FLU negative = push downward
+constexpr float HOVER_THRUST = -0.525f; // Thrust opposite with moving direction, so in FLU negative = push downward
 
 constexpr float DEGREE = 0.017453292f;
 

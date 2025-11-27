@@ -5,9 +5,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-<title>Alpha Control Minus 2</title>
+<title>Alpha Control Minus 2 [V3]</title>
 <style>
-    /* === CORE UI: SCI-FI GREEN === */
+    /* === CORE UI: SCI-FI GREEN (ORIGINAL) === */
     body {
         background-color: #050505;
         color: #00ff41; /* Neon Green */
@@ -70,7 +70,7 @@
     .hud-btn {
         background: rgba(0, 20, 0, 0.6);
         border: 1px solid #00ff41;
-        border-radius: 4px; /* Slightly squarer for tech look */
+        border-radius: 4px; 
         width: 40px; height: 40px;
         display: flex; justify-content: center; align-items: center;
         cursor: pointer;
@@ -112,7 +112,6 @@
     canvas {
         width: 100%; height: 100%; display: block;
         border-radius: 50%;
-        /* Radar / Scope Look */
         background: 
             radial-gradient(circle, rgba(0, 255, 65, 0.1) 0%, transparent 60%),
             linear-gradient(0deg, transparent 49%, rgba(0, 255, 65, 0.2) 50%, transparent 51%),
@@ -151,7 +150,14 @@
 // ========================
 const WS_URL = "ws://10.64.30.129:8765";
 const SEND_RATE_MS = 33; 
-const GYRO_RANGE = 45; 
+
+// Gyro Config
+const GYRO_DEADZONE = 15; // Degrees to ignore (idle zone)
+const GYRO_ACTIVE_RANGE = 45; // Degrees of movement AFTER the deadzone
+
+// Joystick Config
+const JOY_THUMB_RADIUS = 30; // The visual size of the thumb stick
+const JOY_DEADZONE_RADIUS = 40; // The visual size of the deadzone (pixels)
 
 // ========================
 // SYSTEM BOOT
@@ -182,26 +188,57 @@ let ws;
 function initApp() {
     
     // --- UI Setup ---
-    const statusEl = document.getElementById("status-text");
     const btnRecord = document.getElementById("btn-record");
     const btnPause = document.getElementById("btn-pause");
     const btnFs = document.getElementById("btn-fs");
     let flags = { record: false, pause: false };
 
+    // Function to force update the UI status based on priority
+    const updateGlobalStatus = () => {
+        const statusEl = document.getElementById("status-text");
+        
+        // Priority 1: Connection Issues
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            statusEl.innerText = "DISCONNECTED";
+            statusEl.style.color = "#ffaa00";
+            return;
+        }
+
+        // Priority 2: Pause State
+        if (flags.pause) {
+            statusEl.innerText = "PAUSED";
+            statusEl.style.color = "#ffaa00";
+            return;
+        }
+
+        // Priority 3: Recording
+        if (flags.record) {
+            statusEl.innerText = "REC ●";
+            statusEl.style.color = "#ff3333";
+            return;
+        }
+
+        // Priority 4: Activity
+        if (controlsActive) {
+            statusEl.innerText = "ACTIVE";
+            statusEl.style.color = "#00ff41";
+            return;
+        }
+
+        // Priority 5: Default
+        statusEl.innerText = "READY";
+        statusEl.style.color = "#00f3ff";
+    };
+
     btnRecord.addEventListener("click", () => {
         flags.record = !flags.record;
         
         if (flags.record) {
-            // START RECORDING
-            btnRecord.classList.add("recording");
-            statusEl.innerText = "REC ●";
-            statusEl.style.color = "#ff3333";           
+            btnRecord.classList.add("recording");         
         } else {
-            // STOP RECORDING
             btnRecord.classList.remove("recording");
-            statusEl.innerText = "STANDBY";
-            statusEl.style.color = "#00f3ff";
         }
+        updateGlobalStatus();
     });
 
     btnPause.addEventListener("click", () => {
@@ -210,15 +247,12 @@ function initApp() {
             btnPause.classList.add("paused");
             document.getElementById("icon-pause").style.display = "none";
             document.getElementById("icon-play").style.display = "block";
-            statusEl.innerText = "PAUSED";
-            statusEl.style.color = "#ffaa00";
         } else {
             btnPause.classList.remove("paused");
             document.getElementById("icon-pause").style.display = "block";
             document.getElementById("icon-play").style.display = "none";
-            statusEl.innerText = "REC ●"; // If unpausing, we must be recording
-            statusEl.style.color = "#ff3333";
         }
+        updateGlobalStatus();
     });
 
     btnFs.addEventListener("click", () => {
@@ -231,19 +265,16 @@ function initApp() {
         ws = new WebSocket(WS_URL);
         
         ws.onopen = () => { 
-            statusEl.innerText = "CONNECTED"; 
-            statusEl.style.color = "#00f3ff"; 
+            updateGlobalStatus();
         };
         
         ws.onclose = () => { 
-            statusEl.innerText = "RECONNECTING..."; 
-            statusEl.style.color = "#ffaa00"; 
-            // Try to reconnect in 1 second
+            updateGlobalStatus();
             setTimeout(connect, 1000);
         };
         
         ws.onerror = (e) => {
-            ws.close(); // Close to trigger onclose and retry
+            ws.close(); 
         };
     }
     
@@ -251,8 +282,13 @@ function initApp() {
     connect();
 
     // --- Joysticks ---
-    stickLeft = new Joystick("canvasLeft", "rgba(255, 160, 0, 0.8)");
-    stickRight = new Joystick("canvasRight", "rgba(0, 240, 255, 0.8)");
+    const onStickActivity = (isActive) => {
+        controlsActive = isActive;
+        updateGlobalStatus();
+    };
+
+    stickLeft = new Joystick("canvasLeft", "rgba(255, 160, 0, 0.8)", onStickActivity);
+    stickRight = new Joystick("canvasRight", "rgba(0, 240, 255, 0.8)", onStickActivity);
 
     // --- Loop ---
     setInterval(() => gameLoop(flags, ws), SEND_RATE_MS);
@@ -276,41 +312,50 @@ function getShortestDiff(current, base) {
     return diff;
 }
 
+// Deadzone helper for Joysticks (Normalized 0-1 logic)
+function applyRadialDeadzone(x, y, deadzoneThreshold) {
+    const mag = Math.sqrt(x*x + y*y);
+    if (mag < deadzoneThreshold) {
+        return { x: 0, y: 0 };
+    } else {
+        // Rescale the remaining range (from threshold to 1) to be 0 to 1
+        // formula: (val - deadzone) / (1 - deadzone)
+        const activeMag = mag - deadzoneThreshold;
+        const normalizedMag = activeMag / (1 - deadzoneThreshold);
+        const scale = normalizedMag / mag; // Keep the original angle
+        return { x: x * scale, y: y * scale };
+    }
+}
+
 window.addEventListener("deviceorientation", e => {
     gyroRaw.beta = e.beta || 0;
     gyroRaw.gamma = e.gamma || 0;
 });
 
-function activateGyro(statusEl) {
+function activateGyro() {
     if (!controlsActive) {
         controlsActive = true;
         gyroBase.roll = gyroRaw.beta;
         gyroBase.pitch = gyroRaw.gamma;
-        if(statusEl && statusEl.innerText === "WAITING...") statusEl.innerText = "ACTIVE";
-    }
-}
-
-function checkIdle(statusEl, flags) {
-    if (stickLeft.touchId === null && stickRight.touchId === null) {
-        controlsActive = false;
-        // Don't overwrite REC/PAUSE status text
-        if (statusEl && !flags.record && !flags.pause) {
-            statusEl.innerText = "READY";
-            statusEl.style.color = "#00f3ff";
-        }
     }
 }
 
 class Joystick {
-    constructor(canvasId, color) {
+    constructor(canvasId, color, statusCallback) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext("2d");
         this.color = color;
+        this.statusCallback = statusCallback;
         this.touchId = null;
+        
+        // Calculated during resize
+        this.maxDist = 0;
+        this.deadzoneRatio = 0; 
+
         this.resize();
         window.addEventListener('resize', () => this.resize());
         this.pos = { x: this.center, y: this.center };
-        this.val = { x: 0, y: 0 };
+        this.val = { x: 0, y: 0 }; // Raw values
         this.initEvents();
         this.draw();
     }
@@ -323,6 +368,12 @@ class Joystick {
         this.size = rect.width;
         this.center = this.size / 2;
         this.radius = this.size / 2;
+        
+        // Calculate dynamic properties
+        this.maxDist = this.radius - 35; // Max travel distance
+        // Logic: Calculate what % of max travel corresponds to the fixed pixel size of deadzone
+        this.deadzoneRatio = JOY_DEADZONE_RADIUS / this.maxDist; 
+        
         this.pos = { x: this.center, y: this.center };
         this.draw();
     }
@@ -330,10 +381,11 @@ class Joystick {
     initEvents() {
         const start = (e) => {
             e.preventDefault();
-            activateGyro(document.getElementById("status-text"));
+            activateGyro();
             if (this.touchId === null) {
                 this.touchId = e.changedTouches[0].identifier;
                 this.update(e.changedTouches[0]);
+                this.statusCallback(true);
             }
         };
         const move = (e) => {
@@ -345,10 +397,9 @@ class Joystick {
             for (let t of e.changedTouches) if (t.identifier === this.touchId) {
                 this.touchId = null;
                 this.reset();
-                // Pass current flags to avoid overwriting status
-                const isRec = document.getElementById("btn-record").classList.contains("recording");
-                const isPaused = document.getElementById("btn-pause").classList.contains("paused");
-                checkIdle(document.getElementById("status-text"), {record: isRec, pause: isPaused});
+                if (stickLeft.touchId === null && stickRight.touchId === null) {
+                    this.statusCallback(false);
+                }
             }
         };
         this.canvas.addEventListener("touchstart", start);
@@ -362,17 +413,19 @@ class Joystick {
         const dx = (touch.clientX - rect.left) - this.center;
         const dy = (touch.clientY - rect.top) - this.center;
         const dist = Math.sqrt(dx*dx + dy*dy);
-        const maxDist = this.radius - 35;
+        
         let drawX = dx, drawY = dy;
-        if (dist > maxDist) {
-            const ratio = maxDist / dist;
+        if (dist > this.maxDist) {
+            const ratio = this.maxDist / dist;
             drawX *= ratio;
             drawY *= ratio;
         }
         this.pos.x = this.center + drawX;
         this.pos.y = this.center + drawY;
-        this.val.x = drawX / maxDist;
-        this.val.y = drawY / maxDist;
+        
+        // Raw normalized output (-1 to 1)
+        this.val.x = drawX / this.maxDist;
+        this.val.y = drawY / this.maxDist;
         this.draw(true);
     }
 
@@ -387,11 +440,25 @@ class Joystick {
     draw(active) {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.size, this.size);
+        
+        // 1. Outer Limit Ring
         ctx.beginPath();
         ctx.arc(this.center, this.center, this.radius - 2, 0, Math.PI*2);
         ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
+        
+        // 2. Deadzone Ring (Visual)
+        // Draw a circle indicating the idle zone
         ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, 30, 0, Math.PI*2);
+        ctx.arc(this.center, this.center, JOY_DEADZONE_RADIUS, 0, Math.PI*2);
+        ctx.strokeStyle = "rgba(0, 255, 65, 0.2)"; // Faint green
+        ctx.lineWidth = 1; 
+        ctx.setLineDash([5, 5]); // Dashed line for technical look
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+
+        // 3. The Joystick Thumb
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, JOY_THUMB_RADIUS, 0, Math.PI*2);
         ctx.fillStyle = active ? this.color : "#444"; ctx.fill();
         ctx.strokeStyle = active ? "#fff" : "#666"; ctx.lineWidth = 2; ctx.stroke();
     }
@@ -401,21 +468,47 @@ class Joystick {
 // GAME LOOP
 // ========================
 function gameLoop(flags, ws) {
-    output.x = -stickLeft.val.y;
-    output.y = -stickLeft.val.x;
-    output.z = -stickRight.val.y;
-    output.yaw = -stickRight.val.x;
+    
+    // 1. Joystick Processing with Deadzone
+    // We use the calculated deadzone ratio from the stick class to ensure logic matches visual
+    const leftOut = applyRadialDeadzone(stickLeft.val.x, stickLeft.val.y, stickLeft.deadzoneRatio);
+    const rightOut = applyRadialDeadzone(stickRight.val.x, stickRight.val.y, stickRight.deadzoneRatio);
 
+    output.x = -leftOut.y;
+    output.y = -leftOut.x;
+    output.z = -rightOut.y;
+    output.yaw = -rightOut.x;
+
+    // 2. Gyro Processing with Deadzone
     if (controlsActive) {
         let rollDiff = getShortestDiff(gyroRaw.beta, gyroBase.roll);
         let pitchDiff = getShortestDiff(gyroRaw.gamma, gyroBase.pitch);
-        output.roll = clamp(rollDiff / GYRO_RANGE, -1, 1);
-        output.pitch = clamp(pitchDiff / GYRO_RANGE, -1, 1);
+        
+        // Roll Calculation
+        if (Math.abs(rollDiff) < GYRO_DEADZONE) {
+            output.roll = 0; // In idle zone
+        } else {
+            let activeDiff = Math.abs(rollDiff) - GYRO_DEADZONE;
+            output.roll = Math.sign(rollDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+        }
+
+        // Pitch Calculation
+        if (Math.abs(pitchDiff) < GYRO_DEADZONE) {
+            output.pitch = 0; // In idle zone
+        } else {
+            let activeDiff = Math.abs(pitchDiff) - GYRO_DEADZONE;
+            output.pitch = Math.sign(pitchDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+        }
+
+        output.roll = clamp(output.roll, -1, 1);
+        output.pitch = clamp(output.pitch, -1, 1);
+
     } else {
         output.roll = 0;
         output.pitch = 0;
     }
 
+    // 3. Send Data
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             x: round(output.x),
