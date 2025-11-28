@@ -2,6 +2,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "global_utils/utils.hpp"
+#include "global_utils/system_config.hpp"
 #include "ros2_msgs/msg/contact_sensor.hpp"
 #include "ros_gz_interfaces/msg/contact.hpp"
 #include "ros_gz_interfaces/msg/contacts.hpp"

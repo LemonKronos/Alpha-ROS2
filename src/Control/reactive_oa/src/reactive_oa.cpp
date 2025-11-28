@@ -3,6 +3,8 @@
 ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     RCLCPP_INFO(this->get_logger(), "Reactive OA Node has been started.");
 
+    setup_for_simulation(this);
+    
     // Publisher
     final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>("control/final", 10);
 
@@ -30,7 +32,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         std::bind(&ReactiveOANode::perceptionCallback, this, _1));
 
     // Timer
-    node_loop_TIME = this->create_wall_timer(
+    node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );

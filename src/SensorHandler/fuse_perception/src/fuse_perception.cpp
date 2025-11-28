@@ -3,6 +3,8 @@
 FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     using namespace std::chrono_literals;
 
+    setup_for_simulation(this);
+    
     // Create Publisher
     fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>("/on_drone/sensor/fuse_perception", rclcpp::SensorDataQoS());
 
@@ -26,7 +28,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     );
 
     // Create wall timers
-    publish_TIM = this->create_wall_timer(
+    publish_TIM = this->create_timer(
         std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
         std::bind(&FusePerceptionNode::PublishCallback, this)
     );

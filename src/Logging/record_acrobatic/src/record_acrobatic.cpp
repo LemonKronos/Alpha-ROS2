@@ -10,6 +10,8 @@ RecordAcrobaticNode::RecordAcrobaticNode()
       dim_input_(640, 480),
       dim_overview_(1280, 720)
 {
+    setup_for_simulation(this);
+
     // Path Config
     dataset_root_ = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/simulated_expert";
     fs::create_directories(dataset_root_);
@@ -46,7 +48,7 @@ RecordAcrobaticNode::RecordAcrobaticNode()
     client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>("/world/grasslands/control");
 
     // Timer
-    timer_ = this->create_wall_timer(
+    timer_ = this->create_timer(
         std::chrono::duration<double>(SYSTEM_CYCLE), 
         std::bind(&RecordAcrobaticNode::node_loop_callback, this));
 }
@@ -259,7 +261,7 @@ void RecordAcrobaticNode::start_pause() {
     req->world_control.pause = true;
     client_gz_->async_send_request(req);
     pausing_ = true;
-    RCLCPP_INFO(this->get_logger(), YELLOW "Sim Paused" RESET);
+    RCLCPP_INFO(this->get_logger(), YELLOW "Simulation Paused" RESET);
 }
 
 void RecordAcrobaticNode::stop_pause() {
@@ -267,7 +269,7 @@ void RecordAcrobaticNode::stop_pause() {
     req->world_control.pause = false;
     client_gz_->async_send_request(req);
     pausing_ = false;
-    RCLCPP_INFO(this->get_logger(), YELLOW "Sim Continued" RESET);
+    RCLCPP_INFO(this->get_logger(), YELLOW "Simulation Continued" RESET);
 }
 
 // ------------------ Callbacks ------------------

@@ -12,6 +12,7 @@ from rclpy.node import Node
 from advance_control.web_socket_controller import WebSocketController # Web control
 from ros2_msgs.msg import RecordControl # Record flag
 from ros2_msgs.msg import ControlInterface # Control interface
+from python_utils.utils import setup_for_simulation
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -25,6 +26,8 @@ class AdvanceControlNode(Node):
     def __init__(self):
         super().__init__('advance_control_node')
         
+        setup_for_simulation(self)
+
         # Initialize and Start the WebSocket Controller
         self.web_controller = WebSocketController()
         self.web_controller.start()
@@ -64,7 +67,7 @@ class AdvanceControlNode(Node):
         control_msg.header.stamp = self.get_clock().now().to_msg()
 
         self.control_interface_PUB.publish(control_msg)
-        if True:
+        if False:
             if self.no_input_log and self.no_input:
                 self.get_logger().info(" Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
                 self.no_input_log = False

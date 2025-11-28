@@ -2,6 +2,8 @@
 
 ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     using namespace std::chrono_literals;
+
+    setup_for_simulation(this);
     
     // Create Subscriber
     contact_body_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
@@ -38,7 +40,7 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(CONTACT_SENSOR_DIR, rclcpp::SensorDataQoS());
 
     // Create wall timer
-    Contact_pub_TIME = this->create_wall_timer(
+    Contact_pub_TIME = this->create_timer(
         std::chrono::nanoseconds(PUBLISH_CYCLE),
         std::bind(&ContactParserNode::PublisherCallback, this)
     );

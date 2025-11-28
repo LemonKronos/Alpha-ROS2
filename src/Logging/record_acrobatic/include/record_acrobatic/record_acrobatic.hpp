@@ -35,6 +35,7 @@ episode structure:
 #include <string>
 #include <mutex>
 #include "global_utils/utils.hpp"
+#include "global_utils/system_config.hpp"
 
 // ROS Messages
 #include "ros2_msgs/msg/control_interface.hpp"

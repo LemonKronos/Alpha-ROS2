@@ -5,6 +5,8 @@
 FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     using namespace std::chrono_literals;
 
+    setup_for_simulation(this);
+    
     // Create Subscriber
     final_ctrl_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
         "control/final",
@@ -34,7 +36,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     trajectory_set_PUB = this->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 
     // Create wall timer
-    node_loop_TIME = this->create_wall_timer(
+    node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
         std::bind(&FinalizeControlNode::NodeLoopCallback, this)
     );
@@ -80,13 +82,13 @@ void FinalizeControlNode::NodeLoopCallback() {
         control_state = last_final_ctrl->control_state;
         if(!ALLOW_ATTITUDE || (abs(last_final_ctrl->roll) <= ATTITUDE_THRESHOLD && abs(last_final_ctrl->pitch) <= ATTITUDE_THRESHOLD)) {
             if(offboard_mode != OffboardMode::VELOCITY) {
-                RCLCPP_INFO(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
+                RCLCPP_WARN(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
             }
             offboard_mode = OffboardMode::VELOCITY;
         }
         else {
             if(offboard_mode != OffboardMode::ATTITUDE) {
-                RCLCPP_INFO(this->get_logger(), TEAL "Change mode to ATTITUDE" RESET);
+                RCLCPP_WARN(this->get_logger(), TEAL "Change mode to ATTITUDE" RESET);
             }
             offboard_mode = OffboardMode::ATTITUDE;
         }

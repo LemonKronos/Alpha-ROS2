@@ -9,6 +9,7 @@ import time
 import pygame
 import rclpy
 from rclpy.node import Node
+# from python_utils.utils import setup_for_simulation
 
 # Adjust this import path to match your message package
 from ros2_msgs.msg import ControlInterface
@@ -36,6 +37,8 @@ def clamp(val, low = -1, high = 1):
 class PygameControlNode:
     def __init__(self, node: Node):
         self.node = node
+
+        # setup_for_simulation(self)
 
         # Movement / tuning params
         self.WASD_SPEED = 10.0

@@ -6,6 +6,8 @@
 Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") {
     using namespace std::chrono_literals;
 
+    setup_for_simulation(this);
+
     // Create Subscriber
     raw_scan_SUB = this->create_subscription<sensor_msgs::msg::LaserScan>(
         "/sensor/lidar_2d/scan",
@@ -25,7 +27,7 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
     obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(FAR_TOPIC_DIR, rclcpp::SensorDataQoS());
     
     // Create Wall timer
-    sensor_alive_timer = this->create_wall_timer(
+    sensor_alive_timer = this->create_timer(
         std::chrono::nanoseconds(HEART_BEAT_CYCLE),
         std::bind(&Lidar2dHandlerNode::SensorHealthCallback, this)
     );
