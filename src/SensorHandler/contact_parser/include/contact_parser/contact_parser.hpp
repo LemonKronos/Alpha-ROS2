@@ -9,7 +9,6 @@
 
 using std::placeholders::_1;
 
-constexpr const char* CONTACT_SENSOR_DIR = "/on_drone/sensor/contact";
 constexpr uint64_t PUBLISH_CYCLE = 1e8;
 
 class ContactParserNode : public rclcpp::Node {

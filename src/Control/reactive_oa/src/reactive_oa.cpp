@@ -6,28 +6,28 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     setup_for_simulation(this);
     
     // Publisher
-    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>("control/final", 10);
+    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(CONTROL_FINAL_TOPIC, 10);
 
     #ifdef VISUALIZE
-        control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
-        movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
-        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
-        correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
+        control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_CONTROL_VEC_TOPIC, 10);
+        movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_MOVEMENT_VEC_TOPIC, 10);
+        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_REPULSIVE_VEC_TOPIC, 10);
+        correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_CORRECTION_VEC_TOPIC, 10);
     #endif
 
     // Subscriber
     input_control_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        "control/input",
+        CONTROL_INPUT_TOPIC,
         10,
         std::bind(&ReactiveOANode::inputControlCallback, this, _1));
 
     close_contour_SUB = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        "/on_drone/sensor/scan/lidar2d/close",
+        LIDAR_2D_CONTOUR_CLOSE_TOPIC,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
     perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        "/on_drone/sensor/fuse_perception",
+        LIDAR_2D_CONTOUR_FAR_TOPIC,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::perceptionCallback, this, _1));
 

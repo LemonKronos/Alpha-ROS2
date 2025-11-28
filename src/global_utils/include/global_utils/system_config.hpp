@@ -7,24 +7,46 @@
 #include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 #include "global_utils/utils.hpp"
+// ################################# SYSTEM CONFIG
+#define VISUALIZE true
 
-// ################################# CONFIG PARAMETER
+// ################################# SYSTEM PARAMETER
+// Topic path
+constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control";
+constexpr const char* CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"; // inactive
+constexpr const char* CONTROL_FINAL_TOPIC = "/on_drone/drone_control/final/control";
+constexpr const char* FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception";
+constexpr const char* CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact";
+constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";
+constexpr const char* LIDAR_2D_CONTOUR_CLOSE_TOPIC = "/on_drone/sensor/lidar2d/close/contour";
+constexpr const char* LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far/contour";
 
+// Topic path: visualizer
+constexpr const char* VISUAL_CONTROL_VEC_TOPIC = "/visualizer/control_vector";
+constexpr const char* VISUAL_MOVEMENT_VEC_TOPIC = "/visualizer/movement_vector";
+constexpr const char* VISUAL_REPULSIVE_VEC_TOPIC = "/visualizer/repulsive_vector";
+constexpr const char* VISUAL_CORRECTION_VEC_TOPIC = "/visualizer/correction_vector";
+
+// Service path
+constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
+
+// Time
 constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
 constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;
 constexpr int64_t SYSTEM_LOOP_CYCLE_NANOSEC = SYSTEM_LOOP_CYCLE * 1e9;
 
+// Drone
 constexpr float SPEED_MAX_FORWARD = 10.0f;
 constexpr float SPEED_MAX_BACKWARD = 5.0f;
 constexpr float SPEED_MAX_STRAFE = 8.0f;
 constexpr float SPEED_MAX_UP = 5.0f;
 constexpr float SPEED_MAX_DOWN = 2.0f;
 constexpr float THRUST_SAFE_LIMIT = 0.8f;
-constexpr float HOVER_THRUST = -0.525f; // Thrust opposite with moving direction, so in FLU negative = push downward
+constexpr float HOVER_THRUST = -0.5f; // Thrust opposite with moving direction, so in FLU negative = push downward
 
 constexpr float DEGREE = 0.017453292f;
 
-// Need real data or tinkering
+// Safety
 constexpr float SELF_RADIUS = 1.2f; // radius in meter
 constexpr float UNCERTAINTY = 0.05f;
 constexpr float SAFE_BUFFER = 0.05f;

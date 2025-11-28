@@ -4,6 +4,7 @@
 #include "std_msgs/msg/header.hpp"
 #include "global_utils/surrounding.hpp"
 #include "global_utils/utils.hpp"
+#include "global_utils/system_config.hpp"
 #include "global_utils/blockingconcurrentqueue.h" // Moody Camel MPMC Queue with wait blocking
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -20,9 +21,6 @@
 using std::placeholders::_1;
 
 constexpr uint64_t HEART_BEAT_CYCLE = 1e9;
-
-constexpr const char* CLOSE_TOPIC_DIR = "/on_drone/sensor/scan/lidar2d/close";
-constexpr const char* FAR_TOPIC_DIR = "/on_drone/sensor/scan/lidar2d/far";
 
 class Lidar2dHandlerNode : public rclcpp::Node {
 public:

@@ -6,7 +6,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     setup_for_simulation(this);
     
     // Create Publisher
-    fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>("/on_drone/sensor/fuse_perception", rclcpp::SensorDataQoS());
+    fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>(FUSE_PERCEPTION_TOPIC, rclcpp::SensorDataQoS());
 
     // Create Subscriber
     odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(

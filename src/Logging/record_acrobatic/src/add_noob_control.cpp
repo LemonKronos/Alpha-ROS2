@@ -51,11 +51,13 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
 
     // 5. Subscribers
     sub_input_ = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        "control/input", 10,
+        CONTROL_INPUT_TOPIC, 
+        10,
         std::bind(&AddNoobControlNode::input_callback, this, std::placeholders::_1));
 
     sub_record_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
-        "logger/record_control", 10,
+        LOGGER_RECORD_TOPIC,
+        10,
         std::bind(&AddNoobControlNode::record_control_callback, this, std::placeholders::_1));
 
     // 6. Timer (Syncs to Video FPS)
@@ -65,7 +67,7 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
         std::bind(&AddNoobControlNode::game_loop, this));
 
     RCLCPP_INFO(this->get_logger(), GREEN " Loaded Episode %d | Frames: %lu | FPS: %d" RESET, ep_num, total_frames_, fps_);
-    RCLCPP_INFO(this->get_logger(), GREEN "Press SPACE or publish 'logger/record_control'" RESET);
+    RCLCPP_INFO(this->get_logger(), GREEN "Press SPACE or publish control topic" RESET);
 }
 
 AddNoobControlNode::~AddNoobControlNode() {

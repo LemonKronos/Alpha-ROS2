@@ -4,22 +4,22 @@ from rclpy.node import Node
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
 from ros2_msgs.msg import Lidar2dObstacle
+import python_utils.utils
 from rclpy.qos import qos_profile_sensor_data
-
 
 class RvizContourPoint(Node):
     def __init__(self):
         super().__init__('rviz_contour')
 
         self._setup_contour_pair(
-            sub_topic='/on_drone/sensor/scan/lidar2d/far',
+            sub_topic=self.LIDAR_2D_FAR_CONTOUR,
             pub_topic='/visualizer/contour_marker/far',
             color=(0.0, 1.0, 0.0),
             name='far'
         )
 
         self._setup_contour_pair(
-            sub_topic='/on_drone/sensor/scan/lidar2d/close',
+            sub_topic=self.LIDAR_2D_CLOSE_CONTOUR,
             pub_topic='/visualizer/contour_marker/close',
             color=(1.0, 0.0, 0.0),
             name='close'

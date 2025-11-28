@@ -37,7 +37,7 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     );
 
     // Create Publisher
-    contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(CONTACT_SENSOR_DIR, rclcpp::SensorDataQoS());
+    contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(CONTACT_PARSER_TOPIC, rclcpp::SensorDataQoS());
 
     // Create wall timer
     Contact_pub_TIME = this->create_timer(

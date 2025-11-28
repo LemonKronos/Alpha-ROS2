@@ -12,35 +12,27 @@ from rclpy.node import Node
 from advance_control.web_socket_controller import WebSocketController # Web control
 from ros2_msgs.msg import RecordControl # Record flag
 from ros2_msgs.msg import ControlInterface # Control interface
-from python_utils.utils import setup_for_simulation
-
-RED = "\033[31m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-RESET = "\033[0m"
-
-# Constants
-SYSTEM_CYCLE = 1/30
+import python_utils.utils as utils
 
 class AdvanceControlNode(Node):
     def __init__(self):
         super().__init__('advance_control_node')
         
-        setup_for_simulation(self)
+        utils.setup_for_simulation(self)
 
         # Initialize and Start the WebSocket Controller
         self.web_controller = WebSocketController()
         self.web_controller.start()
         
         # Publisher
-        self.control_interface_PUB = self.create_publisher(ControlInterface, "control/final", 10)
-        self.record_control_PUB = self.create_publisher(RecordControl, "logger/record_control", 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, utils.CONTROL_INPUT_TOPIC, 10)
+        self.record_control_PUB = self.create_publisher(RecordControl, utils.LOGGER_RECORD_TOPIC, 10)
         
         # Subscriber
         # For when we publish data to phone
 
         # Timer
-        self.timer = self.create_timer(SYSTEM_CYCLE, self.timer_callback)
+        self.timer = self.create_timer(utils.SYSTEM_CYCLE, self.timer_callback)
 
         # Init variable
         self.last_record = False

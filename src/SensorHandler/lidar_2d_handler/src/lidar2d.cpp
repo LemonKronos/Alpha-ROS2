@@ -22,9 +22,9 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
     );
 
     // Create Publisher
-    obstacle_close_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(CLOSE_TOPIC_DIR, rclcpp::SensorDataQoS());
+    obstacle_close_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(LIDAR_2D_CONTOUR_CLOSE_TOPIC, rclcpp::SensorDataQoS());
 
-    obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(FAR_TOPIC_DIR, rclcpp::SensorDataQoS());
+    obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(LIDAR_2D_CONTOUR_FAR_TOPIC, rclcpp::SensorDataQoS());
     
     // Create Wall timer
     sensor_alive_timer = this->create_timer(
@@ -36,13 +36,13 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
         this,
         std::ref(queue_close), 
         std::ref(obstacle_close_PUB),
-        std::string(CLOSE_TOPIC_DIR), 
+        std::string(LIDAR_2D_CONTOUR_CLOSE_TOPIC), 
         "CLOSE");
     consumer_far = std::thread(&Lidar2dHandlerNode::ConsumerLoop, 
         this, 
         std::ref(queue_far),
         std::ref(obstacle_far_PUB), 
-        std::string(FAR_TOPIC_DIR),
+        std::string(LIDAR_2D_CONTOUR_FAR_TOPIC),
         "FAR");
 }
 

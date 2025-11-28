@@ -9,7 +9,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     
     // Create Subscriber
     final_ctrl_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        "control/final",
+        CONTROL_FINAL_TOPIC,
         10,
         std::bind(&FinalizeControlNode::FinalCtrlCallback, this, _1)
     );
@@ -21,7 +21,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     );
 
     fuse_perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        "/on_drone/sensor/fuse_perception",
+        FUSE_PERCEPTION_TOPIC,
         rclcpp::SensorDataQoS(),
         std::bind(&FinalizeControlNode::FusePerceptionCallback, this, _1)
     );

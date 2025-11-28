@@ -13,7 +13,7 @@ def generate_launch_description():
         Node(
             package='advance_control',
             executable='advance_control',
-            name='pygame_control_node',
+            name='advance_control_node',
             output='screen',
             # arguments=['--ros-args', '--log-level', 'warn']
         ),

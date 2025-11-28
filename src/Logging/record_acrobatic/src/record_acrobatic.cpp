@@ -25,27 +25,29 @@ RecordAcrobaticNode::RecordAcrobaticNode()
 
     // Subs
     sub_record_control_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
-        "logger/record_control", qos_reliable, 
+        LOGGER_RECORD_TOPIC,
+        qos_reliable, 
         std::bind(&RecordAcrobaticNode::record_control_callback, this, std::placeholders::_1));
 
     sub_expert_action_ = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        "control/input", qos_reliable,
+        CONTROL_INPUT_TOPIC,
+        qos_reliable,
         std::bind(&RecordAcrobaticNode::expert_action_callback, this, std::placeholders::_1));
 
     sub_perception_ = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        "/on_drone/sensor/fuse_perception", qos_sensor,
+        FUSE_PERCEPTION_TOPIC, qos_sensor,
         std::bind(&RecordAcrobaticNode::perception_callback, this, std::placeholders::_1));
 
     sub_lidar_close_ = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        "/on_drone/sensor/scan/lidar2d/close", qos_sensor,
+        LIDAR_2D_CONTOUR_CLOSE_TOPIC, qos_sensor,
         std::bind(&RecordAcrobaticNode::lidar_close_callback, this, std::placeholders::_1));
 
     sub_lidar_far_ = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        "/on_drone/sensor/scan/lidar2d/far", qos_sensor,
+        LIDAR_2D_CONTOUR_FAR_TOPIC, qos_sensor,
         std::bind(&RecordAcrobaticNode::lidar_far_callback, this, std::placeholders::_1));
 
     // Service Client
-    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>("/world/grasslands/control");
+    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(CONTROL_WOLRD_GRASSLAND);
 
     // Timer
     timer_ = this->create_timer(

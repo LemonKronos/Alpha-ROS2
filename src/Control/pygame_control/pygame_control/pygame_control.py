@@ -9,7 +9,7 @@ import time
 import pygame
 import rclpy
 from rclpy.node import Node
-# from python_utils.utils import setup_for_simulation
+import python_utils.utils
 
 # Adjust this import path to match your message package
 from ros2_msgs.msg import ControlInterface
@@ -53,7 +53,7 @@ class PygameControlNode:
         self.UP_DOWN_COASTING = 0.05
 
         # Publisher
-        self.pub = self.node.create_publisher(ControlInterface, "control/input", 10)
+        self.pub = self.node.create_publisher(ControlInterface, utils.CONTROL_INPUT_TOPIC, 10)
 
         # UI control internals 
         self.is_armed = None  # not used for ROS publish but kept as attribute

@@ -6,6 +6,7 @@
   <description>Convert contour to rviz2 marker visualizer</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Propietary</license>
+  <depend>python_utils</depend>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
