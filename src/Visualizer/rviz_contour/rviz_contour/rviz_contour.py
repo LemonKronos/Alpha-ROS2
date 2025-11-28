@@ -7,21 +7,23 @@ from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 from ros2_msgs.msg import Lidar2dObstacle
 from rclpy.qos import qos_profile_sensor_data
-import python_utils.utils
+from python_utils.utils import *
 
 class RvizContour(Node):
     def __init__(self):
         super().__init__('rviz_contour')
 
+        setup_for_simulation(self)
+
         # Set up both pairs easily
         self._setup_contour_pair(
-            sub_topic=utils.LIDAR_2D_CONTOUR_FAR_TOPIC,
+            sub_topic=LIDAR_2D_CONTOUR_FAR_TOPIC,
             pub_topic='/visualizer/contour_marker_array/far',
             name='far'
         )
 
         self._setup_contour_pair(
-            sub_topic=utils.LIDAR_2D_CONTOUR_CLOSE_TOPIC,
+            sub_topic=LIDAR_2D_CONTOUR_CLOSE_TOPIC,
             pub_topic='/visualizer/contour_marker_array/close',
             name='close'
         )

@@ -12,27 +12,29 @@ from rclpy.node import Node
 from advance_control.web_socket_controller import WebSocketController # Web control
 from ros2_msgs.msg import RecordControl # Record flag
 from ros2_msgs.msg import ControlInterface # Control interface
-import python_utils.utils as utils
+from python_utils.utils import *
+
+
 
 class AdvanceControlNode(Node):
     def __init__(self):
         super().__init__('advance_control_node')
         
-        utils.setup_for_simulation(self)
+        setup_for_simulation(self)
 
         # Initialize and Start the WebSocket Controller
         self.web_controller = WebSocketController()
         self.web_controller.start()
         
         # Publisher
-        self.control_interface_PUB = self.create_publisher(ControlInterface, utils.CONTROL_INPUT_TOPIC, 10)
-        self.record_control_PUB = self.create_publisher(RecordControl, utils.LOGGER_RECORD_TOPIC, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_FINAL_TOPIC, 10)
+        self.record_control_PUB = self.create_publisher(RecordControl, LOGGER_RECORD_TOPIC, 10)
         
         # Subscriber
         # For when we publish data to phone
 
         # Timer
-        self.timer = self.create_timer(utils.SYSTEM_CYCLE, self.timer_callback)
+        self.timer = self.create_timer(SYSTEM_CYCLE, self.timer_callback)
 
         # Init variable
         self.last_record = False
@@ -59,7 +61,7 @@ class AdvanceControlNode(Node):
         control_msg.header.stamp = self.get_clock().now().to_msg()
 
         self.control_interface_PUB.publish(control_msg)
-        if False:
+        if True:
             if self.no_input_log and self.no_input:
                 self.get_logger().info(" Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
                 self.no_input_log = False

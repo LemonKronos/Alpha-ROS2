@@ -1,18 +1,17 @@
 #include "reactive_oa/reactive_oa.hpp"
 
 ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
-    RCLCPP_INFO(this->get_logger(), "Reactive OA Node has been started.");
-
+    
     setup_for_simulation(this);
     
     // Publisher
     final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(CONTROL_FINAL_TOPIC, 10);
 
     #ifdef VISUALIZE
-        control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_CONTROL_VEC_TOPIC, 10);
-        movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_MOVEMENT_VEC_TOPIC, 10);
-        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_REPULSIVE_VEC_TOPIC, 10);
-        correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>(VISUAL_CORRECTION_VEC_TOPIC, 10);
+        control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
+        movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
+        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
+        correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
     #endif
 
     // Subscriber

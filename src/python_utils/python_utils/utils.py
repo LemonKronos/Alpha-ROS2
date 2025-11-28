@@ -1,8 +1,17 @@
-import rclpy 
+import rclpy
+import time
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rosgraph_msgs.msg import Clock
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+
+RED     = "\033[31m"
+GREEN   = "\033[32m"
+YELLOW  = "\033[33m"
+BLUE    = "\033[34m"
+PINK    = "\033[35m"
+TEAL    = "\033[36m"
+RESET   = "\033[0m"
 
 # ################################################ Parameter
 # System
@@ -18,71 +27,54 @@ LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control"
 LIDAR_2D_CONTOUR_CLOSE_TOPIC = "/on_drone/sensor/lidar2d/close/contour"
 LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far/contour"
 
-# Topic path: visualizer
-VISUAL_CONTROL_VEC_TOPIC = "/visualizer/control_vector"
-VISUAL_MOVEMENT_VEC_TOPIC = "/visualizer/movement_vector"
-VISUAL_REPULSIVE_VEC_TOPIC = "/visualizer/repulsive_vector"
-VISUAL_CORRECTION_VEC_TOPIC = "/visualizer/correction_vector"
-
 # Service path
 CONTROL_WORLD_GRASSLAND = "/world/grasslands/control"
 
 
 # ################################################ Function
-
-def setup_for_simulation(target_node: Node, timeout_sec: float = 2.0):
+def setup_for_simulation(node):
     """
-    Checks for the presence of the /clock topic by spinning a temporary node.
-    If a message is received within the timeout, 'use_sim_time' is set to True.
+    Auto-detects if /clock exists by polling the graph.
+    Does NOT create a temporary node to avoid 'Publisher already registered' warnings.
     """
-    # 1. Check for manual override (If user set use_sim_time=false, respect it)
-    if target_node.has_parameter("use_sim_time"):
-        if target_node.get_parameter("use_sim_time").value == False:
+    # 1. Check if the user manually set the param already. If so, respect it.
+    if node.has_parameter("use_sim_time"):
+        if node.get_parameter("use_sim_time").value:
             return
 
-    target_node.get_logger().info("Checking for Gazebo Clock (Timeout: %s sec)..." % timeout_sec)
+    node.get_logger().info(f"{PINK}Auto check if node run in simulation...{RESET}")
 
-    # 2. Create a temporary detector node
-    detector = rclpy.create_node('clock_detector_temp')
-    
-    # QoS must match /clock (Best effort is required for clock reliability)
-    qos_profile = QoSProfile(
-        reliability=ReliabilityPolicy.BEST_EFFORT,
-        history=HistoryPolicy.KEEP_LAST,
-        depth=1
-    )
+    # 2. Loop Wait (Polling the Graph)
+    clock_found = False
+    retries = 10 # 10 * 0.1s = 1 seconds
 
-    # 3. Use a flag container (Python list trick for mutable boolean)
-    clock_found = [False]
+    while retries > 0:
+        # Get list of all topics currently known [('topic_name', ['type']), ...]
+        topic_names_and_types = node.get_topic_names_and_types()
+        
+        # Extract just the names for checking
+        topic_names = [t[0] for t in topic_names_and_types]
 
-    def clk_cb(msg):
-        # Callback runs when a message is received
-        clock_found[0] = True
-        # Note: We don't need to destroy the subscription here, 
-        # as it will be destroyed when the 'detector' node is destroyed.
+        if "/clock" in topic_names:
+            clock_found = True
+            break
+        
+        # Wait a bit for discovery
+        time.sleep(0.1)
+        retries -= 1
 
-    # 4. Create the subscription (The "Ear")
-    sub = detector.create_subscription(Clock, '/clock', clk_cb, qos_profile)
-
-    # 5. Spin the detector for a bit (Blocking)
-    # This processes the discovery traffic and checks for the message.
-    rclpy.spin_once(detector, timeout_sec=timeout_sec)
-
-    # 6. Logic and Parameter Setting
-    if clock_found[0]:
-        target_node.get_logger().warn("Clock detected! Mode: SIMULATION")
-        if target_node.has_parameter("use_sim_time"):
-            # Set existing parameter
-            target_node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+    # 3. Apply Setting
+    if clock_found:
+        if node.has_parameter("use_sim_time"):
+            node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
         else:
-            # Declare new parameter
-            target_node.declare_parameter("use_sim_time", True)
+            node.declare_parameter("use_sim_time", True)
+            
+        # Pink color warning (Standard ANSI escape codes work in most terminals)
+        node.get_logger().warn(f"{YELLOW}Node run using simulation clock!{RESET}")
     else:
-        target_node.get_logger().info("No Clock detected. Mode: REALTIME")
-        # Ensure it's declared false if it wasn't there before
-        if not target_node.has_parameter("use_sim_time"):
-             target_node.declare_parameter("use_sim_time", False)
-    
-    # 7. Cleanup
-    detector.destroy_node()
+        # Default to Realtime if not found
+        node.get_logger().info(f"{PINK}No simulation clock found, run in realtime.{RESET}")
+        if not node.has_parameter("use_sim_time"):
+            node.declare_parameter("use_sim_time", False)
     

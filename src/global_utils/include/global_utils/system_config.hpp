@@ -21,12 +21,6 @@ constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";
 constexpr const char* LIDAR_2D_CONTOUR_CLOSE_TOPIC = "/on_drone/sensor/lidar2d/close/contour";
 constexpr const char* LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far/contour";
 
-// Topic path: visualizer
-constexpr const char* VISUAL_CONTROL_VEC_TOPIC = "/visualizer/control_vector";
-constexpr const char* VISUAL_MOVEMENT_VEC_TOPIC = "/visualizer/movement_vector";
-constexpr const char* VISUAL_REPULSIVE_VEC_TOPIC = "/visualizer/repulsive_vector";
-constexpr const char* VISUAL_CORRECTION_VEC_TOPIC = "/visualizer/correction_vector";
-
 // Service path
 constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
 
