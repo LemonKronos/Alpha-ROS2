@@ -4,6 +4,13 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
+            package='simulation_control',
+            executable='simulation_control',
+            name='simulation_control_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
             package='pygame_control',
             executable='pygame_control',
             name='pygame_control_node',

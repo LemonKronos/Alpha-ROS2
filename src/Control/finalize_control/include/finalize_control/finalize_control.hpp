@@ -15,7 +15,7 @@
 #include <algorithm>
 
 constexpr float ATTITUDE_THRESHOLD = 0.01f;
-
+constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 3;
 using std::placeholders::_1;
 
 class FinalizeControlNode : public rclcpp::Node {
@@ -41,6 +41,7 @@ private:
     ros2_msgs::msg::ControlInterface::SharedPtr last_final_ctrl = nullptr;
 
     // Variables
+    uint8_t loss_final_control_count = 0;
     uint8_t offboard_stream_counter = 0;
     bool arming_state = false;
     bool offboard_state = false;

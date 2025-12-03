@@ -5,7 +5,6 @@ using namespace std::chrono_literals;
 RecordAcrobaticNode::RecordAcrobaticNode() 
     : Node("record_acrobatic_node"), 
       recording_(false), 
-      pausing_(false),
       frame_count_(0),
       dim_input_(640, 480),
       dim_overview_(1280, 720)
@@ -46,12 +45,9 @@ RecordAcrobaticNode::RecordAcrobaticNode()
         LIDAR_2D_CONTOUR_FAR_TOPIC, qos_sensor,
         std::bind(&RecordAcrobaticNode::lidar_far_callback, this, std::placeholders::_1));
 
-    // Service Client
-    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(CONTROL_WOLRD_GRASSLAND);
-
     // Timer
     timer_ = this->create_timer(
-        std::chrono::duration<double>(SYSTEM_CYCLE), 
+        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC), 
         std::bind(&RecordAcrobaticNode::node_loop_callback, this));
 }
 
@@ -61,7 +57,7 @@ RecordAcrobaticNode::~RecordAcrobaticNode() {
 
 // ------------------ Loop ------------------
 void RecordAcrobaticNode::node_loop_callback() {
-    if (!recording_ || pausing_) return;
+    if (!recording_) return;
 
     // --- NEW: THE GATEKEEPER ---
     // If we don't have an overview image yet, DO NOT record anything.
@@ -96,7 +92,7 @@ void RecordAcrobaticNode::node_loop_callback() {
         auto sectors = extract_sectors(cache_lidar_close_.msg);
         vec.insert(vec.end(), sectors.begin(), sectors.end());
     } else {
-        vec.insert(vec.end(), LIDAR_SECTORS, LIDAR_MAX_DIST);
+        vec.insert(vec.end(), LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
     }
 
     // 3. Lidar Far
@@ -104,7 +100,7 @@ void RecordAcrobaticNode::node_loop_callback() {
         auto sectors = extract_sectors(cache_lidar_far_.msg);
         vec.insert(vec.end(), sectors.begin(), sectors.end());
     } else {
-        vec.insert(vec.end(), LIDAR_SECTORS, LIDAR_MAX_DIST);
+        vec.insert(vec.end(), LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
     }
 
     // 4. Append to Buffer (RAM)
@@ -127,13 +123,13 @@ void RecordAcrobaticNode::node_loop_callback() {
 // ------------------ Helpers ------------------
 bool RecordAcrobaticNode::is_alive(const DataCache& cache, double now) {
     if (!cache.valid) return false;
-    return (now - cache.timestamp) <= (SYSTEM_CYCLE * TIMEOUT_CYCLES);
+    return (now - cache.timestamp) <= (SYSTEM_LOOP_CYCLE* TIMEOUT_CYCLES);
 }
 
 std::vector<float> RecordAcrobaticNode::extract_sectors(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr& msg) {
-    std::vector<float> sectors(LIDAR_SECTORS, LIDAR_MAX_DIST);
+    std::vector<float> sectors(LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
     for (const auto& sec : msg->obstacles) {
-        if (sec.sector_index < LIDAR_SECTORS) {
+        if (sec.sector_index < LIDAR_2D_SECTOR_NUM) {
             sectors[sec.sector_index] = sec.min_distance;
         }
     }
@@ -212,9 +208,9 @@ void RecordAcrobaticNode::start_episode() {
 
     // 3. Init Video
     int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-    vw_rgb_.open((episode_dir_ / "rgb_front.mp4").string(), fourcc, SYSTEM_RATE, dim_input_, true);
-    vw_depth_.open((episode_dir_ / "depth_front.mp4").string(), fourcc, SYSTEM_RATE, dim_input_, true);
-    vw_overview_.open((episode_dir_ / "overview.mp4").string(), fourcc, SYSTEM_RATE, dim_overview_, true);
+    vw_rgb_.open((episode_dir_ / "rgb_front.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_input_, true);
+    vw_depth_.open((episode_dir_ / "depth_front.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_input_, true);
+    vw_overview_.open((episode_dir_ / "overview.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_overview_, true);
 
     // 4. Start
     start_image_subs();
@@ -244,7 +240,7 @@ void RecordAcrobaticNode::finish_episode() {
     // Save Meta
     json meta;
     meta["expert_manuever"] = "unknown";
-    meta["fps"] = SYSTEM_RATE;
+    meta["fps"] = SYSTEM_LOOP_RATE;
     meta["timestamp_start"] = start_timestamp_;
     meta["timestamp_end"] = end_ts;
     meta["duration"] = end_ts - start_timestamp_;
@@ -258,29 +254,10 @@ void RecordAcrobaticNode::finish_episode() {
     RCLCPP_INFO(this->get_logger(), GREEN "REC: Saved. Frames: %lu" RESET, frame_count_);
 }
 
-void RecordAcrobaticNode::start_pause() {
-    auto req = std::make_shared<ros_gz_interfaces::srv::ControlWorld::Request>();
-    req->world_control.pause = true;
-    client_gz_->async_send_request(req);
-    pausing_ = true;
-    RCLCPP_INFO(this->get_logger(), YELLOW "Simulation Paused" RESET);
-}
-
-void RecordAcrobaticNode::stop_pause() {
-    auto req = std::make_shared<ros_gz_interfaces::srv::ControlWorld::Request>();
-    req->world_control.pause = false;
-    client_gz_->async_send_request(req);
-    pausing_ = false;
-    RCLCPP_INFO(this->get_logger(), YELLOW "Simulation Continued" RESET);
-}
-
 // ------------------ Callbacks ------------------
 void RecordAcrobaticNode::record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg) {
     if (msg->record && !recording_) start_episode();
     else if (!msg->record && recording_) finish_episode();
-
-    if (msg->pause && !pausing_) start_pause();
-    else if (!msg->pause && pausing_) stop_pause();
 }
 
 void RecordAcrobaticNode::expert_action_callback(const ros2_msgs::msg::ControlInterface::SharedPtr msg) {

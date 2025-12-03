@@ -21,7 +21,7 @@ void setup_for_simulation(rclcpp::Node *node) {
         if (current_val) return; 
     }
 
-    RCLCPP_INFO(node->get_logger(), PINK "Auto check if node run in simulation..." RESET);
+    // RCLCPP_INFO(node->get_logger(), PINK "Auto check if node run in simulation..." RESET);
 
     // 2. Loop Wait (Polling the Graph)
     // We try for 2 seconds. We do NOT spin, we just peek at the network graph.

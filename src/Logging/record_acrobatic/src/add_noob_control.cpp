@@ -9,7 +9,6 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
       state_("WAITING") 
 {
     // 1. Locate Paths
-    // Adjust this path if your username/folder structure changes
     std::string dataset_root = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/simulated_expert";
     
     char dir_name[32];
@@ -114,7 +113,7 @@ void AddNoobControlNode::game_loop() {
         if (!last_frame_.empty()) {
             cv::Mat disp = last_frame_.clone();
             cv::putText(disp, "PAUSED", cv::Point(20, 80), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 255), 3);
-            cv::imshow("Noob Control Injector", disp);
+            cv::imshow(WINDOW_OVERVIEW_FPV, disp);
             cv::waitKey(1);
         }
         return;
@@ -155,7 +154,7 @@ void AddNoobControlNode::game_loop() {
     cv::Scalar color = (state_ == "RECORDING") ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
     cv::putText(frame, txt, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2);
 
-    cv::imshow("Noob Control Injector", frame);
+    cv::imshow(WINDOW_OVERVIEW_FPV, frame);
     int key = cv::waitKey(1); // 1ms wait allows OpenCV to draw
 
     // 5. Logic

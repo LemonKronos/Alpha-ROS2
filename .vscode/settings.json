@@ -89,14 +89,12 @@
     },
     "python.defaultInterpreterPath": "${workspaceFolder}/pyvenv/bin/python",
     "python.autoComplete.extraPaths": [
-        "/home/mr_lemon/MyCode/Project/Drone/ROS2/install/px4_ros_com/lib/python3.12/site-packages",
         "/home/mr_lemon/MyCode/Project/Drone/ROS2/install/px4_msgs/lib/python3.12/site-packages",
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
     "python.analysis.extraPaths": [
-        "/home/mr_lemon/MyCode/Project/Drone/ROS2/install/px4_ros_com/lib/python3.12/site-packages",
         "/home/mr_lemon/MyCode/Project/Drone/ROS2/install/px4_msgs/lib/python3.12/site-packages",
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
-    "python.envFile": "${workspaceFolder}/pyvenv",
+    "python.envFile": "${workspaceFolder}/.env",
 }

@@ -1,9 +1,5 @@
-import rclpy
 import time
-from rclpy.node import Node
 from rclpy.parameter import Parameter
-from rosgraph_msgs.msg import Clock
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -42,7 +38,7 @@ def setup_for_simulation(node):
         if node.get_parameter("use_sim_time").value:
             return
 
-    node.get_logger().info(f"{PINK}Auto check if node run in simulation...{RESET}")
+    # node.get_logger().info(f"{PINK}Auto check if node run in simulation...{RESET}")
 
     # 2. Loop Wait (Polling the Graph)
     clock_found = False

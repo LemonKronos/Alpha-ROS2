@@ -43,7 +43,6 @@ episode structure:
 #include "ros2_msgs/msg/fuse_perception.hpp"
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
 #include "sensor_msgs/msg/image.hpp"
-#include "ros_gz_interfaces/srv/control_world.hpp"
 
 // OpenCV & CV Bridge
 #include <opencv2/opencv.hpp>
@@ -56,12 +55,8 @@ episode structure:
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
-// Constants matching Python
-constexpr double SYSTEM_RATE = 30.0;
-constexpr double SYSTEM_CYCLE = 1.0 / SYSTEM_RATE;
+// Constants
 constexpr int TIMEOUT_CYCLES = 3;
-constexpr int LIDAR_SECTORS = 12;
-constexpr float LIDAR_MAX_DIST = 10.0f;
 
 struct DataCache {
     double timestamp = 0.0;
@@ -84,7 +79,6 @@ public:
 private:
     // --- State ---
     bool recording_;
-    bool pausing_;
     std::string dataset_root_;
     fs::path episode_dir_;
     double start_timestamp_;
@@ -127,8 +121,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_img_depth_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_img_overview_;
 
-    // World control service
-    rclcpp::Client<ros_gz_interfaces::srv::ControlWorld>::SharedPtr client_gz_;
+    // Timer
     rclcpp::TimerBase::SharedPtr timer_;
 
     // --- Methods ---
@@ -146,8 +139,6 @@ private:
     // Episode Mgmt
     void start_episode();
     void finish_episode();
-    void start_pause();
-    void stop_pause();
     
     // Callbacks
     void record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg);

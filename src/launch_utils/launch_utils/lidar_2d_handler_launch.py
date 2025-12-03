@@ -7,6 +7,13 @@ launch.logging.get_logger().setLevel('WARN')
 def generate_launch_description():
     return LaunchDescription([
         Node(
+            package='simulation_control',
+            executable='simulation_control',
+            name='simulation_control_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',
             name='lidar_2d_handler_node',

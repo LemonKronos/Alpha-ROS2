@@ -11,9 +11,30 @@ def generate_launch_description():
             # arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
+            package='simulation_control',
+            executable='simulation_control',
+            name='simulation_control_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
             package='finalize_control',
             executable='finalize_control',
             name='finalize_control_node',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='reactive_oa',
+            executable='reactive_oa',
+            name='reactive_oa_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='lidar_2d_handler',
+            executable='lidar_2d_handler',
+            name='lidar_2d_handler_node',
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),

@@ -10,6 +10,11 @@
 // ################################# SYSTEM CONFIG
 #define VISUALIZE true
 
+// Time
+constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
+constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;
+constexpr int64_t SYSTEM_LOOP_CYCLE_NANOSEC = SYSTEM_LOOP_CYCLE * 1e9;
+
 // ################################# SYSTEM PARAMETER
 // Topic path
 constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control";
@@ -23,22 +28,24 @@ constexpr const char* LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far
 
 // Service path
 constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
-
-// Time
-constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
-constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;
-constexpr int64_t SYSTEM_LOOP_CYCLE_NANOSEC = SYSTEM_LOOP_CYCLE * 1e9;
+constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_GRASSLAND;
 
 // Drone
 constexpr float SPEED_MAX_FORWARD = 10.0f;
-constexpr float SPEED_MAX_BACKWARD = 5.0f;
-constexpr float SPEED_MAX_STRAFE = 8.0f;
-constexpr float SPEED_MAX_UP = 5.0f;
-constexpr float SPEED_MAX_DOWN = 2.0f;
-constexpr float THRUST_SAFE_LIMIT = 0.8f;
+constexpr float SPEED_MAX_BACKWARD = 10.0f;
+constexpr float SPEED_MAX_STRAFE = 10.0f;
+constexpr float SPEED_MAX_UP = 8.0f;
+constexpr float SPEED_MAX_DOWN = 4.0f;
+constexpr float THRUST_SAFE_LIMIT = 0.9f;
 constexpr float HOVER_THRUST = -0.5f; // Thrust opposite with moving direction, so in FLU negative = push downward
 
 constexpr float DEGREE = 0.017453292f;
+
+// Sensor
+constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
+constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
+constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
+
 
 // Safety
 constexpr float SELF_RADIUS = 1.2f; // radius in meter
@@ -51,6 +58,9 @@ constexpr float DECELERATE_MAX = 5.0f; // m/s^2
  * Safe bubble calculate by: the 2 time is to make sure UHM I may change that to just normal 1 time
  * SAFE_BUBBLE =  2 * (HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX))); 
  */
+
+// Other
+constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
 
 // ################################# FUNCTION
 

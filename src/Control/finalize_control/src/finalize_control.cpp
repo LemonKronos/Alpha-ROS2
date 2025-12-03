@@ -42,6 +42,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     );
 
     // Set variables
+    loss_final_control_count = 0;
     arming_state = false;
     control_state = false;
     yaw_W = 0;
@@ -93,6 +94,7 @@ void FinalizeControlNode::NodeLoopCallback() {
             offboard_mode = OffboardMode::ATTITUDE;
         }
     }
+    else if(loss_final_control_count <= LOSS_FINAL_CONTROL_THRESHOLD) loss_final_control_count++;
     yaw_W = frame_utils::quaternionToYaw(last_q);
 
     // Main FSM loop
@@ -196,7 +198,7 @@ void FinalizeControlNode::SendOffboardCmd() {
             PublishTrajectorySetpoint();
         break;
     }
-    last_final_ctrl = nullptr;
+    if(loss_final_control_count >= LOSS_FINAL_CONTROL_THRESHOLD) last_final_ctrl = nullptr;
 }
 
 void FinalizeControlNode::PublishOffboardControlMode() {
@@ -247,7 +249,10 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         msg.yawspeed = -last_final_ctrl->yaw * M_PI_2f; // frame FLU to FRD
     }
     else {
-        // No need to do anything cause trajectory setpoint auto stay still
+        msg.position.fill(NO_DATA_f);
+        msg.velocity = {0.0f, 0.0f, 0.0f};
+        msg.yaw = NO_DATA_f;
+        msg.yawspeed = 0.0f;
     }
 
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
