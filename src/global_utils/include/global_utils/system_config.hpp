@@ -15,6 +15,10 @@ constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
 constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;
 constexpr int64_t SYSTEM_LOOP_CYCLE_NANOSEC = SYSTEM_LOOP_CYCLE * 1e9;
 
+constexpr float SYSTEM_LOOP_RATE_FAST = 80.0f;
+constexpr float SYSTEM_LOOP_CYCLE_FAST = 1 / SYSTEM_LOOP_RATE_FAST;
+constexpr int64_t SYSTEM_LOOP_CYCLE_FAST_NANOSEC = SYSTEM_LOOP_CYCLE_FAST * 1e9;
+
 // ################################# SYSTEM PARAMETER
 // Topic path
 constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control";

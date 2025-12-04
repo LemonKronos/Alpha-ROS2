@@ -11,7 +11,11 @@ RESET   = "\033[0m"
 
 # ################################################ Parameter
 # System
-SYSTEM_CYCLE = 1.0/30.0
+SYSTEM_RATE = 30.0
+SYSTEM_CYCLE = 1.0 / SYSTEM_RATE
+
+SYSTEM_RATE_FAST = 80.0
+SYSTEM_CYCLE_FAST = 1.0 / SYSTEM_RATE_FAST
 
 # Topic path
 CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control"

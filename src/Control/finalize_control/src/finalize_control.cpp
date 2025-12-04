@@ -37,7 +37,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
 
     // Create wall timer
     node_loop_TIME = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
+        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FinalizeControlNode::NodeLoopCallback, this)
     );
 
@@ -80,6 +80,7 @@ void FinalizeControlNode::FusePerceptionCallback(const ros2_msgs::msg::FusePerce
 void FinalizeControlNode::NodeLoopCallback() {
     // Update drone data
     if(last_final_ctrl != nullptr) {
+        loss_final_control_count = 0;
         control_state = last_final_ctrl->control_state;
         if(!ALLOW_ATTITUDE || (abs(last_final_ctrl->roll) <= ATTITUDE_THRESHOLD && abs(last_final_ctrl->pitch) <= ATTITUDE_THRESHOLD)) {
             if(offboard_mode != OffboardMode::VELOCITY) {

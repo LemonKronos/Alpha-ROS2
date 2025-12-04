@@ -15,7 +15,7 @@
 #include <algorithm>
 
 constexpr float ATTITUDE_THRESHOLD = 0.01f;
-constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 3;
+constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 8;
 using std::placeholders::_1;
 
 class FinalizeControlNode : public rclcpp::Node {

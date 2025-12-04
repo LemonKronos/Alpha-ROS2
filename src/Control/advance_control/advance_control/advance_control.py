@@ -37,8 +37,8 @@ class AdvanceControlNode(Node):
         self.no_input = True 
         self.no_input_log = True
 
-        # 5. Timers - Both run at SYSTEM_CYCLE
-        self.timer_control = self.create_timer(SYSTEM_CYCLE, self.timer_control_callback)
+        # 5. Timers
+        self.timer_control = self.create_timer(SYSTEM_CYCLE_FAST, self.timer_control_callback)
         self.timer_realtime = self.create_timer(SYSTEM_CYCLE, self.timer_realtime_callback, clock=self.wall_clock)
 
     def timer_control_callback(self):

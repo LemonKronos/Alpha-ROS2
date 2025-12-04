@@ -10,13 +10,13 @@ def generate_launch_description():
             output='screen',
             # arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='record_acrobatic',
-        #     executable='record_acrobatic',
-        #     name='record_acrobatic_node',
-        #     output='screen',
-        #     # arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='record_acrobatic',
+            executable='record_acrobatic',
+            name='record_acrobatic_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
         Node(
             package='advance_control', # set publisher to CONTROL_FINAL_TOPIC for now
             executable='advance_control',
