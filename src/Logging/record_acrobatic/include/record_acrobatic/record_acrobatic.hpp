@@ -4,12 +4,16 @@ ROS2 node to record and ouput dataset for AcrobaticOA
 episode structure:
     episode_0001/
     ├─ state.npy
+    ├─ rgb_front.mp4
+    ├─ depth_front.mp4
     ├─ action.npy
     ├─ noob_01.npy
     ├─ overview.mp4
     └─ meta.json
 
- - state.npy: sensor data, also include camera feed
+ - state.npy: sensor data
+ - rgb_front.mp4: RGB camera front, 640x480 pixels
+ - depth_front.mp4: Depth camera front, 640x480 pixels, min range 0.2, max range 30.0 meter
  - action.npy: expert control
  - noob_xx.npy: noob control - also a state data, will later be concatenate to state.npy, can have multiple noob control for a expert action
  - overview.mp4: video record of the whole episode, use as a reference for adding nood control and a overview of the movement

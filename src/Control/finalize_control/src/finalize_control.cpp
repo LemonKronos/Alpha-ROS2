@@ -296,6 +296,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
+        msg.yaw_sp_move_rate = -last_final_ctrl->yaw; // FLU to FRD
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw
@@ -306,9 +307,9 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
 
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(flat_q));
         msg.thrust_body = frame_utils::frameFLUtoFRD(hover_body);
+        msg.yaw_sp_move_rate = 0.0f;
     }
 
-    msg.yaw_sp_move_rate = NO_DATA_f;
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
     attitude_set_PUB->publish(msg);
 }
