@@ -46,7 +46,7 @@ class AdvanceControlNode(Node):
 
         control_msg = ControlInterface()
         control_msg.control_by = ControlInterface.HUMAN
-        control_msg.control_state = True
+        control_msg.control_state = bool(commands.get('control_state', False))
         control_msg.forward = float(commands.get('x', 0.0))
         control_msg.left    = float(commands.get('y', 0.0))
         control_msg.up      = float(commands.get('z', 0.0))

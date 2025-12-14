@@ -24,13 +24,13 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        Node(
-            package='reactive_oa',
-            executable='reactive_oa',
-            name='reactive_oa_node',
-            output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='reactive_oa',
+        #     executable='reactive_oa',
+        #     name='reactive_oa_node',
+        #     output='screen',
+        #     # arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',

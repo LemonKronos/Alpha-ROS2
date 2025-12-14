@@ -12,8 +12,7 @@ RecordAcrobaticNode::RecordAcrobaticNode()
     setup_for_simulation(this);
 
     // Path Config
-    dataset_root_ = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/simulated_expert";
-    fs::create_directories(dataset_root_);
+    fs::create_directories(RECORD_ACROBATIC_DIR);
 
     // Init Action buffer
     current_action_ = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -174,7 +173,7 @@ void RecordAcrobaticNode::stop_image_subs() {
 // ------------------ Episode Mgmt ------------------
 void RecordAcrobaticNode::start_episode() {
     // 1. Meta Logic
-    fs::path root_meta_path = fs::path(dataset_root_) / "meta.json";
+    fs::path root_meta_path = fs::path(RECORD_ACROBATIC_DIR) / "meta.json";
     int episode_idx = 0;
 
     if (fs::exists(root_meta_path)) {
@@ -187,7 +186,7 @@ void RecordAcrobaticNode::start_episode() {
 
     char idx_str[16];
     snprintf(idx_str, sizeof(idx_str), "episode_%03d", episode_idx);
-    episode_dir_ = fs::path(dataset_root_) / idx_str;
+    episode_dir_ = fs::path(RECORD_ACROBATIC_DIR) / idx_str;
     fs::create_directories(episode_dir_);
 
     // Update root meta
@@ -239,7 +238,7 @@ void RecordAcrobaticNode::finish_episode() {
 
     // Save Meta
     json meta;
-    meta["expert_manuever"] = "unknown";
+    meta["expert_manuever"] = RECORD_ACROBATIC_MANUEVER_NAME;
     meta["fps"] = SYSTEM_LOOP_RATE;
     meta["timestamp_start"] = start_timestamp_;
     meta["timestamp_end"] = end_ts;

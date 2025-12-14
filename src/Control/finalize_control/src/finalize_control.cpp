@@ -108,6 +108,8 @@ void FinalizeControlNode::NodeLoopCallback() {
 
             if(!control_state) {
                 offboard_stream_counter = 0;
+                current_loop_state = NodeLoopState::DISARM;
+                just_change_loop_state = true;
             }
             else {
                 SendOffboardCmd();
@@ -123,8 +125,13 @@ void FinalizeControlNode::NodeLoopCallback() {
             if(just_change_loop_state) {
                 just_change_loop_state = false;
             }
-
-            if(arming_state) {
+            
+            if(!control_state) {
+                offboard_stream_counter = 0;
+                current_loop_state = NodeLoopState::DISARM;
+                just_change_loop_state = true;
+            }
+            else if(arming_state) {
                 current_loop_state = NodeLoopState::OFFBOARD;
                 just_change_loop_state = true;
             }
@@ -174,8 +181,10 @@ void FinalizeControlNode::NodeLoopCallback() {
             PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3);
             SendDisarmCmd();
 
-            current_loop_state = NodeLoopState::INIT;
-            just_change_loop_state = true;
+            if(control_state || !arming_state){
+                current_loop_state = NodeLoopState::INIT;
+                just_change_loop_state = true;
+            }
         break;
         default:
             current_loop_state = NodeLoopState::INIT;
@@ -336,7 +345,10 @@ bool FinalizeControlNode::SendArmCmd() {
 }
 
 bool FinalizeControlNode::SendDisarmCmd() {
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
-	RCLCPP_INFO(this->get_logger(), RED "Disarm command send" RESET);
+    // Command: 400 (VEHICLE_CMD_COMPONENT_ARM_DISARM)
+    // Param1: 0.0 (Disarm)
+    // Param2: 21196.0 (The Magic Force Number)
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
+    RCLCPP_INFO(this->get_logger(), RED "FORCE DISARM SENT (Magic Number)" RESET);
     return true;
 }

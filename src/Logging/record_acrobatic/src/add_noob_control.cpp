@@ -9,11 +9,11 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
       state_("WAITING") 
 {
     // 1. Locate Paths
-    std::string dataset_root = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/simulated_expert";
+    // Dynamic in system config
     
     char dir_name[32];
     snprintf(dir_name, sizeof(dir_name), "episode_%03d", ep_num);
-    episode_path_ = fs::path(dataset_root) / dir_name;
+    episode_path_ = fs::path(RECORD_ACROBATIC_DIR) / dir_name;
 
     if (!fs::exists(episode_path_)) {
         RCLCPP_ERROR(this->get_logger(), RED "Directory not found: %s" RESET, episode_path_.c_str());

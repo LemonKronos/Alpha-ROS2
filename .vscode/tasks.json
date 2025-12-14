@@ -4,7 +4,7 @@
         {
             "label": "Build ROS2 Single Node Debug",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --packages-up-to ${input:packageName}",
+            "command": "source /opt/ros/jazzy/setup.bash && ionice -c2 -n7 nice -n 10 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --packages-up-to ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -29,7 +29,7 @@
         {
             "label": "Colcon Build Full ROS2 Workspace",
             "type": "shell",
-            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo; else echo \"Cancelled\"; fi",
+            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source /opt/ros/jazzy/setup.bash && ionice -c2 -n7 nice -n 10 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 ; else echo \"Cancelled\"; fi",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {

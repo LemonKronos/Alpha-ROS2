@@ -1,6 +1,7 @@
 #!/bin/bash
 
-WORLD_NAME="grasslands"
+# WORLD_NAME="grasslands"
+WORLD_NAME="obstacle_tunnel"
 
 # DRONE_NAME="gz_alpha_minus_1"
 DRONE_NAME="gz_alpha_minus_2"
@@ -35,11 +36,10 @@ cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
-PX4_SIM_SPEED_FACTOR=0.3333 \\
+PX4_SIM_SPEED_FACTOR=0.5 \\
 PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=101 \\
-PX4_GZ_MODEL_POSE="0,12,1" \\
 make px4_sitl "$DRONE_NAME"
 exec zsh
 EOF
@@ -63,7 +63,7 @@ export PYTHONNOUSERSITE=1;
 exec zsh' & echo $! >> /tmp/sim_pids.txt &&
 printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
 
-# === No6: Run Gazebo ROS2 bridge ===
+# === No6: Run Gazebo ROS2 bridge (Native Interfaces Only) ===
 (
   source /opt/ros/jazzy/setup.bash
   cd ~/MyCode/Project/Drone/ROS2
@@ -76,11 +76,22 @@ printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
   
   CONFIG_FILE="$HOME/MyCode/Project/Drone/ROS2/config/gz_ros_bridge/${WORLD_NAME}-${DRONE_NAME}.YAML"
   
+  # 1. Control World
   SERVICE_BRIDGE="/world/${WORLD_NAME}/control@ros_gz_interfaces/srv/ControlWorld"
+
+  # 2. Spawn Entity
+  # We MUST use ros_gz_interfaces because the bridge doesn't know simulation_interfaces
+  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/create@ros_gz_interfaces/srv/SpawnEntity"
+
+  # 3. Delete Entity
+  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/remove@ros_gz_interfaces/srv/DeleteEntity"
+
+  # 4. Set Entity Pose (The only supported reset method)
+  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/set_pose@ros_gz_interfaces/srv/SetEntityPose"
 
   if [[ -f "$CONFIG_FILE" ]]; then
     ros2 run ros_gz_bridge parameter_bridge \
-      "$SERVICE_BRIDGE" \
+      $SERVICE_BRIDGE \
       --ros-args -p config_file:="$CONFIG_FILE"
   else
     printf "\033[33m[GZ_ROS2_BRIDGE] No config file for this run!\033[0m\n"
@@ -91,4 +102,5 @@ printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
 printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 
 sleep 5
+echo ""
 echo "Run $DRONE_NAME with world $WORLD_NAME" | lolcat

@@ -83,7 +83,6 @@ public:
 private:
     // --- State ---
     bool recording_;
-    std::string dataset_root_;
     fs::path episode_dir_;
     double start_timestamp_;
     

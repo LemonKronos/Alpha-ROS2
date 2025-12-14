@@ -195,7 +195,7 @@ void ReactiveOANode::publishVectorArrow(
 void ReactiveOANode::nodeLoopCallback() {
     computeCorrectionVector();
     auto msg = ros2_msgs::msg::ControlInterface();
-    msg.control_state = true;
+    msg.control_state = last_input_control->control_state;
     
     if(obstacle_encountered) msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
     else {

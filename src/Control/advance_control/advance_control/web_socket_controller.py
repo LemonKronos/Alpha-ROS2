@@ -6,6 +6,7 @@ import time
 
 # --- SPLIT DATA STRUCTURES ---
 DEFAULT_CONTROL = {
+    'control_state': False,
     'x': 0.0, 'y': 0.0, 'z': 0.0, 
     'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0
 }
@@ -83,8 +84,8 @@ class WebSocketController:
                     if self._enable_logging:
                         rec = data.get('record', False)
                         pse = data.get('pause', False)
-                        pause_status = "PAUSE" if (rec and pse) else ""
-                        print(f"🎮 F:{data.get('x',0):>5.2f} L:{data.get('y',0):>5.2f} U:{data.get('z',0):>5.2f} | {'REC' if rec else '   '} {pause_status}")
+                        arm = data.get('control_state', False)
+                        print(f"{'🎮' if arm else '❌'} F:{data.get('x',0):>5.2f} L:{data.get('y',0):>5.2f} U:{data.get('z',0):>5.2f} | {'REC' if rec else '   '} {'PAUSE' if pse else '     '} |")
 
                 except json.JSONDecodeError:
                     pass

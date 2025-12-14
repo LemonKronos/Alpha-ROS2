@@ -16,7 +16,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     );
 
     contact_SUB = this->create_subscription<ros2_msgs::msg::ContactSensor>(
-        "/on_drone/sensor/contact",
+        CONTACT_PARSER_TOPIC,
         rclcpp::SensorDataQoS(),
         std::bind(&FusePerceptionNode::ContactCallback, this, _1)
     );

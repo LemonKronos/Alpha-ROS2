@@ -20,6 +20,11 @@ constexpr float SYSTEM_LOOP_CYCLE_FAST = 1 / SYSTEM_LOOP_RATE_FAST;
 constexpr int64_t SYSTEM_LOOP_CYCLE_FAST_NANOSEC = SYSTEM_LOOP_CYCLE_FAST * 1e9;
 
 // ################################# SYSTEM PARAMETER
+
+// Logging path
+constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
+constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
+
 // Topic path
 constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control";
 constexpr const char* CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"; // inactive
@@ -32,9 +37,11 @@ constexpr const char* LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far
 
 // Service path
 constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
-constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_GRASSLAND;
+constexpr const char* CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control";
+constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL;
 
 // Drone
+constexpr const char* DRONE_NAME = "alpha_minus_2_0";
 constexpr float SPEED_MAX_FORWARD = 10.0f;
 constexpr float SPEED_MAX_BACKWARD = 10.0f;
 constexpr float SPEED_MAX_STRAFE = 10.0f;
@@ -52,7 +59,7 @@ constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
 
 
 // Safety
-constexpr float SELF_RADIUS = 1.2f; // radius in meter
+constexpr float SELF_RADIUS = 1.2f; // drone radius in meter
 constexpr float UNCERTAINTY = 0.05f;
 constexpr float SAFE_BUFFER = 0.05f;
 constexpr float HAZARD_DISTANCE = SELF_RADIUS + SAFE_BUFFER + UNCERTAINTY;
