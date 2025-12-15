@@ -66,7 +66,7 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
         std::bind(&AddNoobControlNode::game_loop, this));
 
     RCLCPP_INFO(this->get_logger(), GREEN " Loaded Episode %d | Frames: %lu | FPS: %d" RESET, ep_num, total_frames_, fps_);
-    RCLCPP_INFO(this->get_logger(), GREEN "Press SPACE or publish control topic" RESET);
+    RCLCPP_INFO(this->get_logger(), GREEN "Publish control topic to record" RESET);
 }
 
 AddNoobControlNode::~AddNoobControlNode() {
@@ -85,6 +85,9 @@ void AddNoobControlNode::record_control_callback(const ros2_msgs::msg::RecordCon
     // Start Trigger
     if (msg->record && state_ == "WAITING") {
         start_recording();
+    }
+    else if (!msg->record && state_ == "RECORDING") {
+        discard_recording();
     }
     
     // Pause Trigger
@@ -155,15 +158,10 @@ void AddNoobControlNode::game_loop() {
     cv::putText(frame, txt, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2);
 
     cv::imshow(WINDOW_OVERVIEW_FPV, frame);
-    int key = cv::waitKey(1); // 1ms wait allows OpenCV to draw
+    cv::waitKey(1); // 1ms wait allows OpenCV to draw
 
     // 5. Logic
-    if (state_ == "WAITING") {
-        if (key == 32) { // SPACE bar
-            start_recording();
-        }
-    }
-    else if (state_ == "RECORDING") {
+    if (state_ == "RECORDING") {
         // Capture Input
         noob_buffer_.insert(noob_buffer_.end(), current_input_.begin(), current_input_.end());
         frame_idx_++;
@@ -177,8 +175,6 @@ void AddNoobControlNode::game_loop() {
 
 void AddNoobControlNode::finish_recording() {
     state_ = "SAVING";
-    timer_->cancel();
-    cv::destroyAllWindows();
 
     // Validate Data
     size_t recorded_rows = noob_buffer_.size() / 7;
@@ -202,11 +198,19 @@ void AddNoobControlNode::finish_recording() {
         }
         file_idx++;
     }
-    
-    // Shutdown Node
-    rclcpp::shutdown();
+
+    // Back to waiting
+    noob_buffer_.clear();
+    frame_idx_ = 0;
+    state_ = "WAITING";
 }
 
+void AddNoobControlNode::discard_recording() {
+    state_ = "DISCARDING";
+    RCLCPP_WARN(this->get_logger(), PINK "DISCARD Current record, waiting..." RESET);
+    noob_buffer_.clear();
+    state_ = "WAITING";
+}
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);

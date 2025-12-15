@@ -16,11 +16,14 @@ SYSTEM_CYCLE = 1.0 / SYSTEM_RATE
 
 SYSTEM_RATE_FAST = 80.0
 SYSTEM_CYCLE_FAST = 1.0 / SYSTEM_RATE_FAST
+# Logging path
+RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel"
+RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo"
 
 # Topic path
-CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control"
+CONTROL_INPUT_TOPIC = "/on_drone/drone_control/direct/control" # Direct cause no ReactiveOA yet
 CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"  # inactive
-CONTROL_FINAL_TOPIC = "/on_drone/drone_control/final/control"
+CONTROL_FINAL_TOPIC = "/on_drone/drone_control/direct/control"  # Direct cause no ReactiveOA yet
 FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception"
 CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact"
 LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control"
@@ -29,7 +32,8 @@ LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far/contour"
 
 # Service path
 CONTROL_WORLD_GRASSLAND = "/world/grasslands/control"
-
+CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control"
+CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL
 
 # ################################################ Function
 def setup_for_simulation(node):

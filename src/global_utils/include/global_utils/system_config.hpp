@@ -26,9 +26,9 @@ constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Dron
 constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
 
 // Topic path
-constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control";
-constexpr const char* CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"; // inactive
-constexpr const char* CONTROL_FINAL_TOPIC = "/on_drone/drone_control/final/control";
+constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/direct/control"; // Is "direct" since ReactiveOA not active yet!
+constexpr const char* CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"; // INACTIVE!!!
+constexpr const char* CONTROL_FINAL_TOPIC = "/on_drone/drone_control/direct/control"; // Is "direct" since ReactiveOA not active yet!
 constexpr const char* FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception";
 constexpr const char* CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact";
 constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";
@@ -42,6 +42,10 @@ constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL;
 
 // Drone
 constexpr const char* DRONE_NAME = "alpha_minus_2_0";
+constexpr float DRONE_WIDTH = 2.144f;
+constexpr float DRONE_LENGTH = 0.55f;
+constexpr float DRONE_HEIGHT = 0.05f;
+
 constexpr float SPEED_MAX_FORWARD = 10.0f;
 constexpr float SPEED_MAX_BACKWARD = 10.0f;
 constexpr float SPEED_MAX_STRAFE = 10.0f;

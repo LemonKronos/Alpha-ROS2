@@ -36,7 +36,7 @@ ObstacleManager::ObstacleManager() {
     config_.block_size = config_.drone_size * 0.25f; 
     
     // Sector Depth
-    config_.slice_depth = 4.0f * config_.drone_size; 
+    config_.slice_depth = 6.0f * config_.drone_size; 
 
     // Generate a true random seed for this session
     std::random_device rd;

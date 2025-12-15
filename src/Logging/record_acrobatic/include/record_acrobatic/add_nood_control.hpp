@@ -34,6 +34,7 @@ private:
     // --- Logic Helpers ---
     void start_recording();
     void finish_recording();
+    void discard_recording();
 
     // --- State Variables ---
     fs::path episode_path_;
@@ -41,7 +42,7 @@ private:
     int fps_;
     
     size_t frame_idx_;
-    std::string state_; // WAITING, RECORDING, PAUSED, SAVING
+    std::string state_; // WAITING, RECORDING, DISCARDING, PAUSED, SAVING
 
     // --- Data Buffers ---
     std::vector<float> current_input_; // Current joystick state [7]
