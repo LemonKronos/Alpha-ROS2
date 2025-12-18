@@ -32,28 +32,37 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
         std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
         std::bind(&FusePerceptionNode::PublishCallback, this)
     );
+
+    // Init variable
+    lidar_down_miss = TOPIC_MISS_THRESHOLD;
+    odometry_miss = TOPIC_MISS_THRESHOLD;
+    lidar_down_range_min = 0.1f;
+    lidar_down_range_max = 30.0f;
 }
 
 FusePerceptionNode::~FusePerceptionNode() {}
 
 float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-    if(scan_down_init) {
-        scan_down_range_min = msg->range_min;
-        scan_down_range_max = msg->range_max;
-        scan_down_init = false;
+    if(msg == nullptr) {
+        RCLCPP_WARN(this->get_logger(), RED "LiDAR scan down no callback!" RESET);
+        return NO_DATA_f;
     }
-    if(msg->ranges[0] < scan_down_range_min || msg->ranges[0] > scan_down_range_max) {
+    if(msg->ranges[0] < lidar_down_range_min || msg->ranges[0] > lidar_down_range_max) {
         return 0; // 0 mean CLEAR
     }
     else return msg->ranges[0];
 }
+
 /**
  * @brief Parse all data in last_ into the msg and publish
  */
 void FusePerceptionNode::PublishCallback() {
     auto msg = ros2_msgs::msg::FusePerception();
     
-    // Odometry
+    // Odometry - stream
+    if(odometry_miss < TOPIC_MISS_THRESHOLD) odometry_miss++;
+    else last_odo = nullptr;
+
     if(last_odo != nullptr) {
         msg.frame = last_odo->pose_frame; // auto parse from PX4 to ROS2 frame
         msg.position = frame_utils::frameNEDtoENU(last_odo->position);
@@ -64,12 +73,15 @@ void FusePerceptionNode::PublishCallback() {
         last_odo = nullptr;
     }
     else {
+        RCLCPP_WARN(this->get_logger(), RED "Odometry miss no callback!" RESET);
         msg.frame = 0;
         msg.position.fill(NO_DATA_f);
         msg.q.fill(NO_DATA_f);
+        msg.velocity.fill(NO_DATA_f);
+        msg.angular_velocity.fill(NO_DATA_f);
     }
     
-    // Contact sensor
+    // Contact sensor - flag
     if(last_contact != nullptr) {
         msg.bearable_contact = last_contact->bearable_contact;
         msg.critical_contact = last_contact->critical_contact;
@@ -81,15 +93,12 @@ void FusePerceptionNode::PublishCallback() {
         msg.critical_contact = false;
     }
 
-    // Scan down
-    if(last_scan_down != nullptr) {
-        msg.below_distance = handleScanDown(last_scan_down);
-        
+    // Scan down - stream
+    if(lidar_down_miss < TOPIC_MISS_THRESHOLD) lidar_down_miss++;
+    else {
         last_scan_down = nullptr;
     }
-    else {
-        msg.below_distance = NO_DATA_f;
-    }
+    msg.below_distance = handleScanDown(last_scan_down);
     
     msg.header.stamp = this->get_clock()->now();
     fuse_PUB->publish(msg);
@@ -98,6 +107,7 @@ void FusePerceptionNode::PublishCallback() {
 
 void FusePerceptionNode::OdoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
     last_odo = msg;
+    odometry_miss = 0;
 }
 
 void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::SharedPtr msg) {
@@ -106,4 +116,9 @@ void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::Sh
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
+    if(lidar_down_miss >= TOPIC_MISS_THRESHOLD) {
+        lidar_down_range_min = msg->range_min;
+        lidar_down_range_max = msg->range_max;
+    }
+    lidar_down_miss = 0; // Reset miss count
 }

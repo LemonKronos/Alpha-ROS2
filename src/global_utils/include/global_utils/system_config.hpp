@@ -21,6 +21,8 @@ constexpr int64_t SYSTEM_LOOP_CYCLE_FAST_NANOSEC = SYSTEM_LOOP_CYCLE_FAST * 1e9;
 
 // ################################# SYSTEM PARAMETER
 
+constexpr uint8_t TOPIC_MISS_THRESHOLD = 3; // Amount of miss topic before go NaN
+
 // Logging path
 constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
 constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";

@@ -31,9 +31,11 @@ private:
     sensor_msgs::msg::LaserScan::SharedPtr last_scan_down = nullptr;
 
     // Variales
-    bool scan_down_init = true;
-    float scan_down_range_min = 0.1f;
-    float scan_down_range_max = 50.0f;
+    uint8_t lidar_down_miss;
+    uint8_t odometry_miss;
+    float lidar_down_range_min;
+    float lidar_down_range_max;
+
     // Timers
     rclcpp::TimerBase::SharedPtr publish_TIM;
 
