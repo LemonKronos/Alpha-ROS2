@@ -28,7 +28,7 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # 3. Publishers
-        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_FINAL_TOPIC, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_INPUT_TOPIC, 10)
         self.record_control_PUB = self.create_publisher(RecordControl, LOGGER_RECORD_TOPIC, 10)
         
         # 4. State Tracking
@@ -58,7 +58,7 @@ class AdvanceControlNode(Node):
 
         self.control_interface_PUB.publish(control_msg)
 
-        if False:
+        if True:
             if self.no_input_log and self.no_input:
                 self.get_logger().info(" Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
                 self.no_input_log = False

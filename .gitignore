@@ -9,6 +9,7 @@ src/px4_ros_com
 src/ros_gz
 src/simulation_interfaces
 **/__pycache__/
+**/*.bak
 
 # Keep
 !pyvenv/

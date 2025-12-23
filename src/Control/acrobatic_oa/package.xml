@@ -3,20 +3,22 @@
 <package format="3">
   <name>acrobatic_oa</name>
   <version>0.0.1</version>
-  <description>AI acrobatic obstacle avoidance</description>
+  <description>Acrobatic obstacle avoidance node</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
-
-  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
   <depend>ros2_msgs</depend>
-  <depend>global_utils</depend>
+  <depend>python_utils</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
-    <build_type>ament_cmake</build_type>
+    <build_type>ament_python</build_type>
   </export>
 </package>

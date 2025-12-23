@@ -28,9 +28,9 @@ constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Dron
 constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
 
 // Topic path
-constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/direct/control"; // Is "direct" since ReactiveOA not active yet!
-constexpr const char* CONTROL_CORRECTION_TOPIC = "/on_drone/drone_control/correction/control"; // INACTIVE!!!
-constexpr const char* CONTROL_FINAL_TOPIC = "/on_drone/drone_control/direct/control"; // Is "direct" since ReactiveOA not active yet!
+constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control"; // Raw human control signal
+constexpr const char* CONTROL_ACROBATIC_TOPIC = "/on_drone/drone_control/acrobatic/control"; // Control signal after pass through AcrobaticOA brain
+constexpr const char* CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/acrobatic/control"; // INACTIVE, leave as pass through
 constexpr const char* FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception";
 constexpr const char* CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact";
 constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";

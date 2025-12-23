@@ -27,7 +27,7 @@ void setup_for_simulation(rclcpp::Node *node) {
     // We try for 3 seconds. We do NOT spin, we just peek at the network graph.
     // DDS background threads usually populate this even without spinning.
     bool clock_found = false;
-    int retries = 30; // 10 * 100ms = 1 seconds
+    int retries = 30; // 3 seconds
 
     while (retries > 0) {
         // Get list of all topics currently known

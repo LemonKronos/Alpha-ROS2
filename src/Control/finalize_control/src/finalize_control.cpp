@@ -9,7 +9,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     
     // Create Subscriber
     final_ctrl_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        CONTROL_FINAL_TOPIC,
+        CONTROL_REACTIVE_TOPIC,
         10,
         std::bind(&FinalizeControlNode::FinalCtrlCallback, this, _1)
     );
