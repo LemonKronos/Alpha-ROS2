@@ -41,15 +41,15 @@ private:
     moodycamel::BlockingConcurrentQueue<Point> queue_far;
     std::thread consumer_close;
     std::thread consumer_far;
-    std::atomic<bool> node_running{true};
-    bool sensor_alive = true;
+    std::atomic<bool> node_running;
+    bool sensor_alive;
     std::atomic<rcl_time_point_value_t> last_timestamp{0};
-    Point movement_current = {0, 0.5, 0, 0}; // forward, safe bubble 0.5 meter
+    Point movement_current; // {heading, safe distance, unused, unused}
     std::mutex mutex_movement;
     Obstacle method_sector;
     
     // Sensor specs
-    bool init_sensor_specs = true;
+    bool init_sensor_specs;
     float angle_min, angle_max, angle_increasement;
     float range_min, range_max;
     int lidar_2d_size;

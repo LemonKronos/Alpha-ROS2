@@ -1,12 +1,22 @@
 #include "lidar_2d_handler/lidar2d.hpp"
 
 #define DEBUG 0
-#define DEBUG_POINT DEBUG && 1
+#define DEBUG_POINT DEBUG && 0
 
 Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") {
     using namespace std::chrono_literals;
 
     setup_for_simulation(this);
+
+    // Initialize Variables
+    node_running.store(true);
+    sensor_alive = true;
+    init_sensor_specs = true;
+    movement_current = {
+        0.0f, // heading forward
+        2.0f * HAZARD_DISTANCE, // Stand still
+        0.0f, 0.0f // Unused
+    };
 
     // Create Subscriber
     raw_scan_SUB = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -68,6 +78,9 @@ void Lidar2dHandlerNode::ScanCallback(const sensor_msgs::msg::LaserScan::SharedP
         range_max = msg->range_max;
         lidar_2d_size = static_cast<int>(std::floor((angle_max - angle_min) / angle_increasement)) +1;
         init_sensor_specs = false;
+        #if DEBUG && 1
+        printf("LiDAR 2d scan array size = %d", lidar_2d_size);
+        #endif
     }
 
     last_timestamp.store(this->get_clock()->now().nanoseconds());
@@ -118,21 +131,34 @@ void Lidar2dHandlerNode::ScanCallback(const sensor_msgs::msg::LaserScan::SharedP
         if(index_end < 0) continue;
         else if(index_end > lidar_2d_size -1) index_end = lidar_2d_size - 1;
 
-        #if DEBUG && 0
+        if(index_start > index_end) { // at wrap-around, use virtual end
+            index_end += lidar_2d_size;
+        }
+
+        #if DEBUG && 1
         printf("Sector %d\n", current_sector);
-        printf("Start at index %d, end at index %d, number of rays = %d\n", index_start, index_end, index_end - index_start +1);
+        printf("Start at index %d, end at index %d, number of rays = %d\n", index_start, index_end % lidar_2d_size, index_end - index_start +1);
         raise(SIGTRAP);
         #endif
+
         int index = 0;
         while(index_start + index <= index_end) {
+            #if DEBUG && 0
+            if(current_sector == 6) {
+                printf("Sector 6 enter while loop");
+                raise(SIGTRAP);
+            }
+            #endif
             Point point;
             point.arc = angle_start + index*angle_increasement;
             // point.arc = round(point.arc * 1e6) / 1e6;
             if(0 <= index && index < lidar_2d_size) {
-                point.distance = ClampLidar(msg->ranges[index_start + index]);
+                point.distance = ClampLidar(msg->ranges[(index_start + index) % lidar_2d_size]);
                 #if DEBUG && 0
-                printf("Enqueue [%.06f] = %.2f\n", point.arc, point.distance);
-                raise(SIGTRAP);
+                if(current_sector == 6) {
+                    printf("Enqueue [%.06f] = %.2f\n", point.arc, point.distance);
+                    raise(SIGTRAP);
+                }
                 #endif
                 if(point.distance == CLEAR) {
                     queue_close.enqueue(point);
@@ -212,12 +238,16 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
         Point entry = {1, 0, 0, 0};
         queue.wait_dequeue(entry);
         if(!node_running) break;
-        #if DEBUG && 0
-            printf("Dequeue [%.6f] = %.2f\n", entry.arc, entry.distance);
-            if(fabs(entry.arc - 135*DEGREE) < 1e-4) {
-                printf(RED "Here entry 135 Degree\n" RESET);
-                raise(SIGTRAP);
-            }
+        #if DEBUG && 1
+        if(entry.arc < method_sector.getAngleEndSector(6) && entry.arc >= method_sector.getAngleStartSector(6)) {
+            printf("Dequeue in sector 6, [%.6f] = %.2f\n", entry.arc, entry.distance);
+            raise(SIGTRAP);
+        }
+            // printf("Dequeue [%.6f] = %.2f\n", entry.arc, entry.distance);
+            // if(fabs(entry.arc - 135*DEGREE) < 1e-4) {
+            //     printf(RED "Here entry 135 Degree\n" RESET);
+            //     raise(SIGTRAP);
+            // }
         #endif
         if(checkPublishSignal(entry)) { // Producer finish!
             if(!contour.empty()) {
