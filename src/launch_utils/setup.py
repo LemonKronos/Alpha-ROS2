@@ -16,6 +16,7 @@ setup(
             'launch_utils/advance_control_launch.py',
             'launch_utils/record_acrobatic_expert.py',
             'launch_utils/record_acrobatic_noob.py',
+            'launch_utils/reactive_oa_test_static.py',
         ]),
     ],
     install_requires=['setuptools'],

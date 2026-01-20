@@ -16,25 +16,25 @@ fi
 
 
 ### 2. Explicit PX4 processes
-pkill -x px4                           # exact binary name
-pkill -x micrortps_agent               # px4 agent name
-pkill -x MicroXRCEAgent                # alternative agent
+pkill -x px4 >/dev/null                           # exact binary name
+pkill -x micrortps_agent >/dev/null               # px4 agent name
+pkill -x MicroXRCEAgent >/dev/null                # alternative agent
 
 ### Gazebo classic processes
-pkill -9 -f gz
-pkill -f gazebo
-pkill -f simulation-gazebo
+pkill -9 -f gz >/dev/null
+pkill -f gazebo >/dev/null
+pkill -f simulation-gazebo >/dev/null
 
 ### ros_gz_bridge parameter bridge
-pkill -f "ros_gz_bridge parameter_bridge"
-pkill -x parameter_bridge
+pkill -f "ros_gz_bridge parameter_bridge" >/dev/null 
+pkill -f parameter_bridge >/dev/null
 
 
 ### 4. ROS visualization tools
-pkill -x rviz2
+pkill -x rviz2 >/dev/null
 
 ### 5. QGroundControl (GUI app)
-pgrep -x QGroundControl >/dev/null && pkill -9 -x QGroundControl
+pgrep -x QGroundControl >/dev/null && pkill -9 -x QGroundControl >/dev/null
 
 
 echo "[STOP SIM] Cleanup completed safely!"

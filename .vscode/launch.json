@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Build Debug ROS2 Launch",
+            "name": "Build Debug ROS2",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/install/${input:ros2Package}/lib/${input:ros2Package}/${input:ros2Executable}",
@@ -19,7 +19,7 @@
             // ],
             "MIMode": "gdb",
             "stopAtEntry": false,
-            "preLaunchTask": "Build ROS2 Single Node Debug"
+            "preLaunchTask": "Build ROS2 Single Node"
         }
     ],
     "inputs": [

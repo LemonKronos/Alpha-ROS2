@@ -179,7 +179,9 @@ void FinalizeControlNode::NodeLoopCallback() {
             }
 
             PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3);
-            SendDisarmCmd();
+            if(arming_state && last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND) {
+                SendDisarmCmd();
+            }
 
             if(control_state || !arming_state){
                 current_loop_state = NodeLoopState::INIT;
@@ -348,7 +350,9 @@ bool FinalizeControlNode::SendDisarmCmd() {
     // Command: 400 (VEHICLE_CMD_COMPONENT_ARM_DISARM)
     // Param1: 0.0 (Disarm)
     // Param2: 21196.0 (The Magic Force Number)
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
-    RCLCPP_INFO(this->get_logger(), RED "FORCE DISARM SENT (Magic Number)" RESET);
+    // PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
+    // RCLCPP_INFO(this->get_logger(), RED "FORCE DISARM SENT (Magic Number)" RESET);
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
+	RCLCPP_INFO(this->get_logger(), RED "Disarm command send" RESET);
     return true;
 }

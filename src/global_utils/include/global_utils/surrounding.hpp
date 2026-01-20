@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <float.h>
 #include <cmath>
+#include <stack>
 
 /* ######################################## Constant */
 constexpr uint8_t SECTOR_NUM = 12;
@@ -38,6 +39,7 @@ private:
     void setMinDistance(const float& distance) { min_distance = distance; }
     bool makeStraightLine(const Point& point); // Tolerance scale with distance
     float getDistance2Point(const Point& pointA, const Point& pointB);
+    void RDPOptimize(float base_epsilon = 0.01f, float growth_factor = 0.05f); // result line may deriviate {base_epsilon * growth_factor} m from the true obstacle
     
     friend class Obstacle;
 };

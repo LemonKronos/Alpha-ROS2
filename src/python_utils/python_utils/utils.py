@@ -24,7 +24,7 @@ RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo"
 # Topic path
 CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control" # Raw human control signal
 CONTROL_ACROBATIC_TOPIC = "/on_drone/drone_control/acrobatic/control" # Control signal after pass through AcrobaticOA brain
-CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/acrobatic/control" 
+CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/reactive/control" # Control signal after pass through ReactiveOA
 FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception"
 CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact"
 LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control"

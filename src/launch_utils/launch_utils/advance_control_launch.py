@@ -22,15 +22,15 @@ def generate_launch_description():
             executable='finalize_control',
             name='finalize_control_node',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            # arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='reactive_oa',
-        #     executable='reactive_oa',
-        #     name='reactive_oa_node',
-        #     output='screen',
-        #     # arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='reactive_oa',
+            executable='reactive_oa',
+            name='reactive_oa_node',
+            output='screen',
+            # arguments=['--ros-args', '--log-level', 'warn']
+        ),
         Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',
@@ -49,6 +49,20 @@ def generate_launch_description():
             package='fuse_perception',
             executable='fuse_perception',
             name='fuse_perception_node',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour',
+            name='rviz_contour',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour_points',
+            name='rviz_contour_points',
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),

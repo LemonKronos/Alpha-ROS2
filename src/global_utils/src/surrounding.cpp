@@ -84,6 +84,92 @@ float Contour::getDistance2Point(const Point& pointA, const Point& pointB) {
     return hypot(pointA.x - pointB.x, pointA.y - pointB.y);
 }
 
+void Contour::RDPOptimize(float base_epsilon, float growth_factor) {
+    if (points.size() < 3) return;
+
+    std::stack<std::pair<size_t, size_t>> stack;
+    std::vector<bool> keep_point(points.size(), false);
+
+    keep_point[0] = true;
+    keep_point[points.size() - 1] = true;
+    stack.push({0, points.size() - 1});
+
+    while (!stack.empty()) {
+        std::pair<size_t, size_t> range = stack.top();
+        stack.pop();
+
+        size_t start_index = range.first;
+        size_t end_index = range.second;
+
+        // --- DYNAMIC EPSILON CALCULATION ---
+        // We use the distance of the start point of this segment.
+        // Since 'point.distance' is already cached, this is free!
+        float segment_dist = points[start_index].distance;
+        
+        // Example: Base 0.03m + (0.01 * distance)
+        // At 1m: epsilon = 0.04m
+        // At 10m: epsilon = 0.13m
+        // At 30m: epsilon = 0.33m (33cm tolerance)
+        float local_epsilon = base_epsilon + (segment_dist * growth_factor);
+        
+        // Square it for the fast math check
+        float epsilon_sq = local_epsilon * local_epsilon;
+        // -----------------------------------
+
+        float max_dist_sq = 0.0f;
+        size_t furthest_point_index = 0;
+
+        // Cache line deltas
+        const Point& p_start = points[start_index];
+        const Point& p_end = points[end_index];
+        
+        float line_dx = p_end.x - p_start.x;
+        float line_dy = p_end.y - p_start.y;
+        float line_len_sq = line_dx * line_dx + line_dy * line_dy;
+
+        // Iterate points between start and end
+        for (size_t i = start_index + 1; i < end_index; ++i) {
+            float dist_sq;
+
+            // Handle case where start and end are same point (avoid div by 0)
+            if (line_len_sq < 1e-6f) {
+                 float dx = points[i].x - p_start.x;
+                 float dy = points[i].y - p_start.y;
+                 dist_sq = dx * dx + dy * dy;
+            } else {
+                // Perpendicular Distance Squared Formula:
+                // Area = |(y2-y1)x0 - (x2-x1)y0 + x2y1 - y2x1|
+                // Dist^2 = Area^2 / Length^2
+                float area = (p_end.y - p_start.y) * points[i].x 
+                           - (p_end.x - p_start.x) * points[i].y 
+                           + p_end.x * p_start.y 
+                           - p_end.y * p_start.x;
+                dist_sq = (area * area) / line_len_sq;
+            }
+
+            if (dist_sq > max_dist_sq) {
+                max_dist_sq = dist_sq;
+                furthest_point_index = i;
+            }
+        }
+
+        // If the furthest point is outside our tolerance, split and recurse
+        if (max_dist_sq > epsilon_sq) {
+            keep_point[furthest_point_index] = true;
+            stack.push({start_index, furthest_point_index});
+            stack.push({furthest_point_index, end_index});
+        }
+    }
+
+    // Reconstruct
+    std::vector<Point> new_points;
+    new_points.reserve(points.size());
+    for (size_t i = 0; i < points.size(); ++i) {
+        if (keep_point[i]) new_points.push_back(points[i]);
+    }
+    points = std::move(new_points);
+}
+
 // ################################## Class Obstacle
 
 Obstacle::Obstacle() {
@@ -163,6 +249,7 @@ ros2_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
 
 void Obstacle::addContour(const uint8_t& sector_index, Contour& new_contour) {
     if(new_contour.empty()) return;
+    new_contour.RDPOptimize();
     sector[sector_index].contours.push_back(new_contour);
     obstacles_num++;
     sector[sector_index].min_distance = std::min(

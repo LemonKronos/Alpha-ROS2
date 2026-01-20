@@ -30,7 +30,7 @@ constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
 // Topic path
 constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control"; // Raw human control signal
 constexpr const char* CONTROL_ACROBATIC_TOPIC = "/on_drone/drone_control/acrobatic/control"; // Control signal after pass through AcrobaticOA brain
-constexpr const char* CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/acrobatic/control"; // INACTIVE, leave as pass through
+constexpr const char* CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/reactive/control"; // Control signal after pass through Reactive OA
 constexpr const char* FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception";
 constexpr const char* CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact";
 constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";
@@ -67,7 +67,7 @@ constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
 // Safety
 constexpr float SELF_RADIUS = 1.2f; // drone radius in meter
 constexpr float UNCERTAINTY = 0.05f;
-constexpr float SAFE_BUFFER = 0.05f;
+constexpr float SAFE_BUFFER = 2.05f; // tune for testing
 constexpr float HAZARD_DISTANCE = SELF_RADIUS + SAFE_BUFFER + UNCERTAINTY;
 constexpr float REACT_TIME = 0.033333f; // ms
 constexpr float DECELERATE_MAX = 5.0f; // m/s^2

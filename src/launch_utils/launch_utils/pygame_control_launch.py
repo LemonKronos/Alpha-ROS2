@@ -3,13 +3,13 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     return LaunchDescription([
-        Node(
-            package='simulation_control',
-            executable='simulation_control',
-            name='simulation_control_node',
-            output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node( # For FPV window
+        #     package='simulation_control',
+        #     executable='simulation_control',
+        #     name='simulation_control_node',
+        #     output='screen',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='pygame_control',
             executable='pygame_control',
@@ -22,7 +22,7 @@ def generate_launch_description():
         #     executable='reactive_oa',
         #     name='reactive_oa_node',
         #     output='screen',
-        #     # arguments=['--ros-args', '--log-level', 'warn']
+        #     arguments=['--ros-args', '--log-level', 'warn']
         # ),
         Node(
             package='finalize_control',
@@ -52,18 +52,18 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour',
-        #     name='rviz_contour',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour_points',
-        #     name='rviz_contour_points',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # )
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour',
+            name='rviz_contour',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour_points',
+            name='rviz_contour_points',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        )
     ])

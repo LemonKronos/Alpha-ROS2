@@ -97,4 +97,5 @@
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
     "python.envFile": "${workspaceFolder}/.env",
+    "ROS2.distro": "jazzy",
 }

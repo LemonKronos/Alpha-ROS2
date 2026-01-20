@@ -53,7 +53,7 @@ class PygameControlNode:
         self.UP_DOWN_COASTING = 0.05
 
         # Publisher
-        self.pub = self.node.create_publisher(ControlInterface, CONTROL_INPUT_TOPIC, 10)
+        self.pub = self.node.create_publisher(ControlInterface, CONTROL_REACTIVE_TOPIC, 10)
 
         # UI control internals 
         self.is_armed = None  # not used for ROS publish but kept as attribute

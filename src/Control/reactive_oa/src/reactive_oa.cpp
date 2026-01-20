@@ -5,7 +5,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     setup_for_simulation(this);
     
     // Publisher
-    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(CONTROL_FINAL_TOPIC, 10);
+    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(CONTROL_REACTIVE_TOPIC, 10);
 
     #ifdef VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
@@ -26,7 +26,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
     perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        LIDAR_2D_CONTOUR_FAR_TOPIC,
+        FUSE_PERCEPTION_TOPIC,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::perceptionCallback, this, _1));
 
@@ -84,17 +84,71 @@ void ReactiveOANode::computeMovementVector(){
 }
 
 void ReactiveOANode::computeRepulsiveVector(){
-    // Compute repulsive vector by combining all obstacle points' influence
-    repulsive_vec = Eigen::Vector3f::Zero();
+    // We will store distinct forces here instead of summing immediately
+    std::vector<Eigen::Vector3f> distinct_forces;
+    
+    // Iterate through all 12 Sectors
     for(uint8_t index = 0; index < SECTOR_NUM; index++) {
         for(const auto& contour : obstacle.getContours(index)) {
-            for(const auto& point : contour.getContour()) {
-                Eigen::Vector3f point_vec(point.x, point.y, 0);
-                const float factor = (safe_distance - point_vec.norm()); // Cut depth magnitude
-                point_vec = point_vec.normalized() * factor;
-                repulsive_vec -= point_vec;
+            const auto& points = contour.getContour();
+            if(points.size() < 2) continue;
+
+            for(size_t i = 0; i < points.size() - 1; ++i) {
+                // ... [Same Segment Calculation Logic as before] ...
+                Eigen::Vector3f p1(points[i].x, points[i].y, 0);
+                Eigen::Vector3f p2(points[i+1].x, points[i+1].y, 0);
+                Eigen::Vector3f segment = p2 - p1;
+                
+                if(segment.squaredNorm() < 1e-6f) continue;
+
+                float t = -p1.dot(segment) / segment.squaredNorm();
+                if (t < 0.0f) t = 0.0f;
+                else if (t > 1.0f) t = 1.0f;
+
+                Eigen::Vector3f closest_point = p1 + segment * t;
+                float dist = closest_point.norm();
+
+                // Calculate Raw Force for this specific segment
+                if(dist < safe_distance && dist > 1e-3f) {
+                    float factor = (safe_distance - dist); 
+                    Eigen::Vector3f new_force = -closest_point.normalized() * factor;
+
+                    // --- CLUSTERING LOGIC STARTS HERE ---
+                    bool merged = false;
+                    for(auto& existing_force : distinct_forces) {
+                        // Check alignment using Dot Product
+                        // If normalized dot > 0.866, they are within ~30 degrees
+                        // We use unnormalized dot for speed, knowing directions are similar
+                        // Let's use cosine similarity safely:
+                        
+                        float similarity = new_force.normalized().dot(existing_force.normalized());
+
+                        // Threshold: 0.9 is approx 25 degrees cone. 
+                        // If they push in same direction, treat as same obstacle source.
+                        if(similarity > 0.9f) { 
+                            // Take the MAX magnitude (Keep the one that pushes harder)
+                            if(new_force.squaredNorm() > existing_force.squaredNorm()) {
+                                existing_force = new_force;
+                            }
+                            merged = true;
+                            break; 
+                        }
+                    }
+
+                    // If it's a unique direction (e.g. a different wall), add it
+                    if(!merged) {
+                        distinct_forces.push_back(new_force);
+                    }
+                    // --- CLUSTERING LOGIC ENDS HERE ---
+                }
             }
         }
+    }
+
+    // Now simply sum the distinct forces
+    repulsive_vec = Eigen::Vector3f::Zero();
+    for(const auto& f : distinct_forces) {
+        repulsive_vec += f;
     }
 
     // Snap to 0
@@ -103,11 +157,14 @@ void ReactiveOANode::computeRepulsiveVector(){
         return;
     }
 
-    // Scale repulsive vector to try to maintain safe bubble
-    const float x = (safe_distance - obstacle.getMinDistance()) / safe_distance;
-    // const float scale = x * x * (3 - 2 * x); // Smooth S scale
-    // const float scale = sqrtf(x);
-    const float scale = 2.0f * x; // Linear is best
+    // Scale repulsive vector (Your original scaling logic)
+    // Note: You might need to re-tune 'scale' slightly since we aren't summing as many vectors now.
+    float min_dist = obstacle.getMinDistance();
+    if(min_dist > safe_distance) min_dist = safe_distance;
+    
+    const float x = (safe_distance - min_dist) / safe_distance;
+    const float scale = 2.0f * x; 
+    
     repulsive_vec = repulsive_vec.normalized() * (scale * SPEED_MAX_FORWARD);
 }
 
@@ -195,7 +252,7 @@ void ReactiveOANode::publishVectorArrow(
 void ReactiveOANode::nodeLoopCallback() {
     computeCorrectionVector();
     auto msg = ros2_msgs::msg::ControlInterface();
-    msg.control_state = last_input_control->control_state;
+    msg.control_state = true;
     
     if(obstacle_encountered) msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
     else {
@@ -229,7 +286,9 @@ void ReactiveOANode::nodeLoopCallback() {
     }
 
     msg.header.stamp = this->get_clock()->now();
+    #if PUBLISH_CORRECTION_CONTROL
     final_control_PUB->publish(msg);
+    #endif
     
     #ifdef VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0, 0.0, 1.0); // Blue

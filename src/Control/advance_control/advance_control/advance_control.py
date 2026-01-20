@@ -28,7 +28,7 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # 3. Publishers
-        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_INPUT_TOPIC, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_REACTIVE_TOPIC, 10)
         self.record_control_PUB = self.create_publisher(RecordControl, LOGGER_RECORD_TOPIC, 10)
         
         # 4. State Tracking
@@ -58,13 +58,13 @@ class AdvanceControlNode(Node):
 
         self.control_interface_PUB.publish(control_msg)
 
-        if True:
+        if False:
             if self.no_input_log and self.no_input:
-                self.get_logger().info(" Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
+                self.get_logger().info(f"{'🎮' if control_msg.control_state else '❌'}Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
                 self.no_input_log = False
 
             if control_msg.forward != 0 or control_msg.left != 0 or control_msg.up != 0 or control_msg.roll != 0 or control_msg.pitch != 0 or control_msg.yaw != 0:
-                self.get_logger().info(f" Forwar{control_msg.forward:> 5.2f}🔼   Left{control_msg.left:> 5.2f}◀️   Up{control_msg.up:> 5.2f}⬆️   Roll{control_msg.roll:> 5.2f}🔄   Pitch{control_msg.pitch:> 5.2f}↕️   Yaw{control_msg.yaw:> 5.2f}↔️")
+                self.get_logger().info(f"{'🎮' if control_msg.control_state else '❌'}Forwar{control_msg.forward:> 5.2f}🔼   Left{control_msg.left:> 5.2f}◀️   Up{control_msg.up:> 5.2f}⬆️   Roll{control_msg.roll:> 5.2f}🔄   Pitch{control_msg.pitch:> 5.2f}↕️   Yaw{control_msg.yaw:> 5.2f}↔️")
                 self.no_input = False
                 self.no_input_log = True
 

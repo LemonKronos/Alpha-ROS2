@@ -15,6 +15,7 @@
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker.hpp>
 #endif
+#define PUBLISH_CORRECTION_CONTROL 0
 
 #include <Eigen/Dense>
 

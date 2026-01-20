@@ -134,7 +134,8 @@ class WebSocketController:
             
     def stop(self):
         self._is_running = False
-        print("🛑 WebSocket Controller Stopping...")
+        if self._enable_logging:
+            print("🛑 WebSocket Controller Stopping...")
 
 if __name__ == "__main__":
     controller = WebSocketController(enable_logging=True)
