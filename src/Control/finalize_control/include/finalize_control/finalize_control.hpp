@@ -4,9 +4,10 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
 #include "ros2_msgs/msg/control_interface.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp"
+#include "px4_msgs/msg/vehicle_land_detected.hpp"
+#include "px4_msgs/msg/vehicle_odometry.hpp"
 // #include "px4_msgs/msg/vehicle_command_ack.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/vehicle_attitude_setpoint.hpp"
@@ -33,8 +34,9 @@ private:
     // Subcriber
     rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr final_ctrl_SUB;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odometry_SUB;
     // rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
 
 
     // Stored SharedPtr
@@ -45,11 +47,12 @@ private:
     uint8_t offboard_stream_counter = 0;
     bool arming_state = false;
     bool offboard_state = false;
+    bool in_failure = false;
+    bool landed = true;
     uint8_t last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     bool control_state = false;
     Eigen::Quaternionf last_q = {1, 0, 0, 0};
     float yaw_W = 0;
-    float odo_z_velocity = 0;
 
     enum class OffboardMode {
         POSITION,
@@ -77,13 +80,15 @@ private:
     // Callbacks
     void FinalCtrlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
     void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
-    void FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+    void VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
+    void OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
     void NodeLoopCallback();
 
     // Methods
     void PublishVehicleCmd(uint16_t command, float param1 = 0.0, float param2 = 0.0, float param3 = 0.0);
     bool SendArmCmd();
     bool SendDisarmCmd();
+    bool SendForceDisarmCmd();
     void SendOffboardCmd();
     void PublishOffboardControlMode();
     void PublishTrajectorySetpoint();

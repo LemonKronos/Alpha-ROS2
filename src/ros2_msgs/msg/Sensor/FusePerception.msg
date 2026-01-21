@@ -18,7 +18,7 @@ float32[4] q
 # Velocity
 float32[3] velocity
 
-# Angular velocity
+# Angular velocity in body frame
 float32[3] angular_velocity
 
 # Contact sensor

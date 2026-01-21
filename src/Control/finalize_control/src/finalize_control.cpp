@@ -20,16 +20,16 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
         std::bind(&FinalizeControlNode::VehicleStatusCallback, this, _1)
     );
 
-    fuse_perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        FUSE_PERCEPTION_TOPIC,
+    odometry_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
+        "/fmu/out/vehicle_odometry",
         rclcpp::SensorDataQoS(),
-        std::bind(&FinalizeControlNode::FusePerceptionCallback, this, _1)
+        std::bind(&FinalizeControlNode::OdometryCallback, this, _1)
     );
 
     // Create Publisher
-    vehicle_cmd_PUB = this->create_publisher<px4_msgs::msg::VehicleCommand>("fmu/in/vehicle_command", 10);
+    vehicle_cmd_PUB = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
     
-    offboard_ctrl_PUB = this->create_publisher<px4_msgs::msg::OffboardControlMode>("fmu/in/offboard_control_mode", 10);
+    offboard_ctrl_PUB = this->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
     
     attitude_set_PUB = this->create_publisher<px4_msgs::msg::VehicleAttitudeSetpoint>("/fmu/in/vehicle_attitude_setpoint", 10);
 
@@ -43,10 +43,15 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
 
     // Set variables
     loss_final_control_count = 0;
-    arming_state = false;
-    control_state = false;
-    yaw_W = 0;
     offboard_stream_counter = 0;
+    arming_state = false;
+    offboard_state = false;
+    in_failure = false;
+    landed = true;
+    last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
+    control_state = false;
+    last_q = {1, 0, 0, 0};
+    yaw_W = 0;
     current_loop_state = NodeLoopState::INIT;
     just_change_loop_state = true;
 }
@@ -67,12 +72,16 @@ void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStat
     arming_state = msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
     offboard_state = msg->nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     last_nav_state = msg->nav_state;
+    in_failure = msg->failure_detector_status != px4_msgs::msg::VehicleStatus::FAILURE_NONE;
     // RCLCPP_INFO(this->get_logger(), PINK "current nav_state = %d" RESET, msg->nav_state);
 }
 
-void FinalizeControlNode::FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg) {
-    last_q = frame_utils::arrayToQuaternion(msg->q);
-    odo_z_velocity = msg->velocity[2];
+void FinalizeControlNode::VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
+    landed = msg->landed;
+}
+
+void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
+    last_q = frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(msg->q));
 }
 
 /*########################################## FSM */
@@ -84,13 +93,13 @@ void FinalizeControlNode::NodeLoopCallback() {
         control_state = last_final_ctrl->control_state;
         if(!ALLOW_ATTITUDE || (abs(last_final_ctrl->roll) <= ATTITUDE_THRESHOLD && abs(last_final_ctrl->pitch) <= ATTITUDE_THRESHOLD)) {
             if(offboard_mode != OffboardMode::VELOCITY) {
-                RCLCPP_WARN(this->get_logger(), GREEN "Change mode to VECLOCITY" RESET);
+                RCLCPP_WARN(this->get_logger(), GREEN "Changed mode to VECLOCITY" RESET);
             }
             offboard_mode = OffboardMode::VELOCITY;
         }
         else {
             if(offboard_mode != OffboardMode::ATTITUDE) {
-                RCLCPP_WARN(this->get_logger(), TEAL "Change mode to ATTITUDE" RESET);
+                RCLCPP_WARN(this->get_logger(), TEAL "Changed mode to ATTITUDE" RESET);
             }
             offboard_mode = OffboardMode::ATTITUDE;
         }
@@ -151,12 +160,9 @@ void FinalizeControlNode::NodeLoopCallback() {
                 if(!arming_state) { // Lost arm
                     current_loop_state = NodeLoopState::INIT;
                     just_change_loop_state = true;
-                    RCLCPP_INFO(this->get_logger(), RED "System have been disarm, rearm" RESET);
+                    RCLCPP_INFO(this->get_logger(), RED "System have been disarmed, rearm" RESET);
                 }
-                else if(
-                    last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_RTL ||
-                    last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL
-                ) { // In RTL
+                else if(last_nav_state != px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD) { // In RTL
                     current_loop_state = NodeLoopState::INIT;
                     just_change_loop_state = true;
                     RCLCPP_INFO(this->get_logger(), RED "System have leave offboard, restart offboard" RESET);
@@ -166,7 +172,6 @@ void FinalizeControlNode::NodeLoopCallback() {
             else {
                 current_loop_state = NodeLoopState::DISARM;
                 just_change_loop_state = true;
-                RCLCPP_INFO(this->get_logger(), RED "End of control, disarm" RESET);
             }
         break;
         case NodeLoopState::LOST: // Not deal with yet
@@ -183,7 +188,7 @@ void FinalizeControlNode::NodeLoopCallback() {
                 SendDisarmCmd();
             }
 
-            if(control_state || !arming_state){
+            if(control_state){ // Signal arm
                 current_loop_state = NodeLoopState::INIT;
                 just_change_loop_state = true;
             }
@@ -258,7 +263,7 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         msg.position.fill(NO_DATA_f);
         msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
         msg.yaw = NO_DATA_f;
-        msg.yawspeed = -last_final_ctrl->yaw * M_PI_2f; // frame FLU to FRD
+        msg.yawspeed = -last_final_ctrl->yaw * SPEED_MAX_ANGLE; // frame FLU to FRD
     }
     else {
         msg.position.fill(NO_DATA_f);
@@ -275,14 +280,14 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
 void FinalizeControlNode::PublishAttitudeSetPoint() {
     auto msg = px4_msgs::msg::VehicleAttitudeSetpoint();
 
-    if(last_final_ctrl != nullptr) { // Update new rate and thrust
-        // Body rate to world quaternion
-        Eigen::Vector3f omega(
-            last_final_ctrl->roll * 2*M_PIf,
-            -last_final_ctrl->pitch * 2*M_PIf, // No idea why!
-            last_final_ctrl->yaw * 2*M_PIf
+    if(last_final_ctrl != nullptr) {
+        // Body velocity rate to world quaternion
+        Eigen::Vector3f omega( // in velocity
+            last_final_ctrl->roll * SPEED_MAX_ANGLE,
+            -last_final_ctrl->pitch * SPEED_MAX_ANGLE,
+            last_final_ctrl->yaw * SPEED_MAX_ANGLE
         );
-        float angle = omega.norm() * SYSTEM_LOOP_CYCLE;
+        float angle = omega.norm() * SYSTEM_LOOP_CYCLE_FAST;
         Eigen::Quaternionf dq;
         if(angle > 1e-6f) dq = Eigen::AngleAxisf(angle, omega.normalized());
         else dq = Eigen::Quaternionf::Identity();
@@ -307,7 +312,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
-        msg.yaw_sp_move_rate = -last_final_ctrl->yaw; // FLU to FRD
+        msg.yaw_sp_move_rate = NO_DATA_f;
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw
@@ -341,18 +346,24 @@ void FinalizeControlNode::PublishVehicleCmd(uint16_t command, float param1, floa
 }
 
 bool FinalizeControlNode::SendArmCmd() {
+    if(in_failure) return false;
     PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
-	RCLCPP_INFO(this->get_logger(), BLUE "Arm command send" RESET);
+	RCLCPP_INFO(this->get_logger(), BLUE "Arm command sended" RESET);
     return true;
 }
 
 bool FinalizeControlNode::SendDisarmCmd() {
+    if(!landed) return false;
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
+	RCLCPP_INFO(this->get_logger(), RED "Disarm command sended" RESET);
+    return true;
+}
+
+bool FinalizeControlNode::SendForceDisarmCmd() {
     // Command: 400 (VEHICLE_CMD_COMPONENT_ARM_DISARM)
     // Param1: 0.0 (Disarm)
-    // Param2: 21196.0 (The Magic Force Number)
-    // PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
-    // RCLCPP_INFO(this->get_logger(), RED "FORCE DISARM SENT (Magic Number)" RESET);
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
-	RCLCPP_INFO(this->get_logger(), RED "Disarm command send" RESET);
+    // Param2: 21196.0 (Force Code)
+    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
+    RCLCPP_INFO(this->get_logger(), RED "Force Disarm command sended" RESET);
     return true;
 }

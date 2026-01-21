@@ -15,7 +15,7 @@ def generate_launch_description():
             executable='simulation_control',
             name='simulation_control_node',
             output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='finalize_control',

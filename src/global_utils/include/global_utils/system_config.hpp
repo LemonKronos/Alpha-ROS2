@@ -51,6 +51,7 @@ constexpr float DRONE_HEIGHT = 0.05f;
 constexpr float SPEED_MAX_FORWARD = 10.0f;
 constexpr float SPEED_MAX_BACKWARD = 10.0f;
 constexpr float SPEED_MAX_STRAFE = 10.0f;
+constexpr float SPEED_MAX_ANGLE = M_PI_2f;
 constexpr float SPEED_MAX_UP = 8.0f;
 constexpr float SPEED_MAX_DOWN = 4.0f;
 constexpr float THRUST_SAFE_LIMIT = 0.9f;
