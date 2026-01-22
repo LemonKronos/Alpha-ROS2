@@ -17,6 +17,9 @@
 
 constexpr float ATTITUDE_THRESHOLD = 0.01f;
 constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 8;
+constexpr uint8_t OFFBOARD_STREAM_THRESHOLD = 20;
+constexpr uint8_t OFFBOARD_MODE_CHANGE_THRESHOLD = OFFBOARD_STREAM_THRESHOLD / 2;
+
 using std::placeholders::_1;
 
 class FinalizeControlNode : public rclcpp::Node {
@@ -45,6 +48,7 @@ private:
     // Variables
     uint8_t loss_final_control_count = 0;
     uint8_t offboard_stream_counter = 0;
+    uint8_t offboard_attitude_counter = 0;
     bool arming_state = false;
     bool offboard_state = false;
     bool in_failure = false;

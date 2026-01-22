@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 #include "global_utils/utils.hpp"
+
 // ################################# SYSTEM CONFIG
+
 #define VISUALIZE true
 
 // Time
@@ -55,7 +57,7 @@ constexpr float SPEED_MAX_ANGLE = M_PI_2f;
 constexpr float SPEED_MAX_UP = 8.0f;
 constexpr float SPEED_MAX_DOWN = 4.0f;
 constexpr float THRUST_SAFE_LIMIT = 0.9f;
-constexpr float HOVER_THRUST = -0.5f; // Thrust opposite with moving direction, so in FLU negative = push downward
+constexpr float HOVER_THRUST = -0.51f; // Thrust opposite with moving direction, so in FLU negative = push downward
 
 constexpr float DEGREE = 0.017453292f;
 
@@ -82,5 +84,5 @@ constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
 
 // ################################# FUNCTION
 
-void setup_for_simulation(rclcpp::Node *node);
+void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
 

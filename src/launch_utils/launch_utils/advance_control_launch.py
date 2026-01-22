@@ -46,13 +46,6 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
-            package='fuse_perception',
-            executable='fuse_perception',
-            name='fuse_perception_node',
-            output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
-        Node(
             package='rviz_contour',
             executable='rviz_contour',
             name='rviz_contour',

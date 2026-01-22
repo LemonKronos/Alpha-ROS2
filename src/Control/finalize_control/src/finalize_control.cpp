@@ -44,6 +44,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     // Set variables
     loss_final_control_count = 0;
     offboard_stream_counter = 0;
+    offboard_attitude_counter = 0;
     arming_state = false;
     offboard_state = false;
     in_failure = false;
@@ -91,20 +92,32 @@ void FinalizeControlNode::NodeLoopCallback() {
     if(last_final_ctrl != nullptr) {
         loss_final_control_count = 0;
         control_state = last_final_ctrl->control_state;
-        if(!ALLOW_ATTITUDE || (abs(last_final_ctrl->roll) <= ATTITUDE_THRESHOLD && abs(last_final_ctrl->pitch) <= ATTITUDE_THRESHOLD)) {
-            if(offboard_mode != OffboardMode::VELOCITY) {
-                RCLCPP_WARN(this->get_logger(), GREEN "Changed mode to VECLOCITY" RESET);
-            }
-            offboard_mode = OffboardMode::VELOCITY;
+
+        if(ALLOW_ATTITUDE && (abs(last_final_ctrl->roll) > ATTITUDE_THRESHOLD || abs(last_final_ctrl->pitch) > ATTITUDE_THRESHOLD)) {
+            if(offboard_attitude_counter < OFFBOARD_MODE_CHANGE_THRESHOLD) offboard_attitude_counter++;
         }
         else {
+            if(offboard_attitude_counter > 0) offboard_attitude_counter--;
+        }
+
+        if(offboard_attitude_counter >= OFFBOARD_MODE_CHANGE_THRESHOLD) {
             if(offboard_mode != OffboardMode::ATTITUDE) {
                 RCLCPP_WARN(this->get_logger(), TEAL "Changed mode to ATTITUDE" RESET);
             }
             offboard_mode = OffboardMode::ATTITUDE;
         }
+        else {
+            if(offboard_mode != OffboardMode::VELOCITY) {
+                RCLCPP_WARN(this->get_logger(), GREEN "Changed mode to VECLOCITY" RESET);
+            }
+            offboard_mode = OffboardMode::VELOCITY;
+        }
     }
-    else if(loss_final_control_count <= LOSS_FINAL_CONTROL_THRESHOLD) loss_final_control_count++;
+    else {
+        if(loss_final_control_count <= LOSS_FINAL_CONTROL_THRESHOLD) loss_final_control_count++;
+        offboard_mode = OffboardMode::VELOCITY;
+        offboard_attitude_counter = 0;
+    }
     yaw_W = frame_utils::quaternionToYaw(last_q);
 
     // Main FSM loop
@@ -125,7 +138,7 @@ void FinalizeControlNode::NodeLoopCallback() {
                 offboard_stream_counter++;
             }
 
-            if(offboard_stream_counter >= 20){
+            if(offboard_stream_counter >= OFFBOARD_STREAM_THRESHOLD){
                 current_loop_state = NodeLoopState::ARM;
                 just_change_loop_state = true;
             }
@@ -204,17 +217,11 @@ void FinalizeControlNode::NodeLoopCallback() {
 
 void FinalizeControlNode::SendOffboardCmd() {
     PublishOffboardControlMode();
-    switch(offboard_mode) {
-        case OffboardMode::VELOCITY:
-            PublishTrajectorySetpoint();
-        break;
-        case OffboardMode::ATTITUDE:
-            PublishAttitudeSetPoint();
-        break;
-        default:
-            PublishTrajectorySetpoint();
-        break;
-    }
+
+    if(offboard_attitude_counter > 0) PublishAttitudeSetPoint();
+    else if(offboard_attitude_counter < OFFBOARD_MODE_CHANGE_THRESHOLD) PublishTrajectorySetpoint();
+    else PublishTrajectorySetpoint();
+
     if(loss_final_control_count >= LOSS_FINAL_CONTROL_THRESHOLD) last_final_ctrl = nullptr;
 }
 
@@ -283,9 +290,9 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
     if(last_final_ctrl != nullptr) {
         // Body velocity rate to world quaternion
         Eigen::Vector3f omega( // in velocity
-            last_final_ctrl->roll * SPEED_MAX_ANGLE,
-            -last_final_ctrl->pitch * SPEED_MAX_ANGLE,
-            last_final_ctrl->yaw * SPEED_MAX_ANGLE
+            last_final_ctrl->roll * SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
+            -last_final_ctrl->pitch * SPEED_MAX_ANGLE * 8, // No idea why it negative :(
+            last_final_ctrl->yaw * SPEED_MAX_ANGLE * 8
         );
         float angle = omega.norm() * SYSTEM_LOOP_CYCLE_FAST;
         Eigen::Quaternionf dq;
@@ -312,7 +319,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
-        msg.yaw_sp_move_rate = NO_DATA_f;
+        msg.yaw_sp_move_rate = -last_final_ctrl->yaw * SPEED_MAX_ANGLE; // Frame FLU to FRD
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw

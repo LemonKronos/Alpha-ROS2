@@ -5,13 +5,13 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-<title>Alpha Control Minus 2 [V4]</title>
+<title>Alpha Control Minus 2 [V12 Scaled]</title>
 <style>
-    /* === CORE UI: SCI-FI GREEN (ORIGINAL) === */
+    /* === CORE UI: SCI-FI GREEN === */
     body {
         background-color: #050505;
         color: #00ff41; /* Neon Green */
-        font-family: 'Consolas', 'Courier New', monospace; /* Tech font */
+        font-family: 'Consolas', 'Courier New', monospace;
         margin: 0;
         overflow: hidden;
         touch-action: none; 
@@ -76,12 +76,18 @@
         cursor: pointer;
         fill: #00ff41;
         box-shadow: 0 0 5px rgba(0, 255, 65, 0.1);
-        transition: all 0.2s;
+        transition: all 0.1s; 
+        pointer-events: auto; 
+        -webkit-tap-highlight-color: transparent;
     }
-    .hud-btn:active { 
-        background: rgba(0, 255, 65, 0.2); 
+    
+    /* Visual Feedback for Press */
+    .hud-btn.btn-active, .hud-btn:active { 
+        background: rgba(0, 255, 65, 0.3); 
         box-shadow: 0 0 15px #00ff41;
         transform: scale(0.95); 
+        border-color: #fff;
+        fill: #fff;
     }
     
     #btn-record.recording {
@@ -92,18 +98,27 @@
     }
     #btn-pause.paused { fill: #ffcc00; border-color: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
     
-    /* New Style for Mode/State Button */
+    /* ARMED STATE (BLUE) */
     #btn-mode.active {
-        fill: #00f3ff;
-        border-color: #00f3ff;
-        box-shadow: 0 0 10px #00f3ff;
-        background: rgba(0, 243, 255, 0.15);
+        fill: #00f3ff !important;
+        border-color: #00f3ff !important;
+        box-shadow: 0 0 10px #00f3ff !important;
+        background: rgba(0, 243, 255, 0.15) !important;
     }
 
     #status-text {
         font-size: 16px; letter-spacing: 3px;
         text-shadow: 0 0 8px #00ff41; font-weight: bold;
         text-transform: uppercase;
+    }
+
+    /* === FLIGHT HUD (Background Layer) === */
+    #hud-display {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        z-index: 10; /* Behind joysticks (50), On top of BG */
+        pointer-events: none; /* Let touches pass through */
     }
 
     /* === JOYSTICKS === */
@@ -117,7 +132,7 @@
     #zone-left { left: 6vw; }
     #zone-right { right: 6vw; }
 
-    canvas {
+    canvas.joy-canvas {
         width: 100%; height: 100%; display: block;
         border-radius: 50%;
         background: 
@@ -134,6 +149,9 @@
 <body>
 
 <div id="loader">INITIALIZING SYSTEMS...</div>
+
+<!-- FLIGHT HUD LAYER -->
+<canvas id="hud-display"></canvas>
 
 <div id="hud-top">
     <div class="hud-group left">
@@ -152,8 +170,8 @@
     </div>
 </div>
 
-<div id="zone-left" class="joy-container"><canvas id="canvasLeft"></canvas></div>
-<div id="zone-right" class="joy-container"><canvas id="canvasRight"></canvas></div>
+<div id="zone-left" class="joy-container"><canvas id="canvasLeft" class="joy-canvas"></canvas></div>
+<div id="zone-right" class="joy-container"><canvas id="canvasRight" class="joy-canvas"></canvas></div>
 
 <script>
 // ========================
@@ -163,12 +181,13 @@ const WS_URL = "ws://10.183.21.129:8765";
 const SEND_RATE_MS = 12.5; 
 
 // Gyro Config
-const GYRO_DEADZONE = 15; 
+const GYRO_DEADZONE = 5; 
 const GYRO_ACTIVE_RANGE = 45; 
 
 // Joystick Config
 const JOY_THUMB_RADIUS = 30; 
 const JOY_DEADZONE_RADIUS = 40; 
+const KEY_INPUT_MAGNITUDE = 0.75; // Clamped keyboard input
 
 // ========================
 // SYSTEM BOOT
@@ -195,6 +214,27 @@ setTimeout(() => {
 // ========================
 let stickLeft, stickRight;
 let ws;
+let hudCtx;
+let hudCanvas;
+
+// Global State
+let flags = { 
+    record: false, 
+    pause: false, 
+    control_state: false 
+};
+let controlsActive = false;
+let gyroBase = { roll: 0, pitch: 0 }; 
+let gyroRaw = { beta: 0, gamma: 0, alpha: 0 }; 
+let output = { x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0 }; 
+
+// Keyboard State
+let keys = {
+    w: false, a: false, s: false, d: false,
+    q: false, e: false,
+    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+    Space: false, Shift: false
+};
 
 function initApp() {
     
@@ -204,57 +244,67 @@ function initApp() {
     const btnFs = document.getElementById("btn-fs");
     const btnMode = document.getElementById("btn-mode");
     
-    let flags = { 
-        record: false, 
-        pause: false, 
-        control_state: false // Default False
-    };
+    // --- HUD Setup ---
+    hudCanvas = document.getElementById("hud-display");
+    hudCtx = hudCanvas.getContext("2d");
+    resizeHud();
+    window.addEventListener('resize', resizeHud);
 
     // Function to force update the UI status based on priority
     const updateGlobalStatus = () => {
         const statusEl = document.getElementById("status-text");
         
-        // Priority 1: Connection Issues
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             statusEl.innerText = "DISCONNECTED";
             statusEl.style.color = "#ffaa00";
             return;
         }
-
-        // Priority 2: Pause State
         if (flags.pause) {
             statusEl.innerText = "PAUSED";
             statusEl.style.color = "#ffaa00";
             return;
         }
-
-        // Priority 3: Recording
         if (flags.record) {
             statusEl.innerText = "REC ●";
             statusEl.style.color = "#ff3333";
             return;
         }
-
-        // Priority 4: Activity
         if (controlsActive) {
             statusEl.innerText = "ACTIVE";
             statusEl.style.color = "#00ff41";
             return;
         }
-
-        // Priority 5: Default
         statusEl.innerText = "READY";
         statusEl.style.color = "#00f3ff";
     };
 
-    btnRecord.addEventListener("click", () => {
+    // Helper: Handles BOTH Mouse (Laptop) and Touch (Mobile)
+    const addInputListener = (el, callback) => {
+        const handlePress = (e) => {
+            if(e.type === 'touchstart' && e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            el.classList.add('btn-active');
+            callback();
+        };
+        const handleRelease = (e) => {
+            el.classList.remove('btn-active');
+        };
+        el.addEventListener("touchstart", handlePress, {passive: false});
+        el.addEventListener("touchend", handleRelease, {passive: false});
+        el.addEventListener("touchcancel", handleRelease, {passive: false});
+        el.addEventListener("mousedown", handlePress);
+        el.addEventListener("mouseup", handleRelease);
+        el.addEventListener("mouseleave", handleRelease);
+    };
+
+    addInputListener(btnRecord, () => {
         flags.record = !flags.record;
         if (flags.record) btnRecord.classList.add("recording");         
         else btnRecord.classList.remove("recording");
         updateGlobalStatus();
     });
 
-    btnPause.addEventListener("click", () => {
+    addInputListener(btnPause, () => {
         flags.pause = !flags.pause;
         if (flags.pause) {
             btnPause.classList.add("paused");
@@ -268,12 +318,10 @@ function initApp() {
         updateGlobalStatus();
     });
 
-    btnMode.addEventListener("click", () => {
+    addInputListener(btnMode, () => {
         flags.control_state = !flags.control_state;
         if (flags.control_state) btnMode.classList.add("active");
         else btnMode.classList.remove("active");
-        // Optional: Trigger a status update if you want the text to reflect mode
-        // updateGlobalStatus(); 
     });
 
     btnFs.addEventListener("click", () => {
@@ -281,25 +329,46 @@ function initApp() {
         else if (document.exitFullscreen) document.exitFullscreen();
     });
 
+    // --- Keyboard Listeners ---
+    window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        // Check both original key and lower case to catch Shift+Key nuances or caps lock
+        const mappedKey = k === ' ' ? 'Space' : (e.key === 'Shift' ? 'Shift' : k);
+        
+        // Map arrow keys correctly (they don't have lowercase single letters)
+        let finalKey = mappedKey;
+        if (e.key.startsWith('Arrow')) finalKey = e.key;
+        
+        if (keys.hasOwnProperty(finalKey)) {
+            keys[finalKey] = true;
+            if (!controlsActive) {
+                controlsActive = true;
+                updateGlobalStatus();
+            }
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        const mappedKey = k === ' ' ? 'Space' : (e.key === 'Shift' ? 'Shift' : k);
+        let finalKey = mappedKey;
+        if (e.key.startsWith('Arrow')) finalKey = e.key;
+
+        if (keys.hasOwnProperty(finalKey)) {
+            keys[finalKey] = false;
+        }
+    });
+
     // --- WebSocket (Auto-Reconnect) ---
     function connect() {
         ws = new WebSocket(WS_URL);
-        
-        ws.onopen = () => { 
-            updateGlobalStatus();
-        };
-        
+        ws.onopen = () => { updateGlobalStatus(); };
         ws.onclose = () => { 
             updateGlobalStatus();
             setTimeout(connect, 1000);
         };
-        
-        ws.onerror = (e) => {
-            ws.close(); 
-        };
+        ws.onerror = (e) => { ws.close(); };
     }
-    
-    // Initial connection
     connect();
 
     // --- Joysticks ---
@@ -313,15 +382,12 @@ function initApp() {
 
     // --- Loop ---
     setInterval(() => gameLoop(flags, ws), SEND_RATE_MS);
+    requestAnimationFrame(renderLoop); 
 }
 
 // ========================
 // LOGIC HELPERS
 // ========================
-let controlsActive = false;
-let gyroBase = { roll: 0, pitch: 0 };
-let gyroRaw = { beta: 0, gamma: 0 };
-let output = { x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0 };
 
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 const round = (val) => Math.round(val * 100) / 100;
@@ -345,17 +411,200 @@ function applyRadialDeadzone(x, y, deadzoneThreshold) {
     }
 }
 
+// --- GYRO HANDLING ---
 window.addEventListener("deviceorientation", e => {
     gyroRaw.beta = e.beta || 0;
     gyroRaw.gamma = e.gamma || 0;
+    gyroRaw.alpha = e.alpha || 0;
 });
 
 function activateGyro() {
     if (!controlsActive) {
         controlsActive = true;
-        gyroBase.roll = gyroRaw.beta;
+        gyroBase.roll = gyroRaw.beta;  
         gyroBase.pitch = gyroRaw.gamma;
     }
+}
+
+function resizeHud() {
+    if(!hudCanvas) return;
+    hudCanvas.width = window.innerWidth;
+    hudCanvas.height = window.innerHeight;
+}
+
+// ========================
+// RENDER LOOP (HUD)
+// ========================
+function renderLoop() {
+    if (!hudCtx) return;
+    const w = hudCanvas.width;
+    const h = hudCanvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    
+    // --- DYNAMIC SCALE FACTOR ---
+    // All sizes are calculated relative to a reference height (e.g. 800px)
+    // This ensures consistency across window sizes.
+    const refH = 800; 
+    const scale = Math.min(w, h) / refH; 
+    
+    hudCtx.clearRect(0, 0, w, h);
+    hudCtx.lineWidth = 2 * scale;
+    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.6)";
+    hudCtx.fillStyle = "rgba(0, 255, 65, 0.8)";
+    hudCtx.font = `bold ${Math.max(12, 16 * scale)}px Consolas`;
+    hudCtx.textAlign = "center";
+
+    // --- 1. PITCH (Ladder) ---
+    // Scaled parameters
+    const maxPitchPx = h * 0.35; // Total travel distance
+    const pitchOffset = -output.pitch * maxPitchPx; 
+    const clipW = 240 * scale;
+    const clipH = h * 0.7; // Keep clip relative to screen height to avoid clipping issues on resize
+    
+    hudCtx.save();
+    hudCtx.beginPath();
+    // Centered clip box
+    hudCtx.rect(cx - clipW/2, cy - clipH/2, clipW, clipH);
+    hudCtx.clip();
+
+    const horizonY = cy + pitchOffset;
+    const stepPx = maxPitchPx / 4; 
+    
+    for (let i = -4; i <= 4; i++) {
+        const y = horizonY - (i * stepPx);
+        const width = (i === 0) ? (200 * scale) : (i % 2 === 0 ? (120 * scale) : (60 * scale));
+        
+        hudCtx.beginPath();
+        hudCtx.moveTo(cx - width/2, y);
+        hudCtx.lineTo(cx + width/2, y);
+        
+        if (i === 0) {
+            hudCtx.strokeStyle = "rgba(0, 255, 65, 0.9)";
+            hudCtx.lineWidth = 3 * scale;
+        } else {
+            hudCtx.strokeStyle = "rgba(0, 255, 65, 0.4)";
+            hudCtx.lineWidth = 1.5 * scale;
+        }
+        hudCtx.stroke();
+    }
+    
+    // Pitch Value
+    hudCtx.fillStyle = "#00f3ff";
+    hudCtx.textAlign = "center"; 
+    hudCtx.fillText(`Pitch: ${output.pitch.toFixed(2)}`, cx, cy + (40 * scale));
+    
+    // Center Ref (The "Plane")
+    hudCtx.strokeStyle = "#00f3ff";
+    hudCtx.lineWidth = 2 * scale;
+    hudCtx.beginPath();
+    hudCtx.moveTo(cx - (50 * scale), cy); 
+    hudCtx.lineTo(cx - (20 * scale), cy); 
+    hudCtx.lineTo(cx - (20 * scale), cy + (10 * scale));
+    
+    hudCtx.moveTo(cx + (50 * scale), cy); 
+    hudCtx.lineTo(cx + (20 * scale), cy); 
+    hudCtx.lineTo(cx + (20 * scale), cy + (10 * scale));
+    hudCtx.stroke();
+    hudCtx.beginPath(); 
+    hudCtx.arc(cx, cy, 3 * scale, 0, Math.PI*2); 
+    hudCtx.fill();
+    hudCtx.restore();
+
+    // --- 2. ROLL (Top Half Circle) ---
+    const rollRadius = 200 * scale; 
+    const rollCenterY = 300 * scale; // Moved down proportionally
+    
+    hudCtx.save();
+    hudCtx.translate(cx, rollCenterY);
+
+    // Roll Value
+    hudCtx.fillStyle = "#00f3ff";
+    hudCtx.textAlign = "center";
+    hudCtx.fillText(`Roll: ${output.roll.toFixed(2)}`, 0, -rollRadius + (80 * scale));
+
+    // Static Arc
+    hudCtx.beginPath();
+    hudCtx.arc(0, 0, rollRadius, Math.PI, 0); 
+    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.4)";
+    hudCtx.lineWidth = 3 * scale;
+    hudCtx.stroke();
+    
+    // Static Ticks
+    for (let ang = 180; ang >= 0; ang -= 15) {
+        const rad = ang * (Math.PI / 180);
+        const rInner = (ang % 45 === 0) ? rollRadius - (20 * scale) : rollRadius - (10 * scale);
+        const x1 = Math.cos(rad) * rollRadius;
+        const y1 = Math.sin(rad) * rollRadius;
+        const x2 = Math.cos(rad) * rInner;
+        const y2 = Math.sin(rad) * rInner;
+        hudCtx.beginPath();
+        hudCtx.moveTo(x1, -y1); 
+        hudCtx.lineTo(x2, -y2);
+        hudCtx.lineWidth = 2 * scale;
+        hudCtx.stroke();
+    }
+
+    // Moving Indicator
+    const rollAngle = output.roll * (Math.PI / 2); 
+    hudCtx.rotate(rollAngle); 
+    hudCtx.fillStyle = "#00f3ff";
+    hudCtx.beginPath();
+    hudCtx.moveTo(0, -rollRadius + (25 * scale));
+    hudCtx.lineTo(-(10 * scale), -rollRadius + (5 * scale));
+    hudCtx.lineTo((10 * scale), -rollRadius + (5 * scale));
+    hudCtx.fill();
+    hudCtx.restore();
+
+    // --- 3. YAW (Bottom Ruler) ---
+    const rulerY = h - (80 * scale);
+    const rulerWidth = w * 0.8;
+    const tickSpacing = 40 * scale; 
+    // Scale offset based on screen Width to maintain "speed" appearance
+    const yawPixelOffset = output.yaw * (w * 0.3); 
+
+    hudCtx.save();
+    hudCtx.beginPath();
+    hudCtx.rect(cx - rulerWidth/2, rulerY - (50 * scale), rulerWidth, 100 * scale);
+    hudCtx.clip();
+
+    // Background Line
+    hudCtx.beginPath();
+    hudCtx.moveTo(cx - rulerWidth/2, rulerY);
+    hudCtx.lineTo(cx + rulerWidth/2, rulerY);
+    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.6)";
+    hudCtx.lineWidth = 2 * scale;
+    hudCtx.stroke();
+
+    // Moving Ticks
+    const numTicks = Math.ceil(rulerWidth / tickSpacing) + 4;
+    for (let i = -10; i <= 10; i++) {
+        let xPos = cx + (i * tickSpacing) - yawPixelOffset;
+        // Optimization: Don't draw if clearly out of bounds
+        if (xPos > 0 && xPos < w) {
+            hudCtx.beginPath();
+            hudCtx.moveTo(xPos, rulerY);
+            let hTick = (i === 0) ? (20 * scale) : (i % 5 === 0 ? (15 * scale) : (8 * scale));
+            hudCtx.lineTo(xPos, rulerY - hTick);
+            hudCtx.stroke();
+        }
+    }
+    hudCtx.restore();
+
+    // Yaw Value
+    hudCtx.fillStyle = "#00f3ff";
+    hudCtx.textAlign = "center";
+    hudCtx.fillText(`Yaw: ${output.yaw.toFixed(2)}`, cx, rulerY - (40 * scale));
+
+    // Static Center Marker
+    hudCtx.fillStyle = "#00f3ff";
+    hudCtx.beginPath();
+    hudCtx.moveTo(cx, rulerY + (5 * scale));
+    hudCtx.lineTo(cx - (8 * scale), rulerY + (18 * scale));
+    hudCtx.lineTo(cx + (8 * scale), rulerY + (18 * scale));
+    hudCtx.fill();
+
+    requestAnimationFrame(renderLoop);
 }
 
 class Joystick {
@@ -367,6 +616,10 @@ class Joystick {
         this.touchId = null;
         this.maxDist = 0;
         this.deadzoneRatio = 0; 
+        
+        // Internal state for external override (Keyboard)
+        this.externalX = 0;
+        this.externalY = 0;
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -374,6 +627,23 @@ class Joystick {
         this.val = { x: 0, y: 0 }; 
         this.initEvents();
         this.draw();
+    }
+    
+    setExternalInput(x, y) {
+        // x, y are -1 to 1 normalized
+        this.externalX = x;
+        this.externalY = y;
+        
+        // If not touched, use external
+        if (this.touchId === null) {
+            this.val.x = x;
+            this.val.y = y;
+            
+            // Map val back to visual pos
+            this.pos.x = this.center + (x * this.maxDist);
+            this.pos.y = this.center + (y * this.maxDist);
+            this.draw(x !== 0 || y !== 0);
+        }
     }
 
     resize() {
@@ -414,10 +684,10 @@ class Joystick {
                 }
             }
         };
-        this.canvas.addEventListener("touchstart", start);
-        this.canvas.addEventListener("touchmove", move);
-        this.canvas.addEventListener("touchend", end);
-        this.canvas.addEventListener("touchcancel", end);
+        this.canvas.addEventListener("touchstart", start, {passive: false});
+        this.canvas.addEventListener("touchmove", move, {passive: false});
+        this.canvas.addEventListener("touchend", end, {passive: false});
+        this.canvas.addEventListener("touchcancel", end, {passive: false});
     }
 
     update(touch) {
@@ -440,11 +710,16 @@ class Joystick {
     }
 
     reset() {
-        this.pos.x = this.center;
-        this.pos.y = this.center;
-        this.val.x = 0;
-        this.val.y = 0;
-        this.draw(false);
+        // If external input exists, revert to it
+        if (this.externalX !== 0 || this.externalY !== 0) {
+             this.setExternalInput(this.externalX, this.externalY);
+        } else {
+            this.pos.x = this.center;
+            this.pos.y = this.center;
+            this.val.x = 0;
+            this.val.y = 0;
+            this.draw(false);
+        }
     }
 
     draw(active) {
@@ -475,32 +750,70 @@ class Joystick {
 // ========================
 function gameLoop(flags, ws) {
     
-    // 1. Joystick
+    // 0. Update Virtual Joysticks from Keyboard
+    // Clamped to 0.75 as requested
+    let joyLeftX = 0;
+    let joyLeftY = 0;
+    if (keys.w) joyLeftY -= KEY_INPUT_MAGNITUDE; 
+    if (keys.s) joyLeftY += KEY_INPUT_MAGNITUDE; 
+    if (keys.q) joyLeftX -= KEY_INPUT_MAGNITUDE; 
+    if (keys.e) joyLeftX += KEY_INPUT_MAGNITUDE; 
+    
+    stickLeft.setExternalInput(joyLeftX, joyLeftY);
+
+    let joyRightX = 0;
+    let joyRightY = 0;
+    if (keys.Space) joyRightY -= KEY_INPUT_MAGNITUDE; 
+    if (keys.Shift) joyRightY += KEY_INPUT_MAGNITUDE; 
+    if (keys.a) joyRightX -= KEY_INPUT_MAGNITUDE; 
+    if (keys.d) joyRightX += KEY_INPUT_MAGNITUDE; 
+    
+    stickRight.setExternalInput(joyRightX, joyRightY);
+
+    // 1. Process Joystick Outputs
     const leftOut = applyRadialDeadzone(stickLeft.val.x, stickLeft.val.y, stickLeft.deadzoneRatio);
     const rightOut = applyRadialDeadzone(stickRight.val.x, stickRight.val.y, stickRight.deadzoneRatio);
 
     output.x = -leftOut.y;
     output.y = -leftOut.x;
-    output.z = -rightOut.y;
+    output.z = -rightOut.y; // Space maps to stickRight Up (-1) -> output.z = 1
     output.yaw = -rightOut.x;
 
-    // 2. Gyro
+    // 2. Gyro & Display Logic
     if (controlsActive) {
-        let rollDiff = getShortestDiff(gyroRaw.beta, gyroBase.roll);
-        let pitchDiff = getShortestDiff(gyroRaw.gamma, gyroBase.pitch);
         
-        if (Math.abs(rollDiff) < GYRO_DEADZONE) {
-            output.roll = 0; 
+        // --- KEYBOARD OVERRIDE FOR PITCH/ROLL ---
+        let usingKeysForAttitude = false;
+        let keyRoll = 0; 
+        let keyPitch = 0;
+        
+        if (keys.ArrowUp) { keyPitch = -1; usingKeysForAttitude = true; } 
+        if (keys.ArrowDown) { keyPitch = 1; usingKeysForAttitude = true; } 
+        if (keys.ArrowLeft) { keyRoll = -1; usingKeysForAttitude = true; } 
+        if (keys.ArrowRight) { keyRoll = 1; usingKeysForAttitude = true; } 
+        
+        if (usingKeysForAttitude) {
+            output.roll = keyRoll;
+            output.pitch = keyPitch;
         } else {
-            let activeDiff = Math.abs(rollDiff) - GYRO_DEADZONE;
-            output.roll = Math.sign(rollDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
-        }
+            // Use Gyro
+            let rollDiff = getShortestDiff(gyroRaw.beta, gyroBase.roll);
+            let pitchDiff = getShortestDiff(gyroRaw.gamma, gyroBase.pitch);
+            
+            // Calculate Control Output (Normalized)
+            if (Math.abs(rollDiff) < GYRO_DEADZONE) {
+                output.roll = 0; 
+            } else {
+                let activeDiff = Math.abs(rollDiff) - GYRO_DEADZONE;
+                output.roll = Math.sign(rollDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+            }
 
-        if (Math.abs(pitchDiff) < GYRO_DEADZONE) {
-            output.pitch = 0; 
-        } else {
-            let activeDiff = Math.abs(pitchDiff) - GYRO_DEADZONE;
-            output.pitch = Math.sign(pitchDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+            if (Math.abs(pitchDiff) < GYRO_DEADZONE) {
+                output.pitch = 0; 
+            } else {
+                let activeDiff = Math.abs(pitchDiff) - GYRO_DEADZONE;
+                output.pitch = Math.sign(pitchDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+            }
         }
 
         output.roll = clamp(output.roll, -1, 1);
@@ -510,7 +823,7 @@ function gameLoop(flags, ws) {
         output.pitch = 0;
     }
 
-    // 3. Send Data (Include control_state)
+    // 3. Send Data
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             x: round(output.x),
