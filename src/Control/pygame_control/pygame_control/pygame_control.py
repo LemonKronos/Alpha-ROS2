@@ -242,7 +242,7 @@ class PygameControlNode:
                     pass
 
                 # which controller
-                msg.control_by = HUMAN
+                msg.control_by = ControlInterface.OPERATOR
                 msg.control_state = True
 
                 # We'll set them to 0.0 here. If you prefer mapping, change below.
@@ -257,7 +257,7 @@ class PygameControlNode:
                 msg.up = -float(clamp(down_m_s)) # frame FLU temporary fix
 
                 # wings mode left unchanged by UI
-                msg.wings_mode = UNCHANGE
+                msg.wings_mode = ControlInterface.UNCHANGE
 
                 # Publish
                 if MODULE_TEST or False:

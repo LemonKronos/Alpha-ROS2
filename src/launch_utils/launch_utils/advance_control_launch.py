@@ -8,7 +8,7 @@ def generate_launch_description():
             executable='advance_control',
             name='advance_control_node',
             output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='simulation_control',
@@ -22,7 +22,7 @@ def generate_launch_description():
             executable='finalize_control',
             name='finalize_control_node',
             output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='reactive_oa',
@@ -30,6 +30,13 @@ def generate_launch_description():
             name='reactive_oa_node',
             output='screen',
             # arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='fuse_perception',
+            executable='fuse_perception',
+            name='fuse_perception_node',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='lidar_2d_handler',

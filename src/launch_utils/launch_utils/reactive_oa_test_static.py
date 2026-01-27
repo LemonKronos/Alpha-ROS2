@@ -6,11 +6,11 @@ import launch.logging
 
 def generate_launch_description():
     return LaunchDescription([
-        Node(
-            package='pygame_control',
-            executable='pygame_control',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='pygame_control',
+        #     executable='pygame_control',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',
@@ -19,15 +19,7 @@ def generate_launch_description():
         Node(
             package='reactive_oa',
             executable='reactive_oa',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='lidar_static_tf',
-            arguments=['0', '0', '0', '0', '0', '0',
-                       'base_link', 'x500_lidar_2d_0/link/lidar_2d_v2',
-                       '--ros-args', '--log-level', 'warn'],
+            # arguments=['--ros-args', '--log-level', 'warn']
         ),
         Node(
             package='rviz_contour',

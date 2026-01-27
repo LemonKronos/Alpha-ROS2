@@ -13,10 +13,6 @@
                 // "--log-level", "rclcpp:=error"
             ],
             "cwd": "${workspaceFolder}",
-            // "environment": [
-            //     { "name": "RCUTILS_COLORIZED_OUTPUT", "value": "1" },
-            //     { "name": "RCUTILS_CONSOLE_OUTPUT_FORMAT", "value": "[${time}] [${severity}] [${name}]: ${message}" }
-            // ],
             "MIMode": "gdb",
             "stopAtEntry": false,
             "preLaunchTask": "Build ROS2 Single Node"

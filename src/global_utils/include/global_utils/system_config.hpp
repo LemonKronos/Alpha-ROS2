@@ -24,6 +24,7 @@ constexpr int64_t SYSTEM_LOOP_CYCLE_FAST_NANOSEC = SYSTEM_LOOP_CYCLE_FAST * 1e9;
 // ################################# SYSTEM PARAMETER
 
 constexpr uint8_t TOPIC_MISS_THRESHOLD = 3; // Amount of miss topic before go NaN
+constexpr uint8_t MISSED_FAST_TOPIC_THRESHOLD = SYSTEM_LOOP_RATE_FAST / 10.0f;
 
 // Logging path
 constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
@@ -70,13 +71,13 @@ constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
 // Safety
 constexpr float SELF_RADIUS = 1.2f; // drone radius in meter
 constexpr float UNCERTAINTY = 0.05f;
-constexpr float SAFE_BUFFER = 2.05f; // tune for testing
+constexpr float SAFE_BUFFER = 0.15f; // tuneable
 constexpr float HAZARD_DISTANCE = SELF_RADIUS + SAFE_BUFFER + UNCERTAINTY;
-constexpr float REACT_TIME = 0.033333f; // ms
-constexpr float DECELERATE_MAX = 5.0f; // m/s^2
+constexpr float REACT_TIME = SYSTEM_LOOP_CYCLE_FAST; // s
+constexpr float DECELERATE_MAX = 4.0f; // m/s^2
 /**
- * Safe bubble calculate by: the 2 time is to make sure UHM I may change that to just normal 1 time
- * SAFE_BUBBLE =  2 * (HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX))); 
+ * Safe bubble calculate by:
+ * SAFE_BUBBLE =  HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX)); 
  */
 
 // Other

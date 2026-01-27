@@ -4,9 +4,9 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
 #include "global_utils/surrounding.hpp"
+#include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "ros2_msgs/msg/control_interface.hpp"
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp"
 
 // #define VISUALIZE false // uncomment to disable visualize in this node
 #ifndef VISUALIZE
@@ -15,13 +15,13 @@
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker.hpp>
 #endif
-#define PUBLISH_CORRECTION_CONTROL 0
+#define PUBLISH_CORRECTION_CONTROL 1
 
 #include <Eigen/Dense>
 
 using std::placeholders::_1;
-
-constexpr uint8_t OBSTACLE_CLEAR_COUNT_THRESHOLD = 6;
+constexpr uint8_t OBSTACLE_DAMPING_INIT = 8;
+constexpr float REPULSIVE_DAMPING_CONSTANT = 0.8f;
 
 class ReactiveOANode : public rclcpp::Node{
 public:
@@ -40,26 +40,29 @@ private:
     // Subscriber
     rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr close_contour_SUB;
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr perception_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odo_SUB;
 
     // Stored data
-    ros2_msgs::msg::ControlInterface::SharedPtr last_input_control = nullptr;
-    ros2_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+    ros2_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
+    px4_msgs::msg::VehicleOdometry::SharedPtr last_odo = nullptr;
     
     // Variables
-    bool last_input = true;
-    bool obstacle_encountered = false;
+    bool lost_control_signal = true;
+    uint8_t lost_control_signal_counter = 0;
+
     Obstacle obstacle;
+    float safe_distance = HAZARD_DISTANCE;
+
     Eigen::Vector3f control_vec;
     Eigen::Vector3f control_angular_vec;
     Eigen::Vector3f movement_vec;
     Eigen::Vector3f movement_angular_vec;
     Eigen::Vector3f repulsive_vec;
-    float repulsive_damp_unit = 0;
     Eigen::Vector3f correction_vec;
     Eigen::Vector3f correction_angular_vec;
-    float safe_distance = HAZARD_DISTANCE;
-    uint8_t obstacle_clear_counter = 0;
+
+    uint8_t repulsive_damping_counter = 0;
+    uint8_t obstacle_clear_damping_counter = 0;
 
     // Methods
     void computeControlVector();
@@ -81,7 +84,7 @@ private:
     // Callbacks
     void inputControlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
     void closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
-    void perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+    void odoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
     void nodeLoopCallback();
 
 };

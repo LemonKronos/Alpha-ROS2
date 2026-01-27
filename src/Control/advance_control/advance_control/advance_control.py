@@ -10,8 +10,8 @@ from rclpy.clock import Clock, ClockType
 import rclpy.clock 
 
 from advance_control.web_socket_controller import WebSocketController
-from ros2_msgs.msg import RecordControl 
-from ros2_msgs.msg import ControlInterface 
+from ros2_msgs.msg import RecordControl
+from ros2_msgs.msg import ControlInterface
 from python_utils.utils import *
 
 class AdvanceControlNode(Node):
@@ -28,7 +28,7 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # 3. Publishers
-        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_REACTIVE_TOPIC, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_INPUT_TOPIC, 10)
         self.record_control_PUB = self.create_publisher(RecordControl, LOGGER_RECORD_TOPIC, 10)
         
         # 4. State Tracking
@@ -45,7 +45,7 @@ class AdvanceControlNode(Node):
         commands = self.web_controller.get_latest_control_cmd()
 
         control_msg = ControlInterface()
-        control_msg.control_by = ControlInterface.HUMAN
+        control_msg.control_by = ControlInterface.OPERATOR
         control_msg.control_state = bool(commands.get('control_state', False))
         control_msg.forward = float(commands.get('x', 0.0))
         control_msg.left    = float(commands.get('y', 0.0))

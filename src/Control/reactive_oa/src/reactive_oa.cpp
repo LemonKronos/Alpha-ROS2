@@ -25,76 +25,80 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
-    perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        FUSE_PERCEPTION_TOPIC,
+    odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
+        "/fmu/out/vehicle_odometry",
         rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::perceptionCallback, this, _1));
+        std::bind(&ReactiveOANode::odoCallback, this, _1));
 
     // Timer
     node_loop_TIME = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
+        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );
 
     // Init variables
-    obstacle_encountered = false;
-    control_vec = Eigen::Vector3f::Zero();
-    control_angular_vec = Eigen::Vector3f::Zero();
-    movement_vec = Eigen::Vector3f::Zero();
-    movement_angular_vec = Eigen::Vector3f::Zero();
-    repulsive_vec = Eigen::Vector3f::Zero();
-    repulsive_damp_unit = 0;
-    correction_vec = Eigen::Vector3f::Zero();
-    correction_angular_vec = Eigen::Vector3f::Zero();
-    obstacle_clear_counter = 0;
+    control_vec.setZero();
+    control_angular_vec.setZero();
+    movement_vec.setZero();
+    movement_angular_vec.setZero();
+    repulsive_vec.setZero();
+    correction_vec.setZero();
+    correction_angular_vec.setZero();
+
+    repulsive_damping_counter = 0;
+    obstacle_clear_damping_counter = 0;
+
+    safe_distance = HAZARD_DISTANCE;
+
+    lost_control_signal = true;
+    lost_control_signal_counter = 0;
 }
 ReactiveOANode::~ReactiveOANode(){}
 
 /*################################################# Methods*/
 
-void ReactiveOANode::computeControlVector(){
+void ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
-        last_input_control->forward * SPEED_MAX_FORWARD,
-        last_input_control->left * SPEED_MAX_FORWARD,
-        0
+        last_control_signal->forward * SPEED_MAX_FORWARD,
+        last_control_signal->left * SPEED_MAX_FORWARD,
+        0 // last_control_signal->up * SPEED_MAX_UP // Still in 2D
     ); // body frame
 
     control_angular_vec = Eigen::Vector3f(
-        last_input_control->roll,
-        last_input_control->pitch,
-        last_input_control->yaw
+        last_control_signal->roll,
+        last_control_signal->pitch,
+        last_control_signal->yaw
     ); // body frame
 }
 
-void ReactiveOANode::computeMovementVector(){
+void ReactiveOANode::computeMovementVector() {
     movement_vec = Eigen::Vector3f(
-        last_perception->velocity[0],
-        last_perception->velocity[1],
-        0
+        last_odo->velocity[0],
+        last_odo->velocity[1],
+        last_odo->velocity[2]
     ); // world frame
-    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
+    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_odo->q);
     movement_vec = q.inverse() * movement_vec; // body frame
+    movement_vec(2) = 0; // Still in 2D
 
     movement_angular_vec = Eigen::Vector3f(
-        last_perception->angular_velocity[0],
-        last_perception->angular_velocity[1],
-        last_perception->angular_velocity[2]
+        last_odo->angular_velocity[0],
+        last_odo->angular_velocity[1],
+        last_odo->angular_velocity[2]
     ); // world frame
     movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
 
-void ReactiveOANode::computeRepulsiveVector(){
-    // We will store distinct forces here instead of summing immediately
+void ReactiveOANode::computeRepulsiveVector() {
     std::vector<Eigen::Vector3f> distinct_forces;
+    distinct_forces.reserve(SECTOR_NUM);
     
-    // Iterate through all 12 Sectors
     for(uint8_t index = 0; index < SECTOR_NUM; index++) {
         for(const auto& contour : obstacle.getContours(index)) {
             const auto& points = contour.getContour();
             if(points.size() < 2) continue;
 
             for(size_t i = 0; i < points.size() - 1; ++i) {
-                // ... [Same Segment Calculation Logic as before] ...
                 Eigen::Vector3f p1(points[i].x, points[i].y, 0);
                 Eigen::Vector3f p2(points[i+1].x, points[i+1].y, 0);
                 Eigen::Vector3f segment = p2 - p1;
@@ -102,8 +106,7 @@ void ReactiveOANode::computeRepulsiveVector(){
                 if(segment.squaredNorm() < 1e-6f) continue;
 
                 float t = -p1.dot(segment) / segment.squaredNorm();
-                if (t < 0.0f) t = 0.0f;
-                else if (t > 1.0f) t = 1.0f;
+                t = std::clamp(t, 0.0f, 1.0f);
 
                 Eigen::Vector3f closest_point = p1 + segment * t;
                 float dist = closest_point.norm();
@@ -113,99 +116,93 @@ void ReactiveOANode::computeRepulsiveVector(){
                     float factor = (safe_distance - dist); 
                     Eigen::Vector3f new_force = -closest_point.normalized() * factor;
 
-                    // --- CLUSTERING LOGIC STARTS HERE ---
+                    // --- CORE CLUSTERING LOGIC ---
                     bool merged = false;
                     for(auto& existing_force : distinct_forces) {
-                        // Check alignment using Dot Product
-                        // If normalized dot > 0.866, they are within ~30 degrees
-                        // We use unnormalized dot for speed, knowing directions are similar
-                        // Let's use cosine similarity safely:
-                        
                         float similarity = new_force.normalized().dot(existing_force.normalized());
 
-                        // Threshold: 0.9 is approx 25 degrees cone. 
-                        // If they push in same direction, treat as same obstacle source.
-                        if(similarity > 0.9f) { 
-                            // Take the MAX magnitude (Keep the one that pushes harder)
-                            if(new_force.squaredNorm() > existing_force.squaredNorm()) {
-                                existing_force = new_force;
-                            }
+                        if(similarity > 0.9f) { // About 25 degree, keep max amplitude
+                            if(new_force.squaredNorm() > existing_force.squaredNorm()) existing_force = new_force;
                             merged = true;
                             break; 
                         }
                     }
 
-                    // If it's a unique direction (e.g. a different wall), add it
+                    // New unique direction, add it
                     if(!merged) {
                         distinct_forces.push_back(new_force);
                     }
-                    // --- CLUSTERING LOGIC ENDS HERE ---
                 }
             }
         }
     }
 
-    // Now simply sum the distinct forces
-    repulsive_vec = Eigen::Vector3f::Zero();
+    repulsive_vec.setZero();
     for(const auto& f : distinct_forces) {
         repulsive_vec += f;
     }
+    repulsive_vec = repulsive_vec.normalized();
 
-    // Snap to 0
-    if(repulsive_vec.isZero(1e-4f)) {
-        repulsive_vec.setZero();
-        return;
-    }
-
-    // Scale repulsive vector (Your original scaling logic)
-    // Note: You might need to re-tune 'scale' slightly since we aren't summing as many vectors now.
     float min_dist = obstacle.getMinDistance();
     if(min_dist > safe_distance) min_dist = safe_distance;
+    if(min_dist <= SELF_RADIUS) {
+        RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
+    }
+    float urgency = (safe_distance - min_dist) / (safe_distance - HAZARD_DISTANCE + 0.01f); // Cut depth urgency
+    urgency = std::clamp(urgency, 0.01f, 2.85f);
+
+    const float relative_speed = fabs(movement_vec.dot(repulsive_vec));
+    const float movement_bias = 0.75f;
+    const float repulsive_force = urgency * (movement_bias*relative_speed + (1.0f - movement_bias)*SPEED_MAX_FORWARD);
     
-    const float x = (safe_distance - min_dist) / safe_distance;
-    const float scale = 2.0f * x; 
-    
-    repulsive_vec = repulsive_vec.normalized() * (scale * SPEED_MAX_FORWARD);
+    repulsive_vec = repulsive_vec * repulsive_force;
+    RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
 }
 
 void ReactiveOANode::computeCorrectionVector() {
     correction_vec = control_vec + repulsive_vec;
 
-    // Ensure correction vector is at most parallel to obstacle
-    if (!repulsive_vec.isZero(1e-4f)) {
+    // Ensure correction vector is at most perpendicular to repulsive vector
+    if (!repulsive_vec.isZero(1e-3f)) {
         Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        float dot = repulsive_dir.dot(correction_vec);
-        if (dot < 0.0f) {
-            correction_vec -= dot * repulsive_dir;
+        const double dot = repulsive_dir.dot(correction_vec);
+
+        const double bounce_bias = 0.01; // Tune-able
+        if (dot < bounce_bias){
+            correction_vec -= (dot - bounce_bias) * repulsive_dir;
         }
     }
 
     // Clamp correction vector to max speed
     correction_vec = Eigen::Vector3f(
         std::clamp(correction_vec.x(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
-        std::clamp(correction_vec.y(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
-        0
+        std::clamp(correction_vec.y(), -SPEED_MAX_STRAFE, SPEED_MAX_STRAFE),
+        0 // std::clamp(correction_vec.x(), -SPEED_MAX_UP, SPEED_MAX_UP) // Still in 2D
     );
+
     correction_angular_vec = control_angular_vec;
 }
 
 void ReactiveOANode::resetVectors(){
-    control_vec = Eigen::Vector3f::Zero();
-    control_angular_vec = Eigen::Vector3f::Zero();
-    movement_vec = Eigen::Vector3f::Zero();
-    movement_angular_vec = Eigen::Vector3f::Zero();
-
-    if(obstacle_clear_counter == 1) repulsive_damp_unit = repulsive_vec.norm() / OBSTACLE_CLEAR_COUNT_THRESHOLD;
-    if(obstacle_clear_counter >= OBSTACLE_CLEAR_COUNT_THRESHOLD) {
-        repulsive_vec = Eigen::Vector3f::Zero();
+    // Damping repulsive vector
+    if(obstacle_clear_damping_counter == 0) {
+        repulsive_vec.setZero();
     }
     else {
-        const float scale = repulsive_vec.norm() - repulsive_damp_unit * obstacle_clear_counter;
-        repulsive_vec = repulsive_vec.normalized() * scale;
+        repulsive_vec = repulsive_vec * REPULSIVE_DAMPING_CONSTANT;
     }
 
-    correction_vec = Eigen::Vector3f::Zero();
-    correction_angular_vec = Eigen::Vector3f::Zero();
+    // Reset the rest of vectors
+    if(lost_control_signal) {
+        control_vec.setZero();
+        control_angular_vec.setZero();
+    }
+
+    movement_vec.setZero();
+    movement_angular_vec.setZero();
+
+    correction_vec.setZero();
+    correction_angular_vec.setZero();
 }
 
 #ifdef VISUALIZE
@@ -247,76 +244,80 @@ void ReactiveOANode::publishVectorArrow(
 }
 #endif
 
-/*################################################# node loop */
+/*################################################# Node Loop */
 
 void ReactiveOANode::nodeLoopCallback() {
     computeCorrectionVector();
     auto msg = ros2_msgs::msg::ControlInterface();
-    msg.control_state = true;
-    
-    if(obstacle_encountered) msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
-    else {
-        msg.control_by = ros2_msgs::msg::ControlInterface::HUMAN;
-        if(obstacle_clear_counter < OBSTACLE_CLEAR_COUNT_THRESHOLD) {
-            obstacle_clear_counter++;
-        }
-    }
-    obstacle_encountered = false;
-    
+
     msg.forward = correction_vec.x() / SPEED_MAX_FORWARD;
-    msg.left = correction_vec.y() / SPEED_MAX_FORWARD;
+    msg.left = correction_vec.y() / SPEED_MAX_STRAFE;
     // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
-    if(last_input_control != nullptr) { // Still meaningful for changing mode, etc.
-        if(!last_input) {
-            RCLCPP_INFO(this->get_logger(), GREEN "Received control input." RESET);
-            last_input = true;
-        }
-        msg.roll = last_input_control->roll;
-        msg.pitch = last_input_control->pitch;
-        msg.yaw = last_input_control->yaw; // Still in 2D
-        msg.up = last_input_control->up; // Still in 2D
-        msg.wings_mode = last_input_control->wings_mode;
+    if(lost_control_signal_counter < MISSED_FAST_TOPIC_THRESHOLD) lost_control_signal_counter++;
+    if(lost_control_signal_counter >= MISSED_FAST_TOPIC_THRESHOLD) {
+        if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
+        lost_control_signal = true;
+        last_control_signal = nullptr;
     }
     else {
-        if(last_input) {
-            RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control input." RESET);
-            last_input = false;
-        }
+        if(lost_control_signal == true) RCLCPP_INFO(this->get_logger(), GREEN "Received control signal." RESET);
+    }
+
+    if(!lost_control_signal) {
+        msg.control_state = last_control_signal->control_state;
+        msg.roll = last_control_signal->roll;
+        msg.pitch = last_control_signal->pitch;
+        msg.yaw = last_control_signal->yaw;
+        msg.up = last_control_signal->up; // Still in 2D
+        msg.control_by = last_control_signal->control_by;
+        msg.wings_mode = last_control_signal->wings_mode;
+    }
+    else {
+        RCLCPP_INFO(this->get_logger(), RED "Lost control signal!" RESET);
+        msg.control_state = ros2_msgs::msg::ControlInterface::ARM;
+        msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
+    }
+    
+    if(obstacle_clear_damping_counter) {
+        msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
+        obstacle_clear_damping_counter--;
     }
 
     msg.header.stamp = this->get_clock()->now();
     #if PUBLISH_CORRECTION_CONTROL
     final_control_PUB->publish(msg);
     #endif
-    
+
     #ifdef VISUALIZE
-    publishVectorArrow(control_vec_PUB, control_vec, 0.0, 0.0, 1.0); // Blue
-    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0, 0.7, 0.7); // Teal
-    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0, 0.75, 0.75); // Pink
-    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0, 0.0, 0.0); // Red
+    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 0.0f, 1.0f); // Blue
+    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.7f, 0.7f); // Teal
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 0.75f, 0.75f, 0.0f); // Yellow
+    publishVectorArrow(correction_vec_PUB, correction_vec, 0.0f, 1.0f, 0.0f); // Green
     #endif
 
-    last_input_control = nullptr;
     resetVectors();
 }
 
 /*################################################# Callbacks*/
 
 void ReactiveOANode::inputControlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg){
-    last_input_control = msg;
+    lost_control_signal = false;
+    lost_control_signal_counter = 0;
+
+    last_control_signal = msg;
     computeControlVector();
 }
 
 void ReactiveOANode::closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg){
-    obstacle_encountered = true;
-    obstacle_clear_counter = 0;
+    obstacle_clear_damping_counter = OBSTACLE_DAMPING_INIT;
+
     obstacle.topicToObstacle(msg);
     safe_distance = obstacle.safe_distance;
     computeRepulsiveVector();
 }
 
-void ReactiveOANode::perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg){
-    last_perception = msg;
+void ReactiveOANode::odoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg){
+    last_odo = msg;
     computeMovementVector();
 }

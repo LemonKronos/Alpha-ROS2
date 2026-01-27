@@ -3,8 +3,8 @@
 WORLD_NAME="grasslands"
 # WORLD_NAME="obstacle_tunnel"
 
-DRONE_NAME="gz_alpha_minus_1"
-# DRONE_NAME="gz_alpha_minus_2"
+# DRONE_NAME="gz_alpha_minus_1"
+DRONE_NAME="gz_alpha_minus_2"
 # DRONE_NAME="gz_standard_vtol"
 # DRONE_NAME="gz_tiltrotor"
 # DRONE_NAME="gz_x500"
