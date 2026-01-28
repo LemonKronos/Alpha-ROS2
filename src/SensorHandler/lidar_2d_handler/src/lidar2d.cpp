@@ -6,7 +6,7 @@
 Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") {
     using namespace std::chrono_literals;
 
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
 
     // Initialize Variables
     node_running.store(true);
@@ -14,7 +14,7 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
     init_sensor_specs = true;
     movement_current = {
         0.0f, // heading forward
-        HAZARD_DISTANCE, // Stand still
+        Drone::HAZARD_DISTANCE, // Stand still
         0.0f, 0.0f // Unused
     };
 
@@ -32,9 +32,9 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
     );
 
     // Create Publisher
-    obstacle_close_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(LIDAR_2D_CONTOUR_CLOSE_TOPIC, rclcpp::SensorDataQoS());
+    obstacle_close_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_CLOSE, rclcpp::SensorDataQoS());
 
-    obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(LIDAR_2D_CONTOUR_FAR_TOPIC, rclcpp::SensorDataQoS());
+    obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_FAR, rclcpp::SensorDataQoS());
     
     // Create Wall timer
     sensor_alive_timer = this->create_timer(
@@ -46,13 +46,13 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
         this,
         std::ref(queue_close), 
         std::ref(obstacle_close_PUB),
-        std::string(LIDAR_2D_CONTOUR_CLOSE_TOPIC), 
+        std::string(Topic::LIDAR_2D_CONTOUR_CLOSE), 
         "CLOSE");
     consumer_far = std::thread(&Lidar2dHandlerNode::ConsumerLoop, 
         this, 
         std::ref(queue_far),
         std::ref(obstacle_far_PUB), 
-        std::string(LIDAR_2D_CONTOUR_FAR_TOPIC),
+        std::string(Topic::LIDAR_2D_CONTOUR_FAR),
         "FAR");
 }
 
@@ -184,7 +184,7 @@ void Lidar2dHandlerNode::LocalPositionCallback(const px4_msgs::msg::VehicleLocal
         std::lock_guard<std::mutex> lock(mutex_movement);
         if(speed > 0.05) movement_current.arc = -(atan2(msg->vy, msg->vx) - msg->heading); // FLU
         else movement_current.arc = 0;
-        movement_current.distance = HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX));
+        movement_current.distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + ((speed * speed) / (2 * Drone::DECELERATE_MAX));
     }
     RCLCPP_DEBUG(this->get_logger(), "Local Position Call back timestamp %lu: speed= %0.2f; direction= %0.2f; safe distance= %0.2f."
         ,msg->timestamp, speed, movement_current.arc, movement_current.distance

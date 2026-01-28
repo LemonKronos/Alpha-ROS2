@@ -19,19 +19,19 @@ SimulationControlNode::SimulationControlNode()
     // 3. Record Control Subscription (Reliable) --- NEW ---
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
     sub_record_control_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
-        LOGGER_RECORD_TOPIC, 
+        Topic::LOGGER_RECORD, 
         qos_reliable, 
         std::bind(&SimulationControlNode::record_control_callback, this, std::placeholders::_1));
 
     // 4. World Control Client
-    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(CONTROL_WORLD_NAME);
+    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(Service::CONTROL_WORLD_NAME);
 
     // 5. Wall Timer Real
     timer_ = this->create_wall_timer(
         16ms, 
         std::bind(&SimulationControlNode::node_loop, this));
 
-    RCLCPP_INFO(this->get_logger(), GREEN "Simulation Control Node Started. Listening to %s for Pause." RESET, LOGGER_RECORD_TOPIC);
+    RCLCPP_INFO(this->get_logger(), GREEN "Simulation Control Node Started. Listening to %s for Pause." RESET, Topic::LOGGER_RECORD);
 }
 
 SimulationControlNode::~SimulationControlNode() {

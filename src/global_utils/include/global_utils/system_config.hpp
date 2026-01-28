@@ -12,88 +12,92 @@
 
 #define VISUALIZE true
 
+// Time related settings
 namespace Clock {
-constexpr float LOOP_RATE  = 30.0f;   // Hz
-constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
-constexpr int64_t LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9;
+    constexpr float LOOP_RATE  = 30.0f;   // Hz
+    constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
+    constexpr int64_t LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9;
 
-constexpr float LOOP_RATE_FAST = 80.0f;
-constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
-constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
-}// namespace Clock
+    constexpr float LOOP_RATE_FAST = 80.0f;
+    constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
+    constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
 
-// Time
-constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
-constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;
-constexpr int64_t SYSTEM_LOOP_CYCLE_NANOSEC = SYSTEM_LOOP_CYCLE * 1e9;
-
-constexpr float SYSTEM_LOOP_RATE_FAST = 80.0f;
-constexpr float SYSTEM_LOOP_CYCLE_FAST = 1 / SYSTEM_LOOP_RATE_FAST;
-constexpr int64_t SYSTEM_LOOP_CYCLE_FAST_NANOSEC = SYSTEM_LOOP_CYCLE_FAST * 1e9;
+}
 
 // ################################# SYSTEM PARAMETER
 
-constexpr uint8_t TOPIC_MISS_THRESHOLD = 3; // Amount of miss topic before go NaN
-constexpr uint8_t MISSED_FAST_TOPIC_THRESHOLD = SYSTEM_LOOP_RATE_FAST / 10.0f;
+// System thesholds
+namespace Threshold {
+    constexpr uint8_t MISSED_TOPIC = Clock::LOOP_RATE / 10.0f;
+    constexpr uint8_t MISSED_FAST_TOPIC = Clock::LOOP_RATE_FAST / 10.0f;
+}
 
-// Logging path
-constexpr const char* RECORD_ACROBATIC_DIR = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
-constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
+// Machine file directories
+namespace Path {
+    constexpr const char* RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
+    constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
+
+}
 
 // Topic path
-constexpr const char* CONTROL_INPUT_TOPIC = "/on_drone/drone_control/input/control"; // Raw human control signal
-constexpr const char* CONTROL_ACROBATIC_TOPIC = "/on_drone/drone_control/acrobatic/control"; // Control signal after pass through AcrobaticOA brain
-constexpr const char* CONTROL_REACTIVE_TOPIC = "/on_drone/drone_control/reactive/control"; // Control signal after pass through Reactive OA
-constexpr const char* FUSE_PERCEPTION_TOPIC = "/on_drone/sensor/fuse_perception";
-constexpr const char* CONTACT_PARSER_TOPIC = "/on_drone/sensor/body_contact";
-constexpr const char* LOGGER_RECORD_TOPIC = "/on_drone/logger/record_control";
-constexpr const char* LIDAR_2D_CONTOUR_CLOSE_TOPIC = "/on_drone/sensor/lidar2d/close/contour";
-constexpr const char* LIDAR_2D_CONTOUR_FAR_TOPIC = "/on_drone/sensor/lidar2d/far/contour";
+namespace Topic {
+    constexpr const char* CONTROL_INPUT = "/on_drone/drone_control/input/control"; // By control signal input Node
+    constexpr const char* CONTROL_ACROBATIC = "/on_drone/drone_control/acrobatic/control"; // By Acrobatic OA Node
+    constexpr const char* CONTROL_REACTIVE = "/on_drone/drone_control/reactive/control"; // By Reactive OA Node
+    constexpr const char* FUSE_PERCEPTION = "/on_drone/sensor/fuse_perception"; // Combine perception info from px4 and sensors
+    constexpr const char* CONTACT_PARSER = "/on_drone/sensor/body_contact";
+    constexpr const char* LOGGER_RECORD = "/on_drone/logger/record_control"; // Contain flag to record data
+    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour";
+    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour";
+
+}
 
 // Service path
-constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
-constexpr const char* CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control";
-constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL;
+namespace Service {
+    constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
+    constexpr const char* CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control";
+    constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL;
 
-// Drone
-constexpr const char* DRONE_NAME = "alpha_minus_2_0";
-constexpr float DRONE_WIDTH = 2.144f;
-constexpr float DRONE_LENGTH = 0.55f;
-constexpr float DRONE_HEIGHT = 0.05f;
+}
 
-constexpr float SPEED_MAX_FORWARD = 10.0f;
-constexpr float SPEED_MAX_BACKWARD = 10.0f;
-constexpr float SPEED_MAX_STRAFE = 10.0f;
-constexpr float SPEED_MAX_ANGLE = M_PI_2f;
-constexpr float SPEED_MAX_UP = 8.0f;
-constexpr float SPEED_MAX_DOWN = 4.0f;
-constexpr float THRUST_SAFE_LIMIT = 0.9f;
-constexpr float HOVER_THRUST = -0.51f; // Thrust opposite with moving direction, so in FLU negative = push downward
+namespace Drone {
+    constexpr const char* NAME = "alpha_minus_2_0";
+    constexpr float WIDTH = 2.144f;
+    constexpr float LENGTH = 0.55f;
+    constexpr float HEIGHT = 0.05f;
+    
+    constexpr float SPEED_MAX_FORWARD = 10.0f;
+    constexpr float SPEED_MAX_BACKWARD = 10.0f;
+    constexpr float SPEED_MAX_STRAFE = 10.0f;
+    constexpr float SPEED_MAX_ANGLE = M_PI_2f;
+    constexpr float SPEED_MAX_UP = 8.0f;
+    constexpr float SPEED_MAX_DOWN = 4.0f;
+    constexpr float THRUST_SAFE_LIMIT = 0.9f;
+    constexpr float HOVER_THRUST = -0.51f;
 
-constexpr float DEGREE = 0.017453292f;
+    // Safety
+    constexpr float RADIUS = 1.2f; // drone radius in meter
+    constexpr float UNCERTAINTY = 0.05f; // Tune-able
+    constexpr float SAFE_BUFFER = 0.15f; // Tune-able
+    constexpr float HAZARD_DISTANCE = RADIUS + SAFE_BUFFER + UNCERTAINTY;
+    constexpr float REACT_TIME = Clock::LOOP_CYCLE_FAST; // s
+    constexpr float DECELERATE_MAX = 4.0f; // m/s^2
 
-// Sensor
-constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
-constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
-constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
+}
 
+namespace Sensor {
+    constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
+    constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
+    constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
 
-// Safety
-constexpr float SELF_RADIUS = 1.2f; // drone radius in meter
-constexpr float UNCERTAINTY = 0.05f;
-constexpr float SAFE_BUFFER = 0.15f; // tuneable
-constexpr float HAZARD_DISTANCE = SELF_RADIUS + SAFE_BUFFER + UNCERTAINTY;
-constexpr float REACT_TIME = SYSTEM_LOOP_CYCLE_FAST; // s
-constexpr float DECELERATE_MAX = 4.0f; // m/s^2
-/**
- * Safe bubble calculate by:
- * SAFE_BUBBLE =  HAZARD_DISTANCE + speed * REACT_TIME + ((speed * speed) / (2 * DECELERATE_MAX)); 
- */
+}
 
 // Other
 constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
 
 // ################################# FUNCTION
+namespace Global {
+    void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
 
-void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
+}
 

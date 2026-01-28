@@ -5,11 +5,11 @@
 FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     using namespace std::chrono_literals;
 
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
     
     // Create Subscriber
     final_ctrl_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        CONTROL_REACTIVE_TOPIC,
+        Topic::CONTROL_REACTIVE,
         10,
         std::bind(&FinalizeControlNode::FinalCtrlCallback, this, _1)
     );
@@ -37,7 +37,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
 
     // Create wall timer
     node_loop_TIME = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FinalizeControlNode::NodeLoopCallback, this)
     );
 
@@ -260,17 +260,17 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
 
     if(last_final_ctrl != nullptr) {
         float vx = 0;
-        if(last_final_ctrl->forward > 0) vx = last_final_ctrl->forward * SPEED_MAX_FORWARD;
-        else vx = last_final_ctrl->forward * SPEED_MAX_BACKWARD;
-        float vy = last_final_ctrl->left * SPEED_MAX_STRAFE;
+        if(last_final_ctrl->forward > 0) vx = last_final_ctrl->forward * Drone::SPEED_MAX_FORWARD;
+        else vx = last_final_ctrl->forward * Drone::SPEED_MAX_BACKWARD;
+        float vy = last_final_ctrl->left * Drone::SPEED_MAX_STRAFE;
         float vz = 0;
-        if(last_final_ctrl->up > 0) vz = last_final_ctrl->up * SPEED_MAX_UP;
-        else vz = last_final_ctrl->up * SPEED_MAX_DOWN;
+        if(last_final_ctrl->up > 0) vz = last_final_ctrl->up * Drone::SPEED_MAX_UP;
+        else vz = last_final_ctrl->up * Drone::SPEED_MAX_DOWN;
 
         msg.position.fill(NO_DATA_f);
         msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
         msg.yaw = NO_DATA_f;
-        msg.yawspeed = -last_final_ctrl->yaw * SPEED_MAX_ANGLE; // frame FLU to FRD
+        msg.yawspeed = -last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
     }
     else {
         msg.position.fill(NO_DATA_f);
@@ -290,11 +290,11 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
     if(last_final_ctrl != nullptr) {
         // Body velocity rate to world quaternion
         Eigen::Vector3f omega( // in velocity
-            last_final_ctrl->roll * SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
-            -last_final_ctrl->pitch * SPEED_MAX_ANGLE * 8, // No idea why it negative :(
-            last_final_ctrl->yaw * SPEED_MAX_ANGLE * 8
+            last_final_ctrl->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
+            -last_final_ctrl->pitch * Drone::SPEED_MAX_ANGLE * 8, // No idea why it negative :(
+            last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE * 8
         );
-        float angle = omega.norm() * SYSTEM_LOOP_CYCLE_FAST;
+        float angle = omega.norm() * Clock::LOOP_CYCLE_FAST;
         Eigen::Quaternionf dq;
         if(angle > 1e-6f) dq = Eigen::AngleAxisf(angle, omega.normalized());
         else dq = Eigen::Quaternionf::Identity();
@@ -305,7 +305,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         Eigen::Vector3f euler = q_new.toRotationMatrix().eulerAngles(0, 1, 2);
         float roll  = euler.x();
         float pitch = euler.y();
-        float hover_thrust = HOVER_THRUST / (cosf(roll) * cosf(pitch));
+        float hover_thrust = Drone::HOVER_THRUST / (cosf(roll) * cosf(pitch));
         Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust);
         
         Eigen::Vector3f move_body(
@@ -315,18 +315,18 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         );
         
         Eigen::Vector3f total_thurst = hover_body + move_body;
-        total_thurst = total_thurst.cwiseMax(-THRUST_SAFE_LIMIT).cwiseMin(THRUST_SAFE_LIMIT);
+        total_thurst = total_thurst.cwiseMax(-Drone::THRUST_SAFE_LIMIT).cwiseMin(Drone::THRUST_SAFE_LIMIT);
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
-        msg.yaw_sp_move_rate = -last_final_ctrl->yaw * SPEED_MAX_ANGLE; // Frame FLU to FRD
+        msg.yaw_sp_move_rate = -last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE; // Frame FLU to FRD
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw
         Eigen::Quaternionf flat_q = frame_utils::eulerToQuaternion(0.0f, 0.0f, yaw_W);
 
         // Hover thrust, respect current body rate
-        Eigen::Vector3f hover_body(0.0f, 0.0f, HOVER_THRUST);
+        Eigen::Vector3f hover_body(0.0f, 0.0f, Drone::HOVER_THRUST);
 
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(flat_q));
         msg.thrust_body = frame_utils::frameFLUtoFRD(hover_body);

@@ -26,7 +26,7 @@ Color get_sector_color(int index) {
 }
 
 ObstacleManager::ObstacleManager() {
-    config_.drone_size = SELF_RADIUS * 2.0f; 
+    config_.drone_size = Drone::RADIUS * 2.0f; 
     
     // --- TUNING ---
     config_.width = 5.0f * config_.drone_size;

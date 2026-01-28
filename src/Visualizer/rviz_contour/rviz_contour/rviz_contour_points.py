@@ -14,14 +14,14 @@ class RvizContourPoint(Node):
         setup_for_simulation(self)
 
         self._setup_contour_pair(
-            sub_topic=LIDAR_2D_CONTOUR_FAR_TOPIC,
+            sub_topic=Topic.LIDAR_2D_CONTOUR_FAR,
             pub_topic='/visualizer/contour_marker/far',
             color=(0.0, 1.0, 0.0),
             name='far'
         )
 
         self._setup_contour_pair(
-            sub_topic=LIDAR_2D_CONTOUR_CLOSE_TOPIC,
+            sub_topic=Topic.LIDAR_2D_CONTOUR_CLOSE,
             pub_topic='/visualizer/contour_marker/close',
             color=(1.0, 0.0, 0.0),
             name='close'

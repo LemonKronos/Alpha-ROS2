@@ -28,8 +28,8 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # 3. Publishers
-        self.control_interface_PUB = self.create_publisher(ControlInterface, CONTROL_INPUT_TOPIC, 10)
-        self.record_control_PUB = self.create_publisher(RecordControl, LOGGER_RECORD_TOPIC, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, Topic.CONTROL_INPUT, 10)
+        self.record_control_PUB = self.create_publisher(RecordControl, Topic.LOGGER_RECORD, 10)
         
         # 4. State Tracking
         self.last_record = False
@@ -38,8 +38,8 @@ class AdvanceControlNode(Node):
         self.no_input_log = True
 
         # 5. Timers
-        self.timer_control = self.create_timer(SYSTEM_CYCLE_FAST, self.timer_control_callback)
-        self.timer_realtime = self.create_timer(SYSTEM_CYCLE, self.timer_realtime_callback, clock=self.wall_clock)
+        self.timer_control = self.create_timer(Clock.LOOP_CYCLE_FAST, self.timer_control_callback)
+        self.timer_realtime = self.create_timer(Clock.LOOP_CYCLE, self.timer_realtime_callback, clock=self.wall_clock)
 
     def timer_control_callback(self):
         commands = self.web_controller.get_latest_control_cmd()

@@ -25,7 +25,7 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
 
     // --- Subscriptions ---
     perception_sub_ = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        FUSE_PERCEPTION_TOPIC, rclcpp::SensorDataQoS(), 
+        Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS(), 
         std::bind(&ObstacleTunnelNode::perception_callback, this, _1));
 
     // PX4 Status (Best Effort)
@@ -41,7 +41,7 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
 
     // --- Publishers ---
     record_pub_ = this->create_publisher<ros2_msgs::msg::RecordControl>(
-        LOGGER_RECORD_TOPIC, 10);
+        Topic::LOGGER_RECORD, 10);
 
     // --- Shutdown Hook ---
     rclcpp::on_shutdown([this]() {

@@ -98,4 +98,9 @@
     ],
     "python.envFile": "${workspaceFolder}/.env",
     "ROS2.distro": "jazzy",
+    "files.watcherExclude": {
+        "**/build/**": true,
+        "**/install/**": true,
+        "**/log/**": true
+    },
 }

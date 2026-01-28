@@ -3,10 +3,10 @@
 FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     using namespace std::chrono_literals;
 
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
     
     // Create Publisher
-    fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>(FUSE_PERCEPTION_TOPIC, rclcpp::SensorDataQoS());
+    fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>(Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS());
 
     // Create Subscriber
     odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
@@ -16,7 +16,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     );
 
     contact_SUB = this->create_subscription<ros2_msgs::msg::ContactSensor>(
-        CONTACT_PARSER_TOPIC,
+        Topic::CONTACT_PARSER,
         rclcpp::SensorDataQoS(),
         std::bind(&FusePerceptionNode::ContactCallback, this, _1)
     );
@@ -29,15 +29,15 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
 
     // Create wall timers
     publish_TIM = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FusePerceptionNode::PublishCallback, this)
     );
 
     // Init variable
     lost_lidar_down = true;
-    missed_lidar_down = MISSED_FAST_TOPIC_THRESHOLD;
+    missed_lidar_down = Threshold::MISSED_FAST_TOPIC;
     lost_odometry = true;
-    missed_odometry = MISSED_FAST_TOPIC_THRESHOLD;
+    missed_odometry = Threshold::MISSED_FAST_TOPIC;
     lidar_down_range_min = 0.1f;
     lidar_down_range_max = 30.0f;
 }
@@ -59,8 +59,8 @@ void FusePerceptionNode::PublishCallback() {
     auto msg = ros2_msgs::msg::FusePerception();
     
     // Odometry - stream
-    if(missed_odometry < MISSED_FAST_TOPIC_THRESHOLD) missed_odometry++;
-    if(missed_odometry >= MISSED_FAST_TOPIC_THRESHOLD) {
+    if(missed_odometry < Threshold::MISSED_FAST_TOPIC) missed_odometry++;
+    if(missed_odometry >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_odometry == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost Odometry" RESET);
         lost_odometry = true;
         last_odo = nullptr;
@@ -97,8 +97,8 @@ void FusePerceptionNode::PublishCallback() {
     }
 
     // Scan down - stream
-    if(missed_lidar_down < MISSED_FAST_TOPIC_THRESHOLD) missed_lidar_down++;
-    if(missed_lidar_down >= MISSED_FAST_TOPIC_THRESHOLD) {
+    if(missed_lidar_down < Threshold::MISSED_FAST_TOPIC) missed_lidar_down++;
+    if(missed_lidar_down >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_lidar_down == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost lidar scan down" RESET);
         last_scan_down = nullptr;
         lost_lidar_down = true;
@@ -127,7 +127,7 @@ void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::Sh
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
-    if(missed_lidar_down >= TOPIC_MISS_THRESHOLD) {
+    if(missed_lidar_down >= Threshold::MISSED_FAST_TOPIC) {
         lidar_down_range_min = msg->range_min;
         lidar_down_range_max = msg->range_max;
     }

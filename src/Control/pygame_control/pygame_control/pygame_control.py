@@ -17,15 +17,6 @@ from ros2_msgs.msg import ControlInterface
 
 MODULE_TEST = False
 
-# Constants
-HUMAN = 0
-AI = 1
-OUTER = 2
-
-UNCHANGE = 0
-MULTICOPTER = 1
-FIXWINGS = 2
-
 def clamp(val, low = -1, high = 1):
     if val < low:
         return low
@@ -53,7 +44,7 @@ class PygameControlNode:
         self.UP_DOWN_COASTING = 0.05
 
         # Publisher
-        self.pub = self.node.create_publisher(ControlInterface, CONTROL_REACTIVE_TOPIC, 10)
+        self.pub = self.node.create_publisher(ControlInterface, Topic.CONTROL_INPUT, 10)
 
         # UI control internals 
         self.is_armed = None  # not used for ROS publish but kept as attribute

@@ -18,6 +18,7 @@
 /* ######################################## Constances */
 constexpr float NO_DATA_f = std::numeric_limits<float>::quiet_NaN();
 constexpr float NO_DATA_d = std::numeric_limits<float>::quiet_NaN();
+constexpr float DEGREE = 0.017453292f;
 
 /* ########################################## Function*/
 

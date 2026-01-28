@@ -53,7 +53,7 @@ private:
     uint8_t lost_perception_counter = 0;
 
     Obstacle obstacle;
-    float safe_distance = HAZARD_DISTANCE;
+    float safe_distance = Drone::HAZARD_DISTANCE;
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;

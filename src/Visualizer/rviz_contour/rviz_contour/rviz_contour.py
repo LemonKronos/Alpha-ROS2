@@ -17,13 +17,13 @@ class RvizContour(Node):
 
         # Set up both pairs easily
         self._setup_contour_pair(
-            sub_topic=LIDAR_2D_CONTOUR_FAR_TOPIC,
+            sub_topic=Topic.LIDAR_2D_CONTOUR_FAR,
             pub_topic='/visualizer/contour_marker_array/far',
             name='far'
         )
 
         self._setup_contour_pair(
-            sub_topic=LIDAR_2D_CONTOUR_CLOSE_TOPIC,
+            sub_topic=Topic.LIDAR_2D_CONTOUR_CLOSE,
             pub_topic='/visualizer/contour_marker_array/close',
             name='close'
         )

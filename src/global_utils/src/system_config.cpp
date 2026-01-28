@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-void setup_for_simulation(rclcpp::Node *node) {
+void Global::setup_for_simulation(rclcpp::Node *node) {
     // 1. Check override parameter first
     bool current_val = false;
     if (node->get_parameter("use_sim_time", current_val)) {

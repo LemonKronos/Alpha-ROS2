@@ -3,7 +3,7 @@
 ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     using namespace std::chrono_literals;
 
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
     
     // Create Subscriber
     contact_body_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
@@ -37,7 +37,7 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     );
 
     // Create Publisher
-    contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(CONTACT_PARSER_TOPIC, rclcpp::SensorDataQoS());
+    contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(Topic::CONTACT_PARSER, rclcpp::SensorDataQoS());
 
     // Create wall timer
     Contact_pub_TIME = this->create_timer(

@@ -2,10 +2,10 @@
 
 ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
     
     // Publisher
-    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(CONTROL_REACTIVE_TOPIC, 10);
+    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, 10);
 
     #ifdef VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
@@ -16,23 +16,23 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
 
     // Subscriber
     input_control_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        CONTROL_INPUT_TOPIC,
+        Topic::CONTROL_INPUT,
         10,
         std::bind(&ReactiveOANode::inputControlCallback, this, _1));
 
     close_contour_SUB = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        LIDAR_2D_CONTOUR_CLOSE_TOPIC,
+        Topic::LIDAR_2D_CONTOUR_CLOSE,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
     perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        FUSE_PERCEPTION_TOPIC,
+        Topic::FUSE_PERCEPTION,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::perceptionCallback, this, _1));
 
     // Timer
     node_loop_TIME = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );
 
@@ -51,14 +51,14 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
 
     reactive_state = IDLING;
 
-    safe_distance = HAZARD_DISTANCE;
+    safe_distance = Drone::HAZARD_DISTANCE;
 
     lost_control_signal = true;
-    lost_control_signal_counter = MISSED_FAST_TOPIC_THRESHOLD;
+    lost_control_signal_counter = Threshold::MISSED_FAST_TOPIC;
     last_control_signal = nullptr;
 
     lost_perception = true;
-    lost_perception_counter = MISSED_FAST_TOPIC_THRESHOLD;
+    lost_perception_counter = Threshold::MISSED_FAST_TOPIC;
     last_perception = nullptr;
 }
 ReactiveOANode::~ReactiveOANode(){}
@@ -67,8 +67,8 @@ ReactiveOANode::~ReactiveOANode(){}
 
 void ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
-        last_control_signal->forward * SPEED_MAX_FORWARD,
-        last_control_signal->left * SPEED_MAX_FORWARD,
+        last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
+        last_control_signal->left * Drone::SPEED_MAX_FORWARD,
         0 // last_control_signal->up * SPEED_MAX_UP // Still in 2D
     ); // body frame
 
@@ -153,15 +153,15 @@ void ReactiveOANode::computeRepulsiveVector() {
 
     float min_dist = obstacle.getMinDistance();
     if(min_dist > safe_distance) min_dist = safe_distance;
-    if(min_dist <= SELF_RADIUS) {
+    if(min_dist <= Drone::RADIUS) {
         RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
     }
-    float urgency = (safe_distance - min_dist) / (safe_distance - HAZARD_DISTANCE + 0.001f); // Cut depth urgency
+    float urgency = (safe_distance - min_dist) / (safe_distance - Drone::HAZARD_DISTANCE + 0.001f); // Cut depth urgency
     urgency = std::clamp(urgency, 0.01f, 2.75f);
 
     const float relative_speed = fabs(movement_vec.dot(repulsive_vec));
     const float movement_bias = 0.5f; // Tune-able
-    const float repulsive_force = urgency * (movement_bias*relative_speed + (1.0f - movement_bias)*SPEED_MAX_FORWARD);
+    const float repulsive_force = urgency * (movement_bias*relative_speed + (1.0f - movement_bias)*Drone::SPEED_MAX_FORWARD);
     
     repulsive_vec = repulsive_vec * repulsive_force;
     // RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
@@ -220,8 +220,8 @@ void ReactiveOANode::computeCorrectionVector() {
 
     // Clamp correction vector to max speed
     correction_vec = Eigen::Vector3f(
-        std::clamp(correction_vec.x(), -SPEED_MAX_FORWARD, SPEED_MAX_FORWARD),
-        std::clamp(correction_vec.y(), -SPEED_MAX_STRAFE, SPEED_MAX_STRAFE),
+        std::clamp(correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
+        std::clamp(correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
         0 // std::clamp(correction_vec.x(), -SPEED_MAX_UP, SPEED_MAX_UP) // Still in 2D
     );
 }
@@ -326,13 +326,13 @@ void ReactiveOANode::nodeLoopCallback() {
     computeCorrectionVector();
     auto msg = ros2_msgs::msg::ControlInterface();
 
-    msg.forward = correction_vec.x() / SPEED_MAX_FORWARD;
-    msg.left = correction_vec.y() / SPEED_MAX_STRAFE;
+    msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
+    msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
     // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
     // Odometry check
-    if(lost_perception_counter < MISSED_FAST_TOPIC_THRESHOLD) lost_perception_counter++;
-    if(lost_perception_counter >= MISSED_FAST_TOPIC_THRESHOLD) {
+    if(lost_perception_counter < Threshold::MISSED_FAST_TOPIC) lost_perception_counter++;
+    if(lost_perception_counter >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_perception == false) RCLCPP_INFO(this->get_logger(), YELLOW "Lost odometry" RESET);
         lost_perception = true;
         last_perception = nullptr;
@@ -343,8 +343,8 @@ void ReactiveOANode::nodeLoopCallback() {
     }
 
     // Control signal check
-    if(lost_control_signal_counter < MISSED_FAST_TOPIC_THRESHOLD) lost_control_signal_counter++;
-    if(lost_control_signal_counter >= MISSED_FAST_TOPIC_THRESHOLD) {
+    if(lost_control_signal_counter < Threshold::MISSED_FAST_TOPIC) lost_control_signal_counter++;
+    if(lost_control_signal_counter >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
         lost_control_signal = true;
         last_control_signal = nullptr;
