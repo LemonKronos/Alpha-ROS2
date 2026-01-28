@@ -12,6 +12,16 @@
 
 #define VISUALIZE true
 
+namespace Clock {
+constexpr float LOOP_RATE  = 30.0f;   // Hz
+constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
+constexpr int64_t LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9;
+
+constexpr float LOOP_RATE_FAST = 80.0f;
+constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
+constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
+}// namespace Clock
+
 // Time
 constexpr float SYSTEM_LOOP_RATE  = 30.0f;   // Hz
 constexpr float SYSTEM_LOOP_CYCLE = 1 / SYSTEM_LOOP_RATE;

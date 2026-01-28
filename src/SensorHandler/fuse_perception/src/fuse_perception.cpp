@@ -29,13 +29,15 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
 
     // Create wall timers
     publish_TIM = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC),
+        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FusePerceptionNode::PublishCallback, this)
     );
 
     // Init variable
-    lidar_down_miss = TOPIC_MISS_THRESHOLD;
-    odometry_miss = TOPIC_MISS_THRESHOLD;
+    lost_lidar_down = true;
+    missed_lidar_down = MISSED_FAST_TOPIC_THRESHOLD;
+    lost_odometry = true;
+    missed_odometry = MISSED_FAST_TOPIC_THRESHOLD;
     lidar_down_range_min = 0.1f;
     lidar_down_range_max = 30.0f;
 }
@@ -43,10 +45,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
 FusePerceptionNode::~FusePerceptionNode() {}
 
 float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-    if(msg == nullptr) {
-        RCLCPP_WARN(this->get_logger(), RED "LiDAR scan down no callback!" RESET);
-        return NO_DATA_f;
-    }
+    if(msg == nullptr) return NO_DATA_f;
     if(msg->ranges[0] < lidar_down_range_min || msg->ranges[0] > lidar_down_range_max) {
         return 0; // 0 mean CLEAR
     }
@@ -60,20 +59,24 @@ void FusePerceptionNode::PublishCallback() {
     auto msg = ros2_msgs::msg::FusePerception();
     
     // Odometry - stream
-    if(odometry_miss < TOPIC_MISS_THRESHOLD) odometry_miss++;
-    else last_odo = nullptr;
+    if(missed_odometry < MISSED_FAST_TOPIC_THRESHOLD) missed_odometry++;
+    if(missed_odometry >= MISSED_FAST_TOPIC_THRESHOLD) {
+        if(lost_odometry == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost Odometry" RESET);
+        lost_odometry = true;
+        last_odo = nullptr;
+    }else {
+        if(lost_odometry == true) RCLCPP_WARN(this->get_logger(), GREEN "Received Odometry" RESET);
+        lost_odometry = false;
+    }
 
-    if(last_odo != nullptr) {
+    if(!lost_odometry) {
         msg.frame = last_odo->pose_frame; // auto parse from PX4 to ROS2 frame
         msg.position = frame_utils::frameNEDtoENU(last_odo->position);
         msg.q = frame_utils::quaternionToArray(frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(last_odo->q)));
         msg.velocity = frame_utils::frameNEDtoENU(last_odo->velocity);
         msg.angular_velocity = frame_utils::frameFRDtoFLU(last_odo->angular_velocity);
-
-        last_odo = nullptr;
     }
     else {
-        RCLCPP_WARN(this->get_logger(), RED "Odometry miss no callback!" RESET);
         msg.frame = 0;
         msg.position.fill(NO_DATA_f);
         msg.q.fill(NO_DATA_f);
@@ -94,12 +97,20 @@ void FusePerceptionNode::PublishCallback() {
     }
 
     // Scan down - stream
-    if(lidar_down_miss < TOPIC_MISS_THRESHOLD) lidar_down_miss++;
-    else {
+    if(missed_lidar_down < MISSED_FAST_TOPIC_THRESHOLD) missed_lidar_down++;
+    if(missed_lidar_down >= MISSED_FAST_TOPIC_THRESHOLD) {
+        if(lost_lidar_down == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost lidar scan down" RESET);
         last_scan_down = nullptr;
+        lost_lidar_down = true;
+
+    }
+    else {
+        if(lost_lidar_down == true) RCLCPP_WARN(this->get_logger(), GREEN "Received lidar scan donw" RESET);
+        lost_lidar_down = false;
     }
     msg.below_distance = handleScanDown(last_scan_down);
     
+    // Publish msg
     msg.header.stamp = this->get_clock()->now();
     fuse_PUB->publish(msg);
     RCLCPP_INFO(this->get_logger(), GREEN "Published" RESET);
@@ -107,7 +118,7 @@ void FusePerceptionNode::PublishCallback() {
 
 void FusePerceptionNode::OdoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
     last_odo = msg;
-    odometry_miss = 0;
+    missed_odometry = 0;
 }
 
 void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::SharedPtr msg) {
@@ -116,9 +127,9 @@ void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::Sh
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
-    if(lidar_down_miss >= TOPIC_MISS_THRESHOLD) {
+    if(missed_lidar_down >= TOPIC_MISS_THRESHOLD) {
         lidar_down_range_min = msg->range_min;
         lidar_down_range_max = msg->range_max;
     }
-    lidar_down_miss = 0; // Reset miss count
+    missed_lidar_down = 0;
 }

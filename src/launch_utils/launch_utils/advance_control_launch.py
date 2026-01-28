@@ -31,13 +31,13 @@ def generate_launch_description():
             output='screen',
             # arguments=['--ros-args', '--log-level', 'warn']
         ),
-        Node(
-            package='fuse_perception',
-            executable='fuse_perception',
-            name='fuse_perception_node',
-            output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='fuse_perception',
+        #     executable='fuse_perception',
+        #     name='fuse_perception_node',
+        #     output='screen',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',

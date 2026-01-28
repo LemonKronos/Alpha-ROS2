@@ -4,9 +4,9 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
 #include "global_utils/surrounding.hpp"
-#include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "ros2_msgs/msg/control_interface.hpp"
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+#include "ros2_msgs/msg/fuse_perception.hpp"
 
 // #define VISUALIZE false // uncomment to disable visualize in this node
 #ifndef VISUALIZE
@@ -40,29 +40,41 @@ private:
     // Subscriber
     rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr close_contour_SUB;
-    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odo_SUB;
+    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr perception_SUB;
 
     // Stored data
     ros2_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
-    px4_msgs::msg::VehicleOdometry::SharedPtr last_odo = nullptr;
+    ros2_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
     
     // Variables
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
+    bool lost_perception = true;
+    uint8_t lost_perception_counter = 0;
 
     Obstacle obstacle;
     float safe_distance = HAZARD_DISTANCE;
 
     Eigen::Vector3f control_vec;
-    Eigen::Vector3f control_angular_vec;
     Eigen::Vector3f movement_vec;
-    Eigen::Vector3f movement_angular_vec;
     Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f correction_vec;
-    Eigen::Vector3f correction_angular_vec;
+    // Eigen::Vector3f control_angular_vec;
+    // Eigen::Vector3f movement_angular_vec;
+    // Eigen::Vector3f repulsive_angular_vec;
+    // Eigen::Vector3f correction_angular_vec;
 
     uint8_t repulsive_damping_counter = 0;
     uint8_t obstacle_clear_damping_counter = 0;
+
+    enum ReactiveState {
+        IDLING,
+        ENTERING,
+        RUNNING,
+        LEAVING
+    };
+    ReactiveState reactive_state = IDLING;
+    
 
     // Methods
     void computeControlVector();
@@ -84,7 +96,7 @@ private:
     // Callbacks
     void inputControlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
     void closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
-    void odoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
+    void perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 
 };

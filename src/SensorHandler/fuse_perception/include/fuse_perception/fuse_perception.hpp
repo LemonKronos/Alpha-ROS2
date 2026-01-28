@@ -5,8 +5,8 @@
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
-#include "ros2_msgs/msg/contact_sensor.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "ros2_msgs/msg/contact_sensor.hpp"
 #include "ros2_msgs/msg/fuse_perception.hpp"
 
 using std::placeholders::_1;
@@ -31,8 +31,10 @@ private:
     sensor_msgs::msg::LaserScan::SharedPtr last_scan_down = nullptr;
 
     // Variales
-    uint8_t lidar_down_miss;
-    uint8_t odometry_miss;
+    bool lost_lidar_down;
+    uint8_t missed_lidar_down;
+    bool lost_odometry;
+    uint8_t missed_odometry;
     float lidar_down_range_min;
     float lidar_down_range_max;
 

@@ -25,10 +25,10 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
-    odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-        "/fmu/out/vehicle_odometry",
+    perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
+        FUSE_PERCEPTION_TOPIC,
         rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::odoCallback, this, _1));
+        std::bind(&ReactiveOANode::perceptionCallback, this, _1));
 
     // Timer
     node_loop_TIME = this->create_timer(
@@ -38,20 +38,28 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
 
     // Init variables
     control_vec.setZero();
-    control_angular_vec.setZero();
     movement_vec.setZero();
-    movement_angular_vec.setZero();
     repulsive_vec.setZero();
     correction_vec.setZero();
-    correction_angular_vec.setZero();
+    // control_angular_vec.setZero();
+    // movement_angular_vec.setZero();
+    // repulsive_angular_vec.setZero();
+    // correction_angular_vec.setZero();
 
     repulsive_damping_counter = 0;
     obstacle_clear_damping_counter = 0;
 
+    reactive_state = IDLING;
+
     safe_distance = HAZARD_DISTANCE;
 
     lost_control_signal = true;
-    lost_control_signal_counter = 0;
+    lost_control_signal_counter = MISSED_FAST_TOPIC_THRESHOLD;
+    last_control_signal = nullptr;
+
+    lost_perception = true;
+    lost_perception_counter = MISSED_FAST_TOPIC_THRESHOLD;
+    last_perception = nullptr;
 }
 ReactiveOANode::~ReactiveOANode(){}
 
@@ -64,29 +72,29 @@ void ReactiveOANode::computeControlVector() {
         0 // last_control_signal->up * SPEED_MAX_UP // Still in 2D
     ); // body frame
 
-    control_angular_vec = Eigen::Vector3f(
-        last_control_signal->roll,
-        last_control_signal->pitch,
-        last_control_signal->yaw
-    ); // body frame
+    // control_angular_vec = Eigen::Vector3f(
+    //     last_control_signal->roll,
+    //     last_control_signal->pitch,
+    //     last_control_signal->yaw
+    // ); // body frame
 }
 
 void ReactiveOANode::computeMovementVector() {
     movement_vec = Eigen::Vector3f(
-        last_odo->velocity[0],
-        last_odo->velocity[1],
-        last_odo->velocity[2]
+        last_perception->velocity[0],
+        last_perception->velocity[1],
+        last_perception->velocity[2]
     ); // world frame
-    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_odo->q);
+    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
     movement_vec = q.inverse() * movement_vec; // body frame
     movement_vec(2) = 0; // Still in 2D
 
-    movement_angular_vec = Eigen::Vector3f(
-        last_odo->angular_velocity[0],
-        last_odo->angular_velocity[1],
-        last_odo->angular_velocity[2]
-    ); // world frame
-    movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
+    // movement_angular_vec = Eigen::Vector3f(
+    //     last_perception->angular_velocity[0],
+    //     last_perception->angular_velocity[1],
+    //     last_perception->angular_velocity[2]
+    // ); // world frame
+    // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
 
 void ReactiveOANode::computeRepulsiveVector() {
@@ -148,28 +156,65 @@ void ReactiveOANode::computeRepulsiveVector() {
     if(min_dist <= SELF_RADIUS) {
         RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
     }
-    float urgency = (safe_distance - min_dist) / (safe_distance - HAZARD_DISTANCE + 0.01f); // Cut depth urgency
-    urgency = std::clamp(urgency, 0.01f, 2.85f);
+    float urgency = (safe_distance - min_dist) / (safe_distance - HAZARD_DISTANCE + 0.001f); // Cut depth urgency
+    urgency = std::clamp(urgency, 0.01f, 2.75f);
 
     const float relative_speed = fabs(movement_vec.dot(repulsive_vec));
-    const float movement_bias = 0.75f;
+    const float movement_bias = 0.5f; // Tune-able
     const float repulsive_force = urgency * (movement_bias*relative_speed + (1.0f - movement_bias)*SPEED_MAX_FORWARD);
     
     repulsive_vec = repulsive_vec * repulsive_force;
-    RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
+    // RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    correction_vec = control_vec + repulsive_vec;
+    Eigen::Vector3f new_correction_vec = control_vec + repulsive_vec;
 
     // Ensure correction vector is at most perpendicular to repulsive vector
     if (!repulsive_vec.isZero(1e-3f)) {
         Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        const double dot = repulsive_dir.dot(correction_vec);
+        const double dot = repulsive_dir.dot(new_correction_vec);
 
         const double bounce_bias = 0.01; // Tune-able
         if (dot < bounce_bias){
-            correction_vec -= (dot - bounce_bias) * repulsive_dir;
+            new_correction_vec -= (dot - bounce_bias) * repulsive_dir;
+        }
+    }
+
+    // Damping base on state
+    switch(reactive_state) {
+        case IDLING: // Damp base on previous correction
+        {
+            const float idling_bias = 0.5f; // Tune-able
+            correction_vec = (1 - idling_bias)*new_correction_vec + idling_bias*correction_vec;
+            break; 
+        }
+
+        case ENTERING: // Damp base on current movement
+        {
+            const float entering_bias = 0.7f; // Tune-able
+            correction_vec = (1 - entering_bias)*new_correction_vec + entering_bias*movement_vec;
+            break;
+        }
+
+        case RUNNING: // Damp base on previous correction
+        {
+            const float running_bias = 0.3f; // Tune-able
+            correction_vec = (1 - running_bias)*new_correction_vec + running_bias*correction_vec;
+            break;
+        }
+
+        case LEAVING: // Damp base on current movement
+        {
+            const float leaving_bias = 0.7f; // Tune-able
+            correction_vec = (1 - leaving_bias)*new_correction_vec + leaving_bias*movement_vec;
+            break;
+        }
+
+        default:
+        {
+            correction_vec = new_correction_vec;
+            break;
         }
     }
 
@@ -179,11 +224,14 @@ void ReactiveOANode::computeCorrectionVector() {
         std::clamp(correction_vec.y(), -SPEED_MAX_STRAFE, SPEED_MAX_STRAFE),
         0 // std::clamp(correction_vec.x(), -SPEED_MAX_UP, SPEED_MAX_UP) // Still in 2D
     );
-
-    correction_angular_vec = control_angular_vec;
 }
 
 void ReactiveOANode::resetVectors(){
+    // Reset control signal
+    if(lost_control_signal) {
+        control_vec.setZero();
+    }
+
     // Damping repulsive vector
     if(obstacle_clear_damping_counter == 0) {
         repulsive_vec.setZero();
@@ -192,17 +240,13 @@ void ReactiveOANode::resetVectors(){
         repulsive_vec = repulsive_vec * REPULSIVE_DAMPING_CONSTANT;
     }
 
-    // Reset the rest of vectors
-    if(lost_control_signal) {
-        control_vec.setZero();
-        control_angular_vec.setZero();
+    // Keep correction as reference to last
+    // correction_vec.setZero();
+
+    // Reset movement
+    if(lost_perception) {
+        movement_vec.setZero();
     }
-
-    movement_vec.setZero();
-    movement_angular_vec.setZero();
-
-    correction_vec.setZero();
-    correction_angular_vec.setZero();
 }
 
 #ifdef VISUALIZE
@@ -247,6 +291,38 @@ void ReactiveOANode::publishVectorArrow(
 /*################################################# Node Loop */
 
 void ReactiveOANode::nodeLoopCallback() {
+    // State update
+    switch(reactive_state) {
+        case IDLING:
+            if(obstacle_clear_damping_counter) {
+                reactive_state = ENTERING;
+                RCLCPP_INFO(this->get_logger(), TEAL "ENTERING" RESET);
+            }
+            break;
+        case ENTERING:
+            reactive_state = RUNNING;
+            RCLCPP_INFO(this->get_logger(), TEAL "RUNNING" RESET);
+            break;
+        case RUNNING:
+            if(obstacle_clear_damping_counter == OBSTACLE_DAMPING_INIT - 1) {
+                reactive_state = LEAVING;
+                RCLCPP_INFO(this->get_logger(), TEAL "LEAVING" RESET);
+            }
+            break;
+        case LEAVING:
+            if(obstacle_clear_damping_counter == OBSTACLE_DAMPING_INIT) {
+                reactive_state = RUNNING;
+                RCLCPP_INFO(this->get_logger(), TEAL "RUNNING" RESET);
+            }
+            else if(obstacle_clear_damping_counter == 1) {
+                reactive_state = IDLING;
+                RCLCPP_INFO(this->get_logger(), TEAL "IDLING" RESET);
+            }
+            break;
+        default:
+            reactive_state = IDLING;
+    }
+
     computeCorrectionVector();
     auto msg = ros2_msgs::msg::ControlInterface();
 
@@ -254,6 +330,19 @@ void ReactiveOANode::nodeLoopCallback() {
     msg.left = correction_vec.y() / SPEED_MAX_STRAFE;
     // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
+    // Odometry check
+    if(lost_perception_counter < MISSED_FAST_TOPIC_THRESHOLD) lost_perception_counter++;
+    if(lost_perception_counter >= MISSED_FAST_TOPIC_THRESHOLD) {
+        if(lost_perception == false) RCLCPP_INFO(this->get_logger(), YELLOW "Lost odometry" RESET);
+        lost_perception = true;
+        last_perception = nullptr;
+    }
+    else {
+        if(lost_perception == true) RCLCPP_INFO(this->get_logger(), GREEN "Received odometry" RESET);
+        lost_perception = false;
+    }
+
+    // Control signal check
     if(lost_control_signal_counter < MISSED_FAST_TOPIC_THRESHOLD) lost_control_signal_counter++;
     if(lost_control_signal_counter >= MISSED_FAST_TOPIC_THRESHOLD) {
         if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
@@ -262,8 +351,10 @@ void ReactiveOANode::nodeLoopCallback() {
     }
     else {
         if(lost_control_signal == true) RCLCPP_INFO(this->get_logger(), GREEN "Received control signal." RESET);
+        lost_control_signal = false;
     }
 
+    // Build msg
     if(!lost_control_signal) {
         msg.control_state = last_control_signal->control_state;
         msg.roll = last_control_signal->roll;
@@ -274,16 +365,17 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.wings_mode = last_control_signal->wings_mode;
     }
     else {
-        RCLCPP_INFO(this->get_logger(), RED "Lost control signal!" RESET);
         msg.control_state = ros2_msgs::msg::ControlInterface::ARM;
         msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
     }
     
+    // Obstacle damping
     if(obstacle_clear_damping_counter) {
         msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
         obstacle_clear_damping_counter--;
     }
 
+    // Publish msg
     msg.header.stamp = this->get_clock()->now();
     #if PUBLISH_CORRECTION_CONTROL
     final_control_PUB->publish(msg);
@@ -292,8 +384,8 @@ void ReactiveOANode::nodeLoopCallback() {
     #ifdef VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 0.0f, 1.0f); // Blue
     publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.7f, 0.7f); // Teal
-    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 0.75f, 0.75f, 0.0f); // Yellow
-    publishVectorArrow(correction_vec_PUB, correction_vec, 0.0f, 1.0f, 0.0f); // Green
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 0.75f, 0.3f, 0.0f); // Pink
+    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 0.0f, 0.0f); // Red
     #endif
 
     resetVectors();
@@ -317,7 +409,9 @@ void ReactiveOANode::closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle:
     computeRepulsiveVector();
 }
 
-void ReactiveOANode::odoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg){
-    last_odo = msg;
+void ReactiveOANode::perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg){
+    lost_perception_counter = 0;
+
+    last_perception = msg;
     computeMovementVector();
 }
