@@ -20,7 +20,7 @@
 #include <Eigen/Dense>
 
 using std::placeholders::_1;
-constexpr uint8_t OBSTACLE_DAMPING_INIT = 8;
+constexpr uint8_t OBSTACLE_DAMPING_INIT = 5;
 constexpr float REPULSIVE_DAMPING_CONSTANT = 0.8f;
 
 class ReactiveOANode : public rclcpp::Node{
@@ -51,6 +51,8 @@ private:
     uint8_t lost_control_signal_counter = 0;
     bool lost_perception = true;
     uint8_t lost_perception_counter = 0;
+
+    uint8_t obstacle_rate_mismatch_counter = 0;
 
     Obstacle obstacle;
     float safe_distance = Drone::HAZARD_DISTANCE;

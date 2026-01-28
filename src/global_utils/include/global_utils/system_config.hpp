@@ -30,6 +30,8 @@ namespace Clock {
 namespace Threshold {
     constexpr uint8_t MISSED_TOPIC = Clock::LOOP_RATE / 10.0f;
     constexpr uint8_t MISSED_FAST_TOPIC = Clock::LOOP_RATE_FAST / 10.0f;
+    constexpr uint8_t MISMATCH_RATE_TOPIC = std::ceil(Clock::LOOP_RATE_FAST / Clock::LOOP_RATE);
+
 }
 
 // Machine file directories

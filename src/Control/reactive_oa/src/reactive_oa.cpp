@@ -60,6 +60,8 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     lost_perception = true;
     lost_perception_counter = Threshold::MISSED_FAST_TOPIC;
     last_perception = nullptr;
+
+    obstacle_rate_mismatch_counter = 0;
 }
 ReactiveOANode::~ReactiveOANode(){}
 
@@ -157,7 +159,7 @@ void ReactiveOANode::computeRepulsiveVector() {
         RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
     }
     float urgency = (safe_distance - min_dist) / (safe_distance - Drone::HAZARD_DISTANCE + 0.001f); // Cut depth urgency
-    urgency = std::clamp(urgency, 0.01f, 2.75f);
+    urgency = std::clamp(urgency, 0.01f, 2.7f);
 
     const float relative_speed = fabs(movement_vec.dot(repulsive_vec));
     const float movement_bias = 0.5f; // Tune-able
@@ -175,7 +177,7 @@ void ReactiveOANode::computeCorrectionVector() {
         Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
         const double dot = repulsive_dir.dot(new_correction_vec);
 
-        const double bounce_bias = 0.01; // Tune-able
+        const double bounce_bias = 0.08; // Tune-able, about 85 degree
         if (dot < bounce_bias){
             new_correction_vec -= (dot - bounce_bias) * repulsive_dir;
         }
@@ -183,28 +185,27 @@ void ReactiveOANode::computeCorrectionVector() {
 
     // Damping base on state
     switch(reactive_state) {
-        case IDLING: // Damp base on previous correction
+        case IDLING: // No damping
         {
-            const float idling_bias = 0.5f; // Tune-able
-            correction_vec = (1 - idling_bias)*new_correction_vec + idling_bias*correction_vec;
+            correction_vec = new_correction_vec;
             break; 
         }
 
-        case ENTERING: // Damp base on current movement
+        case ENTERING: // Damping base on current movement
         {
-            const float entering_bias = 0.7f; // Tune-able
+            const float entering_bias = 0.9f; // Tune-able
             correction_vec = (1 - entering_bias)*new_correction_vec + entering_bias*movement_vec;
             break;
         }
 
-        case RUNNING: // Damp base on previous correction
+        case RUNNING: // Damping base on previous correction
         {
             const float running_bias = 0.3f; // Tune-able
             correction_vec = (1 - running_bias)*new_correction_vec + running_bias*correction_vec;
             break;
         }
 
-        case LEAVING: // Damp base on current movement
+        case LEAVING: // Damping base on current movement
         {
             const float leaving_bias = 0.7f; // Tune-able
             correction_vec = (1 - leaving_bias)*new_correction_vec + leaving_bias*movement_vec;
@@ -301,7 +302,7 @@ void ReactiveOANode::nodeLoopCallback() {
             break;
         case ENTERING:
             reactive_state = RUNNING;
-            RCLCPP_INFO(this->get_logger(), TEAL "RUNNING" RESET);
+            RCLCPP_INFO(this->get_logger(), PINK "RUNNING" RESET);
             break;
         case RUNNING:
             if(obstacle_clear_damping_counter == OBSTACLE_DAMPING_INIT - 1) {
@@ -330,7 +331,7 @@ void ReactiveOANode::nodeLoopCallback() {
     msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
     // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
 
-    // Odometry check
+    // Odometry callback check
     if(lost_perception_counter < Threshold::MISSED_FAST_TOPIC) lost_perception_counter++;
     if(lost_perception_counter >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_perception == false) RCLCPP_INFO(this->get_logger(), YELLOW "Lost odometry" RESET);
@@ -342,7 +343,7 @@ void ReactiveOANode::nodeLoopCallback() {
         lost_perception = false;
     }
 
-    // Control signal check
+    // Control signal callback check
     if(lost_control_signal_counter < Threshold::MISSED_FAST_TOPIC) lost_control_signal_counter++;
     if(lost_control_signal_counter >= Threshold::MISSED_FAST_TOPIC) {
         if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
@@ -369,10 +370,14 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
     }
     
-    // Obstacle damping
-    if(obstacle_clear_damping_counter) {
-        msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
-        obstacle_clear_damping_counter--;
+    // Obstacle callback check
+    if(obstacle_rate_mismatch_counter < Threshold::MISMATCH_RATE_TOPIC) obstacle_rate_mismatch_counter++;
+    else {
+        // Obstacle damping
+        if(obstacle_clear_damping_counter) {
+            msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
+            obstacle_clear_damping_counter--;
+        }
     }
 
     // Publish msg
@@ -384,7 +389,7 @@ void ReactiveOANode::nodeLoopCallback() {
     #ifdef VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 0.0f, 1.0f); // Blue
     publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.7f, 0.7f); // Teal
-    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 0.75f, 0.3f, 0.0f); // Pink
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.1f, 0.7f); // Pink
     publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 0.0f, 0.0f); // Red
     #endif
 
@@ -403,6 +408,7 @@ void ReactiveOANode::inputControlCallback(const ros2_msgs::msg::ControlInterface
 
 void ReactiveOANode::closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg){
     obstacle_clear_damping_counter = OBSTACLE_DAMPING_INIT;
+    obstacle_rate_mismatch_counter = 0;
 
     obstacle.topicToObstacle(msg);
     safe_distance = obstacle.safe_distance;
