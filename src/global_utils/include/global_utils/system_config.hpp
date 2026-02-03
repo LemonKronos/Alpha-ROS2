@@ -47,7 +47,7 @@ namespace Topic {
     constexpr const char* CONTROL_ACROBATIC = "/on_drone/drone_control/acrobatic/control"; // By Acrobatic OA Node
     constexpr const char* CONTROL_REACTIVE = "/on_drone/drone_control/reactive/control"; // By Reactive OA Node
     constexpr const char* FUSE_PERCEPTION = "/on_drone/sensor/fuse_perception"; // Combine perception info from px4 and sensors
-    constexpr const char* CONTACT_PARSER = "/on_drone/sensor/body_contact";
+    constexpr const char* CONTACT_PARSER = "/on_drone/sensor/contacts";
     constexpr const char* LOGGER_RECORD = "/on_drone/logger/record_control"; // Contain flag to record data
     constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour";
     constexpr const char* LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour";
