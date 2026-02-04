@@ -22,6 +22,10 @@ namespace Clock {
     constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
     constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
 
+    constexpr float LOOP_RATE_SLOW = 0.5f;
+    constexpr float LOOP_CYCLE_SLOW = 1.0f / LOOP_RATE_SLOW;
+    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_FAST * 1e9;
+
 }
 
 // ################################# SYSTEM PARAMETER
@@ -51,6 +55,9 @@ namespace Topic {
     constexpr const char* LOGGER_RECORD = "/on_drone/logger/record_control"; // Contain flag to record data
     constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour";
     constexpr const char* LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour";
+    constexpr const char* DEPTH_CAM_POINTS = "/alpha_depth_cam/camera/image/points";
+    constexpr const char* OCTO_MAP_URGENT_POINTS = "/on_drone/sensor/lidar3d/points";
+
 
 }
 

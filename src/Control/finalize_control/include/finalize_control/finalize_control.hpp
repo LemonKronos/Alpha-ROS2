@@ -41,7 +41,6 @@ private:
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odometry_SUB;
     // rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
 
-
     // Stored SharedPtr
     ros2_msgs::msg::ControlInterface::SharedPtr last_final_ctrl = nullptr;
 
