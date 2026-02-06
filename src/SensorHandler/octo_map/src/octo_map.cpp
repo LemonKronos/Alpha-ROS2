@@ -22,27 +22,27 @@ OctoMapNode::OctoMapNode(const rclcpp::NodeOptions & options)
     );
 
     // Publisher
-    urgent_points_PUB = this->create_publisher<sensor_msgs::msg::PointCloud2>(Topic::LIDAR_3D_URGENT, rclcpp::SensorDataQoS());
-    octo_map_PUB = this->create_publisher<octomap_msgs::msg::Octomap>(Topic::OCTO_MAP_IN, 1);
+    lidar_3d_urgent_voxel_PUB = this->create_publisher<sensor_msgs::msg::PointCloud2>(Topic::LIDAR_3D_URGENT_VOXEL, rclcpp::SensorDataQoS());
+    octo_map_raw_PUB = this->create_publisher<octomap_msgs::msg::Octomap>(Topic::OCTO_MAP_RAW, 1);
 
     // Create wall timer
-    map_out_TIME = this->create_timer(
+    node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_SLOW_NANOSEC),
-        std::bind(&OctoMapNode::MapOutputCallback, this));
+        std::bind(&OctoMapNode::NodeLoopCallback, this));
 }
 
 void OctoMapNode::DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     // 1. Convert ROS -> PCL
-    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-    pcl::fromROSMsg(*msg, pcl_cloud);
+    pcl::PointCloud<pcl::PointXYZ> lidar_3d_pcl;
+    pcl::fromROSMsg(*msg, lidar_3d_pcl); // <== Heavy?
 
     // 2. Get Sensor Origin (Simplified: Assuming cloud is already in 'map' or 'odom' frame)
     // In reality, you'd look up TF here to get camera position.
     octomap::point3d sensor_origin(0, 0, 0); 
 
     // 3. Update OctoMap
-    insertCloudEfficiently(pcl_cloud, sensor_origin);
+    insertCloudEfficiently(lidar_3d_pcl, sensor_origin);
 
     // 4. FAST OUTPUT: Extract only local occupied nodes
     // We iterate the tree, but only send points close to the drone.
@@ -61,16 +61,16 @@ void OctoMapNode::DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPt
     sensor_msgs::msg::PointCloud2 output_msg;
     pcl::toROSMsg(obstacle_cloud, output_msg);
     output_msg.header = msg->header; // Keep timestamp synced
-    urgent_points_PUB->publish(output_msg);
+    lidar_3d_urgent_voxel_PUB->publish(output_msg);
 }
 
-void OctoMapNode::insertCloudEfficiently(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud, const octomap::point3d& sensor_origin) {
+void OctoMapNode::insertCloudEfficiently(const pcl::PointCloud<pcl::PointXYZ>& lidar_3d_pcl, const octomap::point3d& sensor_origin) {
     // 1. Convert PCL PointCloud -> OctoMap PointCloud
     // This is just a quick data copy, very fast.
     octomap::Pointcloud octo_cloud;
-    octo_cloud.reserve(pcl_cloud.size());
+    octo_cloud.reserve(lidar_3d_pcl.size());
     
-    for (const auto& p : pcl_cloud) {
+    for (const auto& p : lidar_3d_pcl) {
         octo_cloud.push_back(p.x, p.y, p.z);
     }
 
@@ -85,14 +85,14 @@ void OctoMapNode::insertCloudEfficiently(const pcl::PointCloud<pcl::PointXYZ>& p
     ocTree->updateInnerOccupancy();
 }
 
-void OctoMapNode::MapOutputCallback()
+void OctoMapNode::NodeLoopCallback()
 {
     // Serialize full map for the High-Level AI
     octomap_msgs::msg::Octomap map_msg;
     octomap_msgs::fullMapToMsg(*ocTree, map_msg);
     map_msg.header.stamp = this->now();
     map_msg.header.frame_id = "odom"; // or whatever your fixed frame is
-    octo_map_PUB->publish(map_msg);
+    octo_map_raw_PUB->publish(map_msg);
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(OctoMapNode)

@@ -20,8 +20,8 @@ public:
 
 private:
     // Publisher
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr urgent_points_PUB;
-    rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octo_map_PUB;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_3d_urgent_voxel_PUB;
+    rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octo_map_raw_PUB;
 
     // Subscriber
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr depth_cam_points_SUB;
@@ -30,11 +30,11 @@ private:
     std::shared_ptr<octomap::OcTree> ocTree;
 
     // Timer
-    rclcpp::TimerBase::SharedPtr map_out_TIME;
+    rclcpp::TimerBase::SharedPtr node_loop_TIME;
 
     // Callbacks
     void DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
-    void MapOutputCallback();
+    void NodeLoopCallback();
 
     // Methods
     void insertCloudEfficiently(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud, const octomap::point3d& sensor_origin);

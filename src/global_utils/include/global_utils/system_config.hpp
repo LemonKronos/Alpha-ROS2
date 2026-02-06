@@ -57,8 +57,8 @@ namespace Topic {
     constexpr const char* LOGGER_RECORD = "/on_drone/logger/record_control"; // Contain flag to record data
     constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour";
     constexpr const char* LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour";
-    constexpr const char* LIDAR_3D_URGENT = "/on_drone/sensor/lidar3d/points";
-    constexpr const char* OCTO_MAP_IN = "on_drone/mapping/in/octomap";
+    constexpr const char* LIDAR_3D_URGENT_VOXEL = "/on_drone/sensor/lidar3d/points";
+    constexpr const char* OCTO_MAP_RAW = "on_drone/mapping/raw/octomap";
     constexpr const char* SPACIAL_MAP = "on_drone/mapping/spacial/octomap";
 
 }
