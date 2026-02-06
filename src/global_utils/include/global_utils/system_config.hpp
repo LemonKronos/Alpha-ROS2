@@ -24,7 +24,7 @@ namespace Clock {
 
     constexpr float LOOP_RATE_SLOW = 0.5f;
     constexpr float LOOP_CYCLE_SLOW = 1.0f / LOOP_RATE_SLOW;
-    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_FAST * 1e9;
+    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_SLOW * 1e9;
 
 }
 
