@@ -22,8 +22,8 @@ OctoMapNode::OctoMapNode(const rclcpp::NodeOptions & options)
     );
 
     // Publisher
-    urgent_points_PUB = this->create_publisher<sensor_msgs::msg::PointCloud2>(Topic::OCTO_MAP_URGENT_POINTS, rclcpp::SensorDataQoS());
-    octo_map_PUB = this->create_publisher<octomap_msgs::msg::Octomap>(Topic::OCTO_MAP_URGENT_POINTS, 1);
+    urgent_points_PUB = this->create_publisher<sensor_msgs::msg::PointCloud2>(Topic::LIDAR_3D_URGENT, rclcpp::SensorDataQoS());
+    octo_map_PUB = this->create_publisher<octomap_msgs::msg::Octomap>(Topic::OCTO_MAP_IN, 1);
 
     // Create wall timer
     map_out_TIME = this->create_timer(
