@@ -7,31 +7,31 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     
     // Create Subscriber
     contact_body_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
-        "sensor/contact_body/contact",
+        Topic::BODY_CONTACT,
         rclcpp::SensorDataQoS(),
         std::bind(&ContactParserNode::BodyCallback, this, _1)
     );
 
     contact_rotor0_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
-        "sensor/contact_rotor0/contact",
+        Topic::ROTOR_0_CONTACT,
         rclcpp::SensorDataQoS(),
         std::bind(&ContactParserNode::RotorCallback, this, _1)
     );
 
     contact_rotor1_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
-        "sensor/contact_rotor1/contact",
+        Topic::ROTOR_1_CONTACT,
         rclcpp::SensorDataQoS(),
         std::bind(&ContactParserNode::RotorCallback, this, _1)
     );
 
     contact_rotor2_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
-        "sensor/contact_rotor2/contact",
+        Topic::ROTOR_2_CONTACT,
         rclcpp::SensorDataQoS(),
         std::bind(&ContactParserNode::RotorCallback, this, _1)
     );
 
     contact_rotor3_SUB = this->create_subscription<ros_gz_interfaces::msg::Contacts>(
-        "sensor/contact_rotor3/contact",
+        Topic::ROTOR_3_CONTACT,
         rclcpp::SensorDataQoS(),
         std::bind(&ContactParserNode::RotorCallback, this, _1)
     );

@@ -8,35 +8,35 @@
 # Contact sensor 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/base_link/sensor/alpha_body_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
-  ros_topic_name: "sensor/contact_body/contact"
+  ros_topic_name: "/sensor/contact_body/contact"
   ros_type_name: "ros_gz_interfaces/msg/Contacts"
   lazy: true
   direction: GZ_TO_ROS
 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/rotor_0/sensor/alpha_rotor_0_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
-  ros_topic_name: "sensor/contact_rotor0/contact"
+  ros_topic_name: "/sensor/contact_rotor0/contact"
   ros_type_name: "ros_gz_interfaces/msg/Contacts"
   lazy: true
   direction: GZ_TO_ROS
 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/rotor_1/sensor/alpha_rotor_1_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
-  ros_topic_name: "sensor/contact_rotor1/contact"
+  ros_topic_name: "/sensor/contact_rotor1/contact"
   ros_type_name: "ros_gz_interfaces/msg/Contacts"
   lazy: true
   direction: GZ_TO_ROS
 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/rotor_2/sensor/alpha_rotor_2_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
-  ros_topic_name: "sensor/contact_rotor2/contact"
+  ros_topic_name: "/sensor/contact_rotor2/contact"
   ros_type_name: "ros_gz_interfaces/msg/Contacts"
   lazy: true
   direction: GZ_TO_ROS
 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/rotor_3/sensor/alpha_rotor_3_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
-  ros_topic_name: "sensor/contact_rotor3/contact"
+  ros_topic_name: "/sensor/contact_rotor3/contact"
   ros_type_name: "ros_gz_interfaces/msg/Contacts"
   lazy: true
   direction: GZ_TO_ROS
@@ -44,7 +44,7 @@
 # Lidar 1d
 - gz_topic_name: "/alpha_lidar_down/scan"
   gz_type_name: "gz.msgs.LaserScan"
-  ros_topic_name: "sensor/lidar_1d_down/scan"
+  ros_topic_name: "/sensor/lidar_1d_down/scan"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   lazy: true
   direction: GZ_TO_ROS
@@ -52,23 +52,37 @@
 # Lidar 2d
 - gz_topic_name: "/alpha_lidar_2d/scan"
   gz_type_name: "gz.msgs.LaserScan"
-  ros_topic_name: "sensor/lidar_2d/scan"
+  ros_topic_name: "/sensor/lidar_2d/scan"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   lazy: true
   direction: GZ_TO_ROS
-  
-# Depth camera
-- gz_topic_name: "/alpha_depth_cam/camera/image"
-  gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/depth_cam/camera/image"
-  ros_type_name: "sensor_msgs/msg/Image"
+
+# Depth camera x3
+- gz_topic_name: "/alpha_depth_cam/front/image/points"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  ros_topic_name: "/sensor/depth_cam/front/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  lazy: true
+  direction: GZ_TO_ROS
+
+- gz_topic_name: "/alpha_depth_cam/left/image/points"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  ros_topic_name: "/sensor/depth_cam/left/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  lazy: true
+  direction: GZ_TO_ROS
+
+- gz_topic_name: "/alpha_depth_cam/right/image/points"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  ros_topic_name: "/sensor/depth_cam/right/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
   lazy: true
   direction: GZ_TO_ROS
 
 # RGB Camera
 - gz_topic_name: "/alpha_cam/camera/image"
   gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/rgb_cam/camera/image"
+  ros_topic_name: "/sensor/rgb_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   lazy: true
   direction: GZ_TO_ROS
@@ -84,7 +98,7 @@
 # Overview camera
 - gz_topic_name: "/alpha_cam_overview/camera/image"
   gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "sensor/overview_cam/camera/image"
+  ros_topic_name: "/sensor/overview_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   lazy: true
   direction: GZ_TO_ROS

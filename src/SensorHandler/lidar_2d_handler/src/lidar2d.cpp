@@ -20,7 +20,7 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
 
     // Create Subscriber
     raw_scan_SUB = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "/sensor/lidar_2d/scan",
+        Topic::LIDAR_2D_AROUND_SCAN,
         rclcpp::SensorDataQoS(),
         std::bind(&Lidar2dHandlerNode::ScanCallback, this, _1)
     );

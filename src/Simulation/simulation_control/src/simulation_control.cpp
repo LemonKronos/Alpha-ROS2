@@ -13,7 +13,7 @@ SimulationControlNode::SimulationControlNode()
     // 2. Image Subscription (Best Effort)
     auto qos_sensor = rclcpp::SensorDataQoS();
     sub_img_ = this->create_subscription<sensor_msgs::msg::Image>(
-        "sensor/overview_cam/camera/image", qos_sensor,
+        Topic::RGB_CAM_FRONT, qos_sensor,
         std::bind(&SimulationControlNode::img_callback, this, std::placeholders::_1));
 
     // 3. Record Control Subscription (Reliable) --- NEW ---

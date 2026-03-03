@@ -47,20 +47,29 @@ namespace Path {
 
 // Topic path
 namespace Topic {
-    constexpr const char* DEPTH_CAM_POINTS = "/alpha_depth_cam/camera/image/points";
+    constexpr const char* DEPTH_CAM_FRONT_PL = "/sensor/depth_cam/front/points";
+    constexpr const char* DEPTH_CAM_LEFT_PL = "/sensor/depth_cam/left/points";
+    constexpr const char* DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points";
+    constexpr const char* RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image";
+    constexpr const char* LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan";
+    constexpr const char* LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan";
+    constexpr const char* BODY_CONTACT = "/sensor/contact_body/contact";
+    constexpr const char* ROTOR_0_CONTACT = "/sensor/contact_rotor0/contact";
+    constexpr const char* ROTOR_1_CONTACT = "/sensor/contact_rotor1/contact";
+    constexpr const char* ROTOR_2_CONTACT = "/sensor/contact_rotor2/contact";
+    constexpr const char* ROTOR_3_CONTACT = "/sensor/contact_rotor3/contact";
 
-    constexpr const char* CONTROL_INPUT = "/on_drone/drone_control/input/control"; // By control signal input Node
-    constexpr const char* CONTROL_ACROBATIC = "/on_drone/drone_control/acrobatic/control"; // By Acrobatic OA Node
-    constexpr const char* CONTROL_REACTIVE = "/on_drone/drone_control/reactive/control"; // By Reactive OA Node
-    constexpr const char* FUSE_PERCEPTION = "/on_drone/sensor/fuse_perception"; // Combine perception info from px4 and sensors
-    constexpr const char* CONTACT_PARSER = "/on_drone/sensor/contacts";
-    constexpr const char* LOGGER_RECORD = "/on_drone/logger/record_control"; // Contain flag to record data
-    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour";
-    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour";
-    constexpr const char* LIDAR_3D_URGENT_VOXEL = "/on_drone/sensor/lidar3d/points";
-    constexpr const char* OCTO_MAP_RAW = "on_drone/mapping/raw/octomap";
-    constexpr const char* SPACIAL_MAP = "on_drone/mapping/spacial/octomap";
-
+    constexpr const char* CONTROL_INPUT = "/internal/drone_control/input/control"; // By control signal input Node
+    constexpr const char* CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/control"; // By Acrobatic OA Node
+    constexpr const char* CONTROL_REACTIVE = "/internal/drone_control/reactive/control"; // By Reactive OA Node
+    constexpr const char* FUSE_PERCEPTION = "/internal/sensor/fuse_perception"; // Combine perception info from px4 and sensors
+    constexpr const char* CONTACT_PARSER = "/internal/sensor/contacts";
+    constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
+    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour";
+    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour";
+    constexpr const char* MAP_SEEING_URGENT_POINTS = "/internal/mapping/seeing/urgent/points";
+    constexpr const char* MAP_MEMORY_URGET_POINTS = "/internal/mapping/memory/urgent/points";
+    
 }
 
 // Service path
