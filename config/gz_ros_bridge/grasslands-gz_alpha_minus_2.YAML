@@ -5,6 +5,20 @@
   lazy: false
   direction: GZ_TO_ROS
 
+# # Dynamic transforms as ground truth
+# - ros_topic_name: "/tf"
+#   gz_topic_name: "/model/alpha_minus_2_0/pose"
+#   ros_type_name: "tf2_msgs/msg/TFMessage"
+#   gz_type_name: "gz.msgs.Pose_V"
+#   direction: GZ_TO_ROS
+
+# # Bridge static transforms as ground truth
+# - ros_topic_name: "/tf_static"
+#   gz_topic_name: "/model/alpha_minus_2_0/pose_static"
+#   ros_type_name: "tf2_msgs/msg/TFMessage"
+#   gz_type_name: "gz.msgs.Pose_V"
+#   direction: GZ_TO_ROS
+
 # Contact sensor 
 - gz_topic_name: "/world/grasslands/model/alpha_minus_2_0/link/base_link/sensor/alpha_body_contact/contact"
   gz_type_name: "gz.msgs.Contacts"
@@ -58,29 +72,29 @@
   direction: GZ_TO_ROS
 
 # Depth camera x3
-- gz_topic_name: "/alpha_depth_cam/front/image/points"
+- gz_topic_name: "/alpha_depth_cam/front/camera/image/points"
   gz_type_name: "gz.msgs.PointCloudPacked"
   ros_topic_name: "/sensor/depth_cam/front/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   lazy: true
   direction: GZ_TO_ROS
 
-- gz_topic_name: "/alpha_depth_cam/left/image/points"
+- gz_topic_name: "/alpha_depth_cam/left/camera/image/points"
   gz_type_name: "gz.msgs.PointCloudPacked"
   ros_topic_name: "/sensor/depth_cam/left/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   lazy: true
   direction: GZ_TO_ROS
 
-- gz_topic_name: "/alpha_depth_cam/right/image/points"
+- gz_topic_name: "/alpha_depth_cam/right/camera/image/points"
   gz_type_name: "gz.msgs.PointCloudPacked"
   ros_topic_name: "/sensor/depth_cam/right/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   lazy: true
   direction: GZ_TO_ROS
 
-# RGB Camera
-- gz_topic_name: "/alpha_cam/camera/image"
+# RGB Camera Front
+- gz_topic_name: "/alpha_cam_front/camera/image"
   gz_type_name: "gz.msgs.Image"
   ros_topic_name: "/sensor/rgb_cam/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"

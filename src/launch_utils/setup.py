@@ -11,6 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
+            'launch_utils/static_tf.py',
             'launch_utils/lidar_2d_handler_launch.py',
             'launch_utils/pygame_control_launch.py',
             'launch_utils/advance_control_launch.py',
@@ -23,7 +24,7 @@ setup(
     zip_safe=True,
     maintainer='Trong Data',
     maintainer_email='trongdat4work@gmail.com',
-    description='UHM',
+    description='launch files',
     license='Proprietary',
     entry_points={
         'console_scripts': [],

@@ -1,8 +1,16 @@
+import os
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
+    static_tf_path = os.path.join(os.path.dirname(__file__), 'static_tf.py')
+
     return LaunchDescription([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(static_tf_path)
+        ),
         Node(
             package='advance_control',
             executable='advance_control',
