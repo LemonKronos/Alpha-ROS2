@@ -13,12 +13,12 @@
   <depend>rclcpp_components</depend>
   <depend>global_utils</depend>
   <depend>ros2_msgs</depend>
-  <depend>pcl_conversions</depend>
-  <depend>pcl_ros</depend>
-  <depend>octomap</depend>
-  <depend>octomap_ros</depend>
-  <depend>octomap_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_sensor_msgs</depend>
+  <depend>tf2_eigen</depend>
+  <depend>octomap</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

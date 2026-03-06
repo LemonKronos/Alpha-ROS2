@@ -10,30 +10,31 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(global_utils REQUIRED)
 find_package(ros2_msgs REQUIRED)
-find_package(pcl_conversions REQUIRED)
-find_package(pcl_ros REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
 find_package(octomap REQUIRED)
-find_package(octomap_ros REQUIRED)
-find_package(octomap_msgs REQUIRED)
-find_package(PCL REQUIRED) # PCL is a bit special, usually found via PCLConfig
+find_package(Eigen3 REQUIRED)
 
 include_directories(include)
 
 # ####################################### COMPONENT |>
 
 add_library(octo_map_component SHARED
-src/octo_map.cpp
+  src/octo_map.cpp
+  src/octo_map_threads.cpp
+  src/component.cpp
 )
 
 target_include_directories(octo_map_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${PCL_INCLUDE_DIRS}
   ${OCTOMAP_INCLUDE_DIRS}
 )
 
 target_link_libraries(octo_map_component
-  ${PCL_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
 )
 
@@ -42,13 +43,15 @@ ament_target_dependencies(octo_map_component
   rclcpp_components
   global_utils
   ros2_msgs
-  pcl_conversions
-  pcl_ros
-  octomap_ros
-  octomap_msgs
+  std_msgs
+  sensor_msgs
+  tf2_ros
+  tf2_sensor_msgs
+  tf2_eigen
+  octomap
 )
 
-rclcpp_components_register_nodes(octo_map_component "OctoMapNode")
+rclcpp_components_register_nodes(octo_map_component "alpha_brain::OctoMapNode")
 
 # ####################################### EXECUTABLE |>
 

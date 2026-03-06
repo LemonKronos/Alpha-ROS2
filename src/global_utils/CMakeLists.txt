@@ -19,6 +19,8 @@ add_library(${PROJECT_NAME}
   src/system_config.cpp
 )
 
+set_target_properties(global_utils PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(${PROJECT_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

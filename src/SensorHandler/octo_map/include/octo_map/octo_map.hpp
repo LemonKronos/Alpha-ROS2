@@ -1,10 +1,43 @@
 #pragma once
 
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/header.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
+
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp"
-#include "octo_map/octo_map_threads.hpp"
- 
+#include "ros2_msgs/msg/fuse_perception.hpp" 
+#include"octo_map/octo_map_threads.hpp"
 
+namespace alpha_brain {
+
+using std::placeholders::_1;
+
+class OctoMapNode : public rclcpp::Node {
+public:
+    OctoMapNode(const rclcpp::NodeOptions& options);
+    ~OctoMapNode();
+
+
+private:
+    // Frame transform
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener;
+
+    // Subscriber
+    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
+
+    // Variables
+    std::unique_ptr<HazardPointThread> hazard_point_thread;
+    std::unique_ptr<WorldUpdateThread> world_update_thread;
+    std::unique_ptr<ProcessingThread> front_processing_thread;
+    std::unique_ptr<ProcessingThread> left_processing_thread;
+    std::unique_ptr<ProcessingThread> right_processing_thread;
+
+    // Callbacks
+    void FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+
+};
+
+} // namespace alpha_brain

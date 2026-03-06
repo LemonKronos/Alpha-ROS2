@@ -14,17 +14,21 @@
 
 // Time related settings
 namespace Clock {
-    constexpr float LOOP_RATE  = 30.0f;   // Hz
-    constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
+    constexpr float LOOP_CYCLE = 0.031f;
+    constexpr float LOOP_RATE  = 1.0f / LOOP_CYCLE;
     constexpr int64_t LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9;
 
-    constexpr float LOOP_RATE_FAST = 80.0f;
-    constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
+    constexpr float LOOP_CYCLE_FAST = 0.013f;
+    constexpr float LOOP_RATE_FAST = 1.0f / LOOP_CYCLE_FAST;
     constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
 
-    constexpr float LOOP_RATE_SLOW = 0.5f;
-    constexpr float LOOP_CYCLE_SLOW = 1.0f / LOOP_RATE_SLOW;
+    constexpr float LOOP_CYCLE_SLOW = 1.997f;
+    constexpr float LOOP_RATE_SLOW = 1.0f / LOOP_CYCLE_SLOW;
     constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_SLOW * 1e9;
+
+    constexpr float LOOP_CYCLE_HEAVY = 4.001f;
+    constexpr float LOOP_RATE_HEAVY = 1.0f / LOOP_CYCLE_HEAVY;
+    constexpr int64_t LOOP_CYCLE_HEAVY_NANOSEC = LOOP_CYCLE_HEAVY * 1e9;
 
 }
 
@@ -67,8 +71,8 @@ namespace Topic {
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
     constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour";
     constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour";
-    constexpr const char* MAP_SEEING_URGENT_POINTS = "/internal/mapping/seeing/urgent/points";
-    constexpr const char* MAP_MEMORY_URGET_POINTS = "/internal/mapping/memory/urgent/points";
+    constexpr const char* VOXEL_HAZARD_SEEING = "/internal/mapping/hazard/seeing/voxel_blocks";
+    constexpr const char* VOXEL_HAZARD_MEMORY = "/internal/mapping/hazard/memory/voxel_blocks";
     
 }
 
@@ -109,6 +113,8 @@ namespace Sensor {
     constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
     constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
+    constexpr float DEPTH_CAM_RANGE = 30.0f;
+    constexpr float OCTREE_VOXEL_RESOLUTION = 0.25f;
 
 }
 

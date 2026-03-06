@@ -28,3 +28,6 @@ bool critical_contact
 # Lidar down
 float32 below_distance
 
+# Safety
+float32 hazard_distance_sq
+

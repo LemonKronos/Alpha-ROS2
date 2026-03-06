@@ -3,6 +3,7 @@ bags_files/
 build/
 install/
 log/
+others/
 pyvenv/*
 src/px4_msgs
 src/px4_ros_com
