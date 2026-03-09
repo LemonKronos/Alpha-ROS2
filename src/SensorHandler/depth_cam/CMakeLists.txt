@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(octo_map)
+project(depth_cam)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -22,23 +22,23 @@ include_directories(include)
 
 # ####################################### COMPONENT |>
 
-add_library(octo_map_component SHARED
-  src/octo_map.cpp
-  src/octo_map_threads.cpp
+add_library(depth_cam_component SHARED
+  src/depth_cam.cpp
+  src/depth_cam_threads.cpp
   src/component.cpp
 )
 
-target_include_directories(octo_map_component PUBLIC
+target_include_directories(depth_cam_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${OCTOMAP_INCLUDE_DIRS}
 )
 
-target_link_libraries(octo_map_component
+target_link_libraries(depth_cam_component
   ${OCTOMAP_LIBRARIES}
 )
 
-ament_target_dependencies(octo_map_component
+ament_target_dependencies(depth_cam_component
   rclcpp
   rclcpp_components
   global_utils
@@ -51,26 +51,26 @@ ament_target_dependencies(octo_map_component
   octomap
 )
 
-rclcpp_components_register_nodes(octo_map_component "alpha_brain::OctoMapNode")
+rclcpp_components_register_nodes(depth_cam_component "alpha_brain::DepthCamNode")
 
 # ####################################### EXECUTABLE |>
 
-add_executable(octo_map
+add_executable(depth_cam
   src/main.cpp
 )
 
-target_link_libraries(octo_map
-  octo_map_component
+target_link_libraries(depth_cam
+  depth_cam_component
 )
 
-ament_target_dependencies(octo_map
+ament_target_dependencies(depth_cam
   rclcpp
   rclcpp_components
 )
 
 install(TARGETS
-  octo_map_component 
-  octo_map
+  depth_cam_component 
+  depth_cam
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

@@ -1,4 +1,4 @@
-#include "octo_map/octo_map_threads.hpp"
+#include "depth_cam/depth_cam_threads.hpp"
 
 #pragma region ProcessingThread class
 alpha_brain::ProcessingThread::ProcessingThread(

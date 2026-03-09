@@ -20,7 +20,7 @@
 
 namespace alpha_brain {
 
-class OctoMapNode; // Forward declaration
+class DepthCamNode; // Forward declaration
 
 constexpr int MAX_BATCH_SIZE = 1024;
 
