@@ -22,7 +22,7 @@ constexpr float DEGREE = 0.017453292f;
 
 /* ########################################## Function*/
 
-// All q in Eigen::Quaternionf
+// All q in Eigen::Quaternionf wxyz
 namespace frame_utils {
     inline float angleInWrapped(float angle) {
         while(angle < -M_PI) angle += 2*M_PI;
@@ -122,9 +122,10 @@ namespace frame_utils {
     }
 
     // Quaternion wxyz from PX4 NED frame to ROS2 ENU frame
-    inline Eigen::Quaternionf quaternionNEDtoENU(const Eigen::Quaternionf& q) { // in wxyz
-        Eigen::Quaternionf q_transform(0, M_SQRT1_2f, M_SQRT1_2f, 0);
-        return q_transform * q;
+    inline Eigen::Quaternionf quaternionNEDtoENU(const Eigen::Quaternionf& q) {
+        Eigen::Quaternionf q_tf_world(0, M_SQRT1_2f, M_SQRT1_2f, 0);
+        Eigen::Quaternionf q_tf_body(0.0f, 1.0f, 0.0f, 0.0f);
+        return q_tf_world * q * q_tf_body;
     }
     inline Eigen::Quaternionf quaternionNEDtoENU(const std::array<float, 4>& qA) {
         Eigen::Quaternionf qQ(qA[0], qA[1], qA[2], qA[3]);
@@ -132,10 +133,11 @@ namespace frame_utils {
         return q_transform * qQ;
     }
     
-    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame THIS COULD BE WRONG!
+    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame
     inline Eigen::Quaternionf quaternionENUtoNED(const Eigen::Quaternionf& q) {
-        Eigen::Quaternionf q_transform(0, M_SQRT1_2f, M_SQRT1_2f, 0);
-        return q_transform * q;
+        Eigen::Quaternionf q_tf_world(0, M_SQRT1_2f, M_SQRT1_2f, 0);
+        Eigen::Quaternionf q_tf_body(0.0f, 1.0f, 0.0f, 0.0f);
+        return q_tf_world * q * q_tf_body;
     }
 
     inline float quaternionToYaw(const float w, const float x, const float y, const float z) {

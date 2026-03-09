@@ -25,13 +25,14 @@ alpha_brain::ProcessingThread::ProcessingThread(
 
     // Spawn thread
     m_processing_thread = std::thread(&ProcessingThread::ConsumerLoop, this);
-    RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Spawn worker thread %s" RESET, m_name.c_str());
+    RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Spawn worker %s processing thread" RESET, m_name.c_str());
 }
 
 alpha_brain::ProcessingThread::~ProcessingThread() {
     m_running.store(false);
     m_msg_queue.enqueue(nullptr);
     if(m_processing_thread.joinable()) m_processing_thread.join();
+    RCLCPP_INFO(m_thisNode->get_logger(), BLUE "%s processing thread destructor called" RESET, m_name.c_str());
 }
 
 void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg) {
@@ -85,10 +86,10 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             RCLCPP_INFO(m_thisNode->get_logger(), YELLOW "%s thread called world update" RESET, m_name.c_str());
             try {
                 geometry_msgs::msg::TransformStamped tf_world = m_tf_buffer->lookupTransform(
-                    "world", // Are we sure it world?
+                    "world",
                     msg->header.frame_id, // Current frame: depth camera
                     msg->header.stamp, // Time stamp of the scan
-                    rclcpp::Duration::from_nanoseconds(Clock::LOOP_CYCLE_NANOSEC)
+                    rclcpp::Duration::from_nanoseconds(Clock::LOOP_CYCLE_NANOSEC * 2)
                 );
                 iso_world = tf2::transformToEigen(tf_world);
                 has_tf_world = true;
@@ -123,7 +124,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             // For hazard point
             Eigen::Vector3d body_point = m_iso_body * raw_point;
             double distance_sq = body_point.squaredNorm();
-            if(distance_sq < 10.0) { // #test
+            if(distance_sq < hazard_distance_sq) {
                 if(hazard_exist) {
                     if(hazard_cloud->size() >= MAX_BATCH_SIZE) {
                         m_hazard_point_queue.enqueue(std::move(hazard_cloud));
@@ -188,6 +189,7 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
     m_running.store(false);
     m_hazard_point_queue.enqueue(nullptr);
     if(m_hazard_point_thread.joinable()) m_hazard_point_thread.join();
+    RCLCPP_INFO(m_thisNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 }
 
 moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& alpha_brain::HazardPointThread::getQueue() {
@@ -267,6 +269,7 @@ alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
     m_running.store(false);
     m_world_update_queue.enqueue(nullptr);
     if(m_world_update_thread.joinable()) m_world_update_thread.join();
+    RCLCPP_INFO(m_thisNode->get_logger(), BLUE "World update thread destructor called" RESET);
 }
 
 const std::atomic<bool>& alpha_brain::WorldUpdateThread::getStatus() {
@@ -278,7 +281,12 @@ moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& alpha
 }
 
 void alpha_brain::WorldUpdateThread::doWorldUpdate() {
+    m_running.store(false);
+    m_world_update_queue.enqueue(nullptr);
     if (m_world_update_thread.joinable()) m_world_update_thread.join();
+    std::unique_ptr<octomap::Pointcloud> flush_batch;
+    while(m_world_update_queue.try_dequeue(flush_batch)){};
+
     m_running.store(true);
     m_world_update_thread = std::thread(&WorldUpdateThread::ConsumerLoop, this);
     RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Spawn Consumer thread World Update" RESET);
@@ -303,8 +311,9 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
         // I had no idea whether this batch cloud will get push to the existing octomap or make new octomap, so for now the batch cloud just sit here and die
     }
     m_running.store(false);
-    if(has_data) RCLCPP_INFO(m_thisNode->get_logger(), PINK "Wolrd update complete" RESET);
-    else RCLCPP_INFO(m_thisNode->get_logger(), PINK "Wolrd update get skipped" RESET);
+    if(has_data && worker_finished >= 3) RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Wolrd update complete" RESET);
+    else if(has_data && worker_finished < 3) RCLCPP_WARN(m_thisNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
+    else RCLCPP_WARN(m_thisNode->get_logger(), PINK "Wolrd update empty" RESET);
     // Thread naturally die here
 }
 

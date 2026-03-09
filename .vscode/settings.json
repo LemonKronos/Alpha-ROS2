@@ -5,7 +5,7 @@
         "args": [
             "-l",
             "-c",
-            "[ -f /opt/ros/jazzy/setup.zsh ] && source /opt/ros/jazzy/setup.zsh || echo '[ROS2 Jazzy not found]' ; [ -f ~/MyCode/Project/Drone/ROS2/install/local_setup.zsh ] && source ~/MyCode/Project/Drone/ROS2/install/local_setup.zsh || echo '[Local setup missing]' ; [ -f ~/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh ] && source ~/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh || echo '[FastDDS Setup missing]'; export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ; echo '[ROS2 source ready]' ; source /home/mr_lemon/MyCode/Project/Drone/ROS2/pyvenv/bin/activate && export PYTHONNOUSERSITE=1 && echo '[ Python ready ]' ; clear ; zsh"
+            "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh; zsh"
             ]
         }
     },
@@ -87,6 +87,7 @@
         "typeindex": "cpp",
         "geometry": "cpp"
     },
+    "python.terminal.activateEnvironment": false,
     "python.defaultInterpreterPath": "${workspaceFolder}/pyvenv/bin/python",
     "python.autoComplete.extraPaths": [
         "/home/mr_lemon/MyCode/Project/Drone/ROS2/install/px4_msgs/lib/python3.12/site-packages",

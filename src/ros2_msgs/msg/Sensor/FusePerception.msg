@@ -12,7 +12,7 @@ uint8 frame
 # Position
 float32[3] position
 
-# Quaternion
+# Quaternion x y z w
 float32[4] q
 
 # Velocity

@@ -13,6 +13,8 @@ find_package(px4_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ros2_msgs REQUIRED)
 find_package(global_utils REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 include_directories(
   include
@@ -31,6 +33,8 @@ ament_target_dependencies(fuse_perception
   sensor_msgs
   ros2_msgs
   global_utils
+  geometry_msgs
+  tf2_ros
 )
 
 install(TARGETS

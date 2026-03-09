@@ -4,6 +4,9 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     using namespace std::chrono_literals;
 
     Global::setup_for_simulation(this);
+
+    // Tf 
+    broadcaster_TF = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     
     // Create Publisher
     fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>(Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS());
@@ -52,6 +55,21 @@ float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::Shar
     else return msg->ranges[0];
 }
 
+void FusePerceptionNode::doFrameTransform(ros2_msgs::msg::FusePerception msg) {
+    geometry_msgs::msg::TransformStamped tf;
+    tf.header.stamp = this->get_clock()->now();
+    tf.header.frame_id = "world";
+    tf.child_frame_id = "alpha_minus_2_0/base_link";
+    tf.transform.translation.x = msg.position[0];
+    tf.transform.translation.y = msg.position[1];
+    tf.transform.translation.z = msg.position[2];
+    tf.transform.rotation.w = msg.q[0];
+    tf.transform.rotation.x = msg.q[1];
+    tf.transform.rotation.y = msg.q[2];
+    tf.transform.rotation.z = msg.q[3];
+    broadcaster_TF->sendTransform(tf);
+}
+
 /**
  * @brief Parse all data in last_ into the msg and publish
  */
@@ -75,6 +93,12 @@ void FusePerceptionNode::PublishCallback() {
         msg.q = frame_utils::quaternionToArray(frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(last_odo->q)));
         msg.velocity = frame_utils::frameNEDtoENU(last_odo->velocity);
         msg.angular_velocity = frame_utils::frameFRDtoFLU(last_odo->angular_velocity);
+
+        float speed = std::sqrt(msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2]);
+        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + ((speed * speed) / (2 * Drone::DECELERATE_MAX));
+        msg.hazard_distance_sq = hazard_distance*hazard_distance;
+
+        doFrameTransform(msg);
     }
     else {
         msg.frame = 0;
