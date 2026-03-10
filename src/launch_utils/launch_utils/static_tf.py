@@ -33,7 +33,7 @@ def generate_launch_description():
             ros_arguments=['--log-level', 'error'],
             name='depth_cam_left_static_tf',
             arguments=[
-                '--x', '0.1294', '--y', '0.483', '--z', '0.0',
+                '--x', '-0.158', '--y', '1.0', '--z', '0.0',
                 '--qx', '0.0', '--qy', '0.0', '--qz', '0.6087626432369819', '--qw', '0.7933524085796444',
                 '--frame-id', 'alpha_minus_2_0/base_link',
                 '--child-frame-id', 'alpha_minus_2_0/base_link/alpha_depth_cam_left'
@@ -45,7 +45,7 @@ def generate_launch_description():
             ros_arguments=['--log-level', 'error'],
             name='depth_cam_right_static_tf',
             arguments=[
-                '--x', '0.1294', '--y', '-0.483', '--z', '0.0',
+                '--x', '-0.158', '--y', '-1.0', '--z', '0.0',
                 '--qx', '0.0', '--qy', '0.0', '--qz', '-0.6087626432369819', '--qw', '0.7933524085796444',
                 '--frame-id', 'alpha_minus_2_0/base_link',
                 '--child-frame-id', 'alpha_minus_2_0/base_link/alpha_depth_cam_right'

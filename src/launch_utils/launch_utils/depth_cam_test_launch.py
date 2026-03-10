@@ -67,25 +67,25 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour',
-        #     name='rviz_contour',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour_points',
-        #     name='rviz_contour_points',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='hazard_voxels',
-        #     executable='hazard_voxels',
-        #     name='hazard_voxels',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour',
+            name='rviz_contour',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='rviz_contour',
+            executable='rviz_contour_points',
+            name='rviz_contour_points',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+        Node(
+            package='hazard_voxels',
+            executable='hazard_voxels',
+            name='hazard_voxels',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
     ])

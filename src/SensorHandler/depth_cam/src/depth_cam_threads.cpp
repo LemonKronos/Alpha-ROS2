@@ -69,7 +69,9 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         // Dequeue the msg
         sensor_msgs::msg::PointCloud2::SharedPtr msg;
         m_msg_queue.wait_dequeue(msg);
-        while(m_msg_queue.try_dequeue(msg)) {} // FLush to only use latest msg
+        while(m_msg_queue.try_dequeue(msg)) {
+            RCLCPP_WARN(m_thisNode->get_logger(), YELLOW "%s flushed a mesage" RESET, m_name.c_str());
+        } // FLush to only use latest msg
         if(!m_running.load(std::memory_order_relaxed)) break;
 
         // Load local atomic variables
@@ -107,8 +109,8 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
         std::unique_ptr<octomap::Pointcloud> world_update_cloud;
         if(world_update && !m_done_world_update) {
-            world_update_cloud = std::make_unique<octomap::Pointcloud>();
-            world_update_cloud->reserve(MAX_BATCH_SIZE);
+            world_update_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+            world_update_cloud->reserve(WORLD_BATCH_SIZE);
         }
 
         sensor_msgs::PointCloud2Iterator<float> itx(*msg, "x");
@@ -119,22 +121,28 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         for(; itx != itx.end(); ++itx, ++ity, ++itz) {
             if(!std::isfinite(*itx) || !std::isfinite(*ity) || !std::isfinite(*itz)) continue;
 
-            Eigen::Vector3d raw_point(*itx, *ity, *itz);
+            Eigen::Vector3d raw_point(*itx, *ity, *itz); // Raw from depth camera
+            Eigen::Vector3d body_point = m_iso_body * raw_point; // Transformed to body frame
             
+            // Body clipping check
+            bool x_cliped = (Drone::MIN_X < body_point.x() && body_point.x() < Drone::MAX_X);
+            bool y_cliped = (Drone::MIN_Y < body_point.y() && body_point.y() < Drone::MAX_Y);
+            bool z_cliped = (Drone::MIN_Z < body_point.z() && body_point.z() < Drone::MAX_Z);
+            if(x_cliped || y_cliped || z_cliped) continue;
+
             // For hazard point
-            Eigen::Vector3d body_point = m_iso_body * raw_point;
             double distance_sq = body_point.squaredNorm();
             if(distance_sq < hazard_distance_sq) {
                 if(hazard_exist) {
-                    if(hazard_cloud->size() >= MAX_BATCH_SIZE) {
+                    if(hazard_cloud->size() >= HAZARD_BATCH_SIZE) {
                         m_hazard_point_queue.enqueue(std::move(hazard_cloud));
-                        hazard_cloud = std::make_unique<octomap::Pointcloud>();
-                        hazard_cloud->reserve(MAX_BATCH_SIZE);
+                        hazard_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+                        hazard_cloud->reserve(HAZARD_BATCH_SIZE);
                     }
                 }
                 else {
-                    hazard_cloud = std::make_unique<octomap::Pointcloud>();
-                    hazard_cloud->reserve(MAX_BATCH_SIZE);
+                    hazard_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+                    hazard_cloud->reserve(HAZARD_BATCH_SIZE);
                     hazard_exist = true;
                 }
                 hazard_cloud->push_back(body_point.x(), body_point.y(), body_point.z());
@@ -143,10 +151,10 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             // For world update
             if(world_update && !m_done_world_update && has_tf_world) {
                 Eigen::Vector3d world_point = (*iso_world) * raw_point;
-                if(world_update_cloud->size() >= MAX_BATCH_SIZE) {
+                if(world_update_cloud->size() >= WORLD_BATCH_SIZE) {
                     m_world_update_queue.enqueue(std::move(world_update_cloud));
-                    world_update_cloud = std::make_unique<octomap::Pointcloud>();
-                    world_update_cloud->reserve(MAX_BATCH_SIZE);
+                    world_update_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+                    world_update_cloud->reserve(WORLD_BATCH_SIZE);
                 }
                 world_update_cloud->push_back(world_point.x(), world_point.y(), world_point.z());
             }
@@ -208,7 +216,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
             worker_finished++;
             if(worker_finished >= m_num_worker) {
                 oc_tree->updateInnerOccupancy();
-                PublishHazardPoint(oc_tree);
+                PublishHazardPoint(oc_tree.get());
                 oc_tree->clear();
                 worker_finished = 0;
             }
@@ -220,7 +228,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
     }
 }
 
-void alpha_brain::HazardPointThread::PublishHazardPoint(std::unique_ptr<octomap::OcTree>& oc_tree) {
+void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *oc_tree) {
     ros2_msgs::msg::Point32Array pa;
     pa.points.reserve(128);
     for(auto it = oc_tree->begin_leafs(), end = oc_tree->end_leafs(); it != end; ++it) {
@@ -244,7 +252,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(std::unique_ptr<octomap:
     msg.size = pa.points.size();
     msg.point_array = pa;
     m_hazard_voxel_PUB->publish(msg);
-    RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Published hazard points" RESET);
+    RCLCPP_INFO(m_thisNode->get_logger(), GREEN "Published %d hazard points" RESET, pa.points.size());
 }
 
 #pragma endregion

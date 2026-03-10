@@ -50,7 +50,7 @@ class RvizContourPoint(Node):
             return
 
         marker = Marker()
-        marker.header.frame_id = "base_link"
+        marker.header.frame_id = "alpha_minus_2_0/base_link"
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = ns
         marker.id = 0

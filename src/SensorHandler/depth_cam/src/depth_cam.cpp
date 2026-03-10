@@ -1,7 +1,7 @@
 #include "depth_cam/depth_cam.hpp"
 
 alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
-    Node("octo_map_node", options)
+    Node("depth_cam_node", options)
     {
 
     Global::setup_for_simulation(this);

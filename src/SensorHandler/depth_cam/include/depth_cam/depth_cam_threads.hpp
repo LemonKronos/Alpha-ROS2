@@ -22,7 +22,8 @@ namespace alpha_brain {
 
 class DepthCamNode; // Forward declaration
 
-constexpr int MAX_BATCH_SIZE = 1024;
+constexpr int HAZARD_BATCH_SIZE = 256; // #CanBeOptimize
+constexpr int WORLD_BATCH_SIZE = 1024;
 
 using std::placeholders::_1;
 
@@ -93,7 +94,7 @@ private:
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> m_hazard_point_queue;
 
     void ConsumerLoop();
-    void PublishHazardPoint(std::unique_ptr<octomap::OcTree>& oc_tree);
+    void PublishHazardPoint(const octomap::OcTree *oc_tree);
 
 };
 

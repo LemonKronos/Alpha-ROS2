@@ -18,6 +18,7 @@ setup(
             'launch_utils/record_acrobatic_expert.py',
             'launch_utils/record_acrobatic_noob.py',
             'launch_utils/reactive_oa_test_static.py',
+            'launch_utils/depth_cam_test_launch.py',
         ]),
     ],
     install_requires=['setuptools'],

@@ -93,13 +93,13 @@
   lazy: true
   direction: GZ_TO_ROS
 
-# RGB Camera Front
-- gz_topic_name: "/alpha_cam_front/camera/image"
-  gz_type_name: "gz.msgs.Image"
-  ros_topic_name: "/sensor/rgb_cam/camera/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  lazy: true
-  direction: GZ_TO_ROS
+# # RGB Camera Front
+# - gz_topic_name: "/alpha_cam_front/camera/image"
+#   gz_type_name: "gz.msgs.Image"
+#   ros_topic_name: "/sensor/rgb_cam/camera/image"
+#   ros_type_name: "sensor_msgs/msg/Image"
+#   lazy: true
+#   direction: GZ_TO_ROS
 
 # Gimbal camera OFFLINE
 # - gz_topic_name: "/gimbal/camera/image"

@@ -11,16 +11,15 @@ SimulationControlNode::SimulationControlNode()
     cv::namedWindow(WINDOW_OVERVIEW_FPV, cv::WINDOW_AUTOSIZE);
 
     // 2. Image Subscription (Best Effort)
-    auto qos_sensor = rclcpp::SensorDataQoS();
     sub_img_ = this->create_subscription<sensor_msgs::msg::Image>(
-        Topic::RGB_CAM_FRONT, qos_sensor,
+        Topic::OVERVIEW_CAM, 
+        rclcpp::SensorDataQoS(),
         std::bind(&SimulationControlNode::img_callback, this, std::placeholders::_1));
 
     // 3. Record Control Subscription (Reliable) --- NEW ---
-    auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
     sub_record_control_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
         Topic::LOGGER_RECORD, 
-        qos_reliable, 
+        rclcpp::QoS(rclcpp::KeepLast(10)).reliable(), 
         std::bind(&SimulationControlNode::record_control_callback, this, std::placeholders::_1));
 
     // 4. World Control Client

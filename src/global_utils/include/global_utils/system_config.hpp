@@ -55,6 +55,7 @@ namespace Topic {
     constexpr const char* DEPTH_CAM_LEFT_PL = "/sensor/depth_cam/left/points";
     constexpr const char* DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points";
     constexpr const char* RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image";
+    constexpr const char* OVERVIEW_CAM = "/sensor/overview_cam/camera/image";
     constexpr const char* LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan";
     constexpr const char* LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan";
     constexpr const char* BODY_CONTACT = "/sensor/contact_body/contact";
@@ -80,15 +81,15 @@ namespace Topic {
 namespace Service {
     constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
     constexpr const char* CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control";
-    constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL;
+    constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_GRASSLAND;
 
 }
 
 namespace Drone {
     constexpr const char* NAME = "alpha_minus_2_0";
-    constexpr float WIDTH = 2.144f;
-    constexpr float LENGTH = 0.55f;
-    constexpr float HEIGHT = 0.05f;
+    constexpr float WIDTH = 2.15f;
+    constexpr float LENGTH = 0.93f;
+    constexpr float HEIGHT = 0.31f;
     
     constexpr float SPEED_MAX_FORWARD = 10.0f;
     constexpr float SPEED_MAX_BACKWARD = 10.0f;
@@ -107,6 +108,13 @@ namespace Drone {
     constexpr float REACT_TIME = Clock::LOOP_CYCLE_FAST; // s
     constexpr float DECELERATE_MAX = 4.0f; // m/s^2
 
+    // Body box anti clipping, independent with sensor mount point, sensor data have to be body frame transformed
+    constexpr float MAX_X = 0.53f + UNCERTAINTY;
+    constexpr float MIN_X = -0.4f - UNCERTAINTY;
+    constexpr float MAX_Y = 1.075f + UNCERTAINTY;
+    constexpr float MIN_Y = -1.075f - UNCERTAINTY;
+    constexpr float MAX_Z = 0.21f + UNCERTAINTY;
+    constexpr float MIN_Z = -0.1f -UNCERTAINTY; 
 }
 
 namespace Sensor {
@@ -114,12 +122,9 @@ namespace Sensor {
     constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
     constexpr float DEPTH_CAM_RANGE = 30.0f;
-    constexpr float OCTREE_VOXEL_RESOLUTION = 0.25f;
+    constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f;
 
 }
-
-// Other
-constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
 
 // ################################# FUNCTION
 namespace Global {

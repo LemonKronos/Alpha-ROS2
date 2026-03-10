@@ -58,7 +58,7 @@ class RvizContour(Node):
                     point_array.append(Point(x=point.x, y=point.y, z=0.0))
                 
             marker = Marker()
-            marker.header.frame_id = "base_link"
+            marker.header.frame_id = "alpha_minus_2_0/base_link"
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = ns
             marker.id = index

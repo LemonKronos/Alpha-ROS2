@@ -1,4 +1,5 @@
 import time
+import math
 from rclpy.parameter import Parameter
 
 RED     = "\033[31m"
@@ -13,11 +14,27 @@ DEGREE = 0.017453292
 
 # ################################################ Parameter
 class Clock:
-    LOOP_RATE = 30.0
-    LOOP_CYCLE = 1.0 / LOOP_RATE
+    LOOP_CYCLE = 0.031
+    LOOP_RATE  = 1.0 / LOOP_CYCLE
+    LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9
 
-    LOOP_RATE_FAST = 80.0
-    LOOP_CYCLE_FAST = 1.0 / LOOP_RATE_FAST
+    LOOP_CYCLE_FAST = 0.013
+    LOOP_RATE_FAST = 1.0 / LOOP_CYCLE_FAST
+    LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9
+
+    LOOP_CYCLE_SLOW = 1.997
+    LOOP_RATE_SLOW = 1.0 / LOOP_CYCLE_SLOW
+    LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_SLOW * 1e9
+
+    LOOP_CYCLE_HEAVY = 4.001
+    LOOP_RATE_HEAVY = 1.0 / LOOP_CYCLE_HEAVY
+    LOOP_CYCLE_HEAVY_NANOSEC = LOOP_CYCLE_HEAVY * 1e9
+
+
+class Threshold:
+    MISSED_TOPIC = Clock.LOOP_RATE / 10.0
+    MISSED_FAST_TOPIC = Clock.LOOP_RATE_FAST / 10.0
+    MISMATCH_RATE_TOPIC = math.ceil(Clock.LOOP_RATE_FAST / Clock.LOOP_RATE)
 
 
 class Path:
@@ -26,15 +43,28 @@ class Path:
 
 
 class Topic:
-    CONTROL_INPUT = "/on_drone/drone_control/input/control" # Raw human control signal
-    CONTROL_ACROBATIC = "/on_drone/drone_control/acrobatic/control" # Control signal after pass through AcrobaticOA brain
-    CONTROL_REACTIVE = "/on_drone/drone_control/reactive/control" # Control signal after pass through ReactiveOA
-    FUSE_PERCEPTION = "/on_drone/sensor/fuse_perception"
-    CONTACT_PARSER = "/on_drone/sensor/body_contact"
-    LOGGER_RECORD = "/on_drone/logger/record_control"
-    LIDAR_2D_CONTOUR_CLOSE = "/on_drone/sensor/lidar2d/close/contour"
-    LIDAR_2D_CONTOUR_FAR = "/on_drone/sensor/lidar2d/far/contour"
-    DEPTH_CAM = "sensor/depth_cam/camera/image" 
+    DEPTH_CAM_FRONT_PL = "/sensor/depth_cam/front/points"
+    DEPTH_CAM_LEFT_PL = "/sensor/depth_cam/left/points"
+    DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points"
+    RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
+    LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan"
+    LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan"
+    BODY_CONTACT = "/sensor/contact_body/contact"
+    ROTOR_0_CONTACT = "/sensor/contact_rotor0/contact"
+    ROTOR_1_CONTACT = "/sensor/contact_rotor1/contact"
+    ROTOR_2_CONTACT = "/sensor/contact_rotor2/contact"
+    ROTOR_3_CONTACT = "/sensor/contact_rotor3/contact"
+
+    CONTROL_INPUT = "/internal/drone_control/input/control"
+    CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/control"
+    CONTROL_REACTIVE = "/internal/drone_control/reactive/control"
+    FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
+    CONTACT_PARSER = "/internal/sensor/contacts"
+    LOGGER_RECORD = "/internal/logger/record_control"
+    LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour"
+    LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour"
+    VOXEL_HAZARD_SEEING = "/internal/mapping/hazard/seeing/voxel_blocks"
+    VOXEL_HAZARD_MEMORY = "/internal/mapping/hazard/memory/voxel_blocks"
 
 
 class Service:
@@ -45,13 +75,14 @@ class Service:
 
 class Drone:
     NAME = "alpha_minus_2_0"
-    WIDTH = 2.144
-    LENGTH = 0.55
-    HEIGHT = 0.05
+    WIDTH = 2.15
+    LENGTH = 0.93
+    HEIGHT = 0.31
 
     SPEED_MAX_FORWARD = 10.0
     SPEED_MAX_BACKWARD = 10.0
     SPEED_MAX_STRAFE = 10.0
+    SPEED_MAX_ANGLE = math.pi/2
     SPEED_MAX_UP = 8.0
     SPEED_MAX_DOWN = 4.0
     THRUST_SAFE_LIMIT = 0.9
@@ -70,6 +101,7 @@ class Sensor:
     LIDAR_2D_RANGE_MAX = 30.0
     LIDAR_2D_RANGE_MIN = 0.1
     DEPTH_MAX_DIST = 30.0
+    OCTREE_VOXEL_RESOLUTION = 0.25
 
 # Others
 WINDOW_OVERVIEW_FPV = "Alpha FPV"
