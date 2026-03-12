@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 ALL_GOOD=1
 ROS_SETUP="/opt/ros/jazzy/setup.zsh"
@@ -35,10 +35,11 @@ else
     ALL_GOOD=0
 fi
 
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+cd $HOME/MyCode/Project/Drone/ROS2
 
 if [ "$ALL_GOOD" -eq 1 ]; then
-    clear
+    # echo $'\033[32m <| Setup complete! |>\033[0m'
+    # clear
     source $HOME/.config/terminal-tag/ROS2.sh
 else
     echo $'\033[31m <| Setup incomplete! |>\033[0m'

@@ -1,38 +1,48 @@
 #!/bin/bash
 
-WORLD_NAME="grasslands"
-# WORLD_NAME="obstacle_tunnel"
+# ==========================================
+# Global Variables
+# ==========================================
+export WORLD_NAME="grasslands"
+# export WORLD_NAME="obstacle_tunnel"
 
-# DRONE_NAME="gz_alpha_minus_1"
-DRONE_NAME="gz_alpha_minus_2"
-# DRONE_NAME="gz_standard_vtol"
-# DRONE_NAME="gz_tiltrotor"
-# DRONE_NAME="gz_x500"
+# export DRONE_NAME="gz_alpha_minus_1"
+export DRONE_NAME="gz_alpha_minus_2"
+# export DRONE_NAME="gz_standard_vtol"
+# export DRONE_NAME="gz_tiltrotor"
+# export DRONE_NAME="gz_x500"
 
-# Data stays on laptop. No "Air Bytes".
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-export ROS_STATIC_PEERS=""
+export FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
+export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
 
-FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
+# export GAZEBO_HEADLESS="--headless"
 
-# === No1: Custom Gazebo world ===
-cd ~/MyCode/Project/Drone/Gazebo 
-python3 simulation-gazebo --world "$WORLD_NAME" > /dev/null 2>&1 & disown &&
-printf "\033[92m[GZ SIM] running...\033[0m\n"
+# ==========================================
+# Functions
+# ==========================================
 
-# === No2: Micro XRCE-DDS Agent (Optimized) ===
-(
-  cd ~/MyCode/Project/Drone/Micro-XRCE-DDS-Agent
-  source /opt/ros/jazzy/setup.bash
-  export PATH=$PATH:$HOME/MyCode/Project/Drone/Micro-XRCE-DDS-Agent/build
-  source "$FAST_DDS_SETUP"
-  MicroXRCEAgent udp4 -p 8888 -l 127.0.0.1 > /dev/null 2>&1
-) & echo $! >> /tmp/sim_pids.txt &&
-printf "\033[92m[MicroXRCEAgent] Running silently on UDP 8888 (Shared Memory Enabled)...\033[0m\n"
+start_gazebo() {
+  (
+    cd ~/MyCode/Project/Drone/Gazebo 
+    exec rNvidia python3 simulation-gazebo --world "$WORLD_NAME" "$GAZEBO_HEADLESS" > /dev/null 2>&1 # rNvidia is a env set for Nvidia GPU on Linux
+  ) & echo $! >> /tmp/sim_pids.txt &&
+  printf "\033[92m[GZ SIM] running...\033[0m\n"
+}
 
+start_micro_xrce_agent() {
+  zsh -c '
+    source "$FAST_DDS_SETUP"
+    
+    cd ~/MyCode/Project/Drone/Micro-XRCE-DDS-Agent
+    export PATH=$PATH:$HOME/MyCode/Project/Drone/Micro-XRCE-DDS-Agent/build
+    
+    MicroXRCEAgent udp4 -p 8888 > /tmp/micro_xrce_agent.log 2>&1
+  ' & echo $! >> /tmp/sim_pids.txt &&
+  printf "\033[92m[MicroXRCEAgent] Running ...\033[0m\n"
+}
 
-# === No3: PX4 SITL with Gazebo RTPS , stand alone mode ===
-kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
+start_px4_sitl() {
+  kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
 cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
@@ -46,63 +56,68 @@ make px4_sitl "$DRONE_NAME"
 exec zsh
 EOF
 )" & echo $! >> /tmp/sim_pids.txt &&
-printf "\033[92m[PX4] Starting with Gazebo in standalone mode...\033[0m\n"
+  printf "\033[92m[PX4] Starting with Gazebo in standalone mode...\033[0m\n"
+}
 
-# === No4: Run QGroundControl ===
-QGroundControl-x86_64.AppImage > /dev/null 2>&1 & disown &&
-printf "\033[92m[QGroundControl] running...\033[0m\n"
+start_qgroundcontrol() {
+  zsh -c '
+    QGroundControl-x86_64.AppImage > /dev/null 2>&1
+  ' & echo $! >> /tmp/sim_pids.txt &&
+  printf "\033[92m[QGroundControl] running...\033[0m\n"
+}
 
-# === No5: Run a basic ROS 2 terminal ===
-kitty env TERMINAL_TAG=ROS2 zsh -c '
-printf "[ROS 2] Launching sourced terminal..." ;
-source /opt/ros/jazzy/setup.zsh ;
-cd ~/MyCode/Project/Drone/ROS2 &&
-source install/setup.zsh ;
-source '$FAST_DDS_SETUP';
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST;
-source /home/mr_lemon/MyCode/Project/Drone/ROS2/pyvenv/bin/activate;
-export PYTHONNOUSERSITE=1;
-exec zsh' & echo $! >> /tmp/sim_pids.txt &&
-printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
+start_ros2_terminal() {
+  kitty zsh -c '
+    source "$SETUP_ROS2"
+    exec zsh
+  ' & echo $! >> /tmp/sim_pids.txt &&
+  printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
+}
 
-# === No6: Run Gazebo ROS2 bridge (Native Interfaces Only) ===
-(
-  source /opt/ros/jazzy/setup.bash
-  cd ~/MyCode/Project/Drone/ROS2
-  source install/setup.bash
+start_gz_ros_bridge() {
+  zsh -c '
+    source "$SETUP_ROS2"
+    
+    # Wait for clock to ensure GZ is up
+    until gz topic -l | grep -q "/clock"; do sleep 1; done
+    
+    CONFIG_FILE="$HOME/MyCode/Project/Drone/ROS2/config/gz_ros_bridge/${WORLD_NAME}-${DRONE_NAME}.YAML"
+
+    if [[ -f "$CONFIG_FILE" ]]; then
+      ros2 run ros_gz_bridge parameter_bridge \
+        "/world/${WORLD_NAME}/control@ros_gz_interfaces/srv/ControlWorld" \
+        "/world/${WORLD_NAME}/create@ros_gz_interfaces/srv/SpawnEntity" \
+        "/world/${WORLD_NAME}/remove@ros_gz_interfaces/srv/DeleteEntity" \
+        "/world/${WORLD_NAME}/set_pose@ros_gz_interfaces/srv/SetEntityPose" \
+        --ros-args -p config_file:="$CONFIG_FILE"
+    else
+      printf "\033[33m[GZ_ROS2_BRIDGE] No config file for this run!\033[0m\n"
+      echo "$WORLD_NAME-$DRONE_NAME.YAML - file = $CONFIG_FILE"
+      exit 1
+    fi
+  ' & echo $! >> /tmp/sim_pids.txt
+  printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
+}
+
+# ==========================================
+# Main Execution
+# ==========================================
+main() {
+  # Clear previous PIDs just in case
+  > /tmp/sim_pids.txt
+
   source "$FAST_DDS_SETUP"
-  export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-  
-  # Wait for clock to ensure GZ is up
-  until gz topic -l | grep -q "/clock"; do sleep 1; done
-  
-  CONFIG_FILE="$HOME/MyCode/Project/Drone/ROS2/config/gz_ros_bridge/${WORLD_NAME}-${DRONE_NAME}.YAML"
-  
-  # 1. Control World
-  SERVICE_BRIDGE="/world/${WORLD_NAME}/control@ros_gz_interfaces/srv/ControlWorld"
 
-  # 2. Spawn Entity
-  # We MUST use ros_gz_interfaces because the bridge doesn't know simulation_interfaces
-  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/create@ros_gz_interfaces/srv/SpawnEntity"
+  start_gazebo
+  start_micro_xrce_agent
+  start_px4_sitl
+  start_qgroundcontrol
+  start_ros2_terminal
+  start_gz_ros_bridge
 
-  # 3. Delete Entity
-  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/remove@ros_gz_interfaces/srv/DeleteEntity"
+  sleep 5
+  echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat
+}
 
-  # 4. Set Entity Pose (The only supported reset method)
-  SERVICE_BRIDGE="${SERVICE_BRIDGE} /world/${WORLD_NAME}/set_pose@ros_gz_interfaces/srv/SetEntityPose"
-
-  if [[ -f "$CONFIG_FILE" ]]; then
-    ros2 run ros_gz_bridge parameter_bridge \
-      $SERVICE_BRIDGE \
-      --ros-args -p config_file:="$CONFIG_FILE"
-  else
-    printf "\033[33m[GZ_ROS2_BRIDGE] No config file for this run!\033[0m\n"
-    echo "$WORLD_NAME-$DRONE_NAME.YAML - file = $CONFIG_FILE"
-    exit 1
-  fi
-) & echo $! >> /tmp/sim_pids.txt &&
-printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
-
-sleep 5
-echo ""
-echo "Run $DRONE_NAME with world $WORLD_NAME" | lolcat
+# Run the script
+main

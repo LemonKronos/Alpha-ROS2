@@ -36,5 +36,4 @@ pkill -x rviz2 >/dev/null
 ### 5. QGroundControl (GUI app)
 pgrep -x QGroundControl >/dev/null && pkill -9 -x QGroundControl >/dev/null
 
-
 echo "[STOP SIM] Cleanup completed safely!"

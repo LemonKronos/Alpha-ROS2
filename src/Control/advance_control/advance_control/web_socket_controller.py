@@ -20,7 +20,7 @@ class WebSocketController:
     Manages WebSocket server with DUAL LOCKING.
     Splits Flight Control data from UI/State data to prevent lock contention.
     """
-    def __init__(self, host="0.0.0.0", port=8765, enable_logging=False):
+    def __init__(self, host="10.183.21.129", port=8765, enable_logging=False):
         self._host = host
         self._port = port
         self._enable_logging = enable_logging
