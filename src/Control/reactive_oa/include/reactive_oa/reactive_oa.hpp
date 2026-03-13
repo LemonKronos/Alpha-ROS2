@@ -8,7 +8,7 @@
 #include "ros2_msgs/msg/lidar2d_obstacle.hpp"
 #include "ros2_msgs/msg/fuse_perception.hpp"
 
-// #define VISUALIZE false // uncomment to disable visualize in this node
+#define VISUALIZE true // uncomment to disable visualize in this node
 #ifndef VISUALIZE
     #define VISUALIZE false
 #endif

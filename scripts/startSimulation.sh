@@ -24,7 +24,7 @@ export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
 start_gazebo() {
   (
     cd ~/MyCode/Project/Drone/Gazebo 
-    exec rNvidia python3 simulation-gazebo --world "$WORLD_NAME" "$GAZEBO_HEADLESS" > /dev/null 2>&1 # rNvidia is a env set for Nvidia GPU on Linux
+    exec rNvidia python3 simulation-gazebo --world "$WORLD_NAME" > /dev/null 2>&1 # rNvidia is a env set for Nvidia GPU on Linux
   ) & echo $! >> /tmp/sim_pids.txt &&
   printf "\033[92m[GZ SIM] running...\033[0m\n"
 }

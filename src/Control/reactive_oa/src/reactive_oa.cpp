@@ -256,7 +256,7 @@ void ReactiveOANode::publishVectorArrow(
     const Eigen::Vector3f& vec,
     float r, float g, float b) {
     visualization_msgs::msg::Marker arrow;
-    arrow.header.frame_id = "base_link";
+    arrow.header.frame_id = "alpha_minus_2_0/base_link";
     arrow.header.stamp = this->now();
     arrow.ns = "oa_vectors";
     arrow.id = 0;
@@ -264,9 +264,9 @@ void ReactiveOANode::publishVectorArrow(
     arrow.action = visualization_msgs::msg::Marker::ADD;
 
     // Arrow scale (bigger arrow)
-    arrow.scale.x = 0.5;  // shaft thickness
-    arrow.scale.y = 0.8;   // head diameter
-    arrow.scale.z = 0.5;   // head length
+    arrow.scale.x = 0.2;  // shaft thickness
+    arrow.scale.y = 0.2;   // head diameter
+    arrow.scale.z = 0.2;   // head length
 
     // Color
     arrow.color.r = r;
