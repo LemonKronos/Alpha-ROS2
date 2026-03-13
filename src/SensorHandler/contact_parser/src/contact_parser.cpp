@@ -37,7 +37,7 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
     );
 
     // Create Publisher
-    contact_PUB = this->create_publisher<ros2_msgs::msg::ContactSensor>(Topic::CONTACT_PARSER, rclcpp::SensorDataQoS());
+    contact_PUB = this->create_publisher<alpha_msgs::msg::ContactSensor>(Topic::CONTACT_PARSER, rclcpp::SensorDataQoS());
 
     // Create wall timer
     Contact_pub_TIME = this->create_timer(
@@ -69,7 +69,7 @@ void ContactParserNode::PublisherCallback() {
     bool current_critical = critical;
 
     if(current_bearable != last_bearable || current_critical != last_critical) {
-        auto msg = ros2_msgs::msg::ContactSensor();
+        auto msg = alpha_msgs::msg::ContactSensor();
         msg.header.stamp = this->get_clock()->now();
         msg.header.frame_id = "base_link";
         msg.bearable_contact = current_bearable;

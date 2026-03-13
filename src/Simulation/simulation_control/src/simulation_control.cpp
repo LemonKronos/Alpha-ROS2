@@ -17,7 +17,7 @@ SimulationControlNode::SimulationControlNode()
         std::bind(&SimulationControlNode::img_callback, this, std::placeholders::_1));
 
     // 3. Record Control Subscription (Reliable) --- NEW ---
-    sub_record_control_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
+    sub_record_control_ = this->create_subscription<alpha_msgs::msg::RecordControl>(
         Topic::LOGGER_RECORD, 
         rclcpp::QoS(rclcpp::KeepLast(10)).reliable(), 
         std::bind(&SimulationControlNode::record_control_callback, this, std::placeholders::_1));
@@ -49,7 +49,7 @@ void SimulationControlNode::img_callback(const sensor_msgs::msg::Image::SharedPt
 }
 
 // --- NEW CALLBACK ---
-void SimulationControlNode::record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg) {
+void SimulationControlNode::record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg) {
     // Only act if the state actually changes
     if (msg->pause && !is_paused_) {
         // Command says PAUSE, we are running -> PAUSE

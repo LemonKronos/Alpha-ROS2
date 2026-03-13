@@ -1,5 +1,5 @@
 import numpy as np
-from ros2_msgs.msg import ControlInterface
+from alpha_msgs.msg import ControlInterface
 
 # Specific Utils for the Acrobatic Brain Node
 # Logic for safety checks and emergency messages

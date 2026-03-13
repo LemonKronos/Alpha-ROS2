@@ -15,7 +15,7 @@ from cv_bridge import CvBridge
 
 # ROS Messages
 from sensor_msgs.msg import Image
-from ros2_msgs.msg import ControlInterface, FusePerception, Lidar2dObstacle
+from alpha_msgs.msg import ControlInterface, FusePerception, Lidar2dObstacle
 
 # Python Libs
 import torch

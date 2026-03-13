@@ -8,7 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ros_gz_interfaces REQUIRED)
 find_package(global_utils REQUIRED)
@@ -30,7 +30,7 @@ add_executable(record_acrobatic
 
 ament_target_dependencies(record_acrobatic
   rclcpp
-  ros2_msgs
+  alpha_msgs
   sensor_msgs
   ros_gz_interfaces
   global_utils
@@ -47,7 +47,7 @@ add_executable(add_noob_control
 
 ament_target_dependencies(add_noob_control
   rclcpp
-  ros2_msgs
+  alpha_msgs
   ros_gz_interfaces
   global_utils
   cv_bridge

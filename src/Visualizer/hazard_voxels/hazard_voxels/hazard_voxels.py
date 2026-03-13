@@ -5,7 +5,7 @@ from geometry_msgs.msg import Point
 from rclpy.qos import qos_profile_sensor_data
 from python_utils.utils import *
 
-from ros2_msgs.msg import VoxelBlock
+from alpha_msgs.msg import VoxelBlock
 
 class HazardVoxelVisualizer(Node):
     def __init__(self):

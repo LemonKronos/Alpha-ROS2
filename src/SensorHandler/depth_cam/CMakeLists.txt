@@ -9,7 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(global_utils REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -42,7 +42,7 @@ ament_target_dependencies(depth_cam_component
   rclcpp
   rclcpp_components
   global_utils
-  ros2_msgs
+  alpha_msgs
   std_msgs
   sensor_msgs
   tf2_ros

@@ -32,9 +32,9 @@ Lidar2dHandlerNode::Lidar2dHandlerNode() : rclcpp::Node("lidar2d_handler_node") 
     );
 
     // Create Publisher
-    obstacle_close_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_CLOSE, rclcpp::SensorDataQoS());
+    obstacle_close_PUB = this->create_publisher<alpha_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_CLOSE, rclcpp::SensorDataQoS());
 
-    obstacle_far_PUB = this->create_publisher<ros2_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_FAR, rclcpp::SensorDataQoS());
+    obstacle_far_PUB = this->create_publisher<alpha_msgs::msg::Lidar2dObstacle>(Topic::LIDAR_2D_CONTOUR_FAR, rclcpp::SensorDataQoS());
     
     // Create Wall timer
     sensor_alive_timer = this->create_timer(
@@ -224,7 +224,7 @@ void Lidar2dHandlerNode::sendPublishSignal(moodycamel::BlockingConcurrentQueue<P
  * @brief Read rays from queue, handle when to separate contour (to sector), publish topic
  */
 void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>& queue,
-    rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
+    rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
     const std::string& publish_dir,
     const std::string& label) {
     Obstacle obstacle;
@@ -320,7 +320,7 @@ void Lidar2dHandlerNode::ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>
  * @brief Serialize the class sector into individual contour, repersented by pair of 2 float (arc, distance).
  * vector float = [(arc1 distance1 float2 distance2 ... )], each contour end by END_TOKEN (69, 0).
  */
-void Lidar2dHandlerNode::publishData(rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
+void Lidar2dHandlerNode::publishData(rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
     Obstacle& obstacle,
     const std::string& label) {
     if(obstacle.getObstaclesNum() == 0) return;

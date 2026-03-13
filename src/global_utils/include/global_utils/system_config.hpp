@@ -126,6 +126,10 @@ namespace Sensor {
 
 }
 
+namespace Window {
+    constexpr const char* OVERVIEW_FPV = "Alpha FPV";
+}
+
 // ################################# FUNCTION
 namespace Global {
     void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation

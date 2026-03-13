@@ -5,7 +5,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     Global::setup_for_simulation(this);
     
     // Publisher
-    final_control_PUB = this->create_publisher<ros2_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, 10);
+    final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, 10);
 
     #ifdef VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
@@ -15,17 +15,17 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     #endif
 
     // Subscriber
-    input_control_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
+    input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
         10,
         std::bind(&ReactiveOANode::inputControlCallback, this, _1));
 
-    close_contour_SUB = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
+    close_contour_SUB = this->create_subscription<alpha_msgs::msg::Lidar2dObstacle>(
         Topic::LIDAR_2D_CONTOUR_CLOSE,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::closeContourCallback, this, _1));
 
-    perception_SUB = this->create_subscription<ros2_msgs::msg::FusePerception>(
+    perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
         Topic::FUSE_PERCEPTION,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::perceptionCallback, this, _1));
@@ -325,7 +325,7 @@ void ReactiveOANode::nodeLoopCallback() {
     }
 
     computeCorrectionVector();
-    auto msg = ros2_msgs::msg::ControlInterface();
+    auto msg = alpha_msgs::msg::ControlInterface();
 
     msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
     msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
@@ -366,8 +366,8 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.wings_mode = last_control_signal->wings_mode;
     }
     else {
-        msg.control_state = ros2_msgs::msg::ControlInterface::ARM;
-        msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
+        msg.control_state = alpha_msgs::msg::ControlInterface::ARM;
+        msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
     }
     
     // Obstacle callback check
@@ -375,7 +375,7 @@ void ReactiveOANode::nodeLoopCallback() {
     else {
         // Obstacle damping
         if(obstacle_clear_damping_counter) {
-            msg.control_by = ros2_msgs::msg::ControlInterface::REACTIVE_OA;
+            msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
             obstacle_clear_damping_counter--;
         }
     }
@@ -398,7 +398,7 @@ void ReactiveOANode::nodeLoopCallback() {
 
 /*################################################# Callbacks*/
 
-void ReactiveOANode::inputControlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg){
+void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg){
     lost_control_signal = false;
     lost_control_signal_counter = 0;
 
@@ -406,7 +406,7 @@ void ReactiveOANode::inputControlCallback(const ros2_msgs::msg::ControlInterface
     computeControlVector();
 }
 
-void ReactiveOANode::closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg){
+void ReactiveOANode::closeContourCallback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg){
     obstacle_clear_damping_counter = OBSTACLE_DAMPING_INIT;
     obstacle_rate_mismatch_counter = 0;
 
@@ -415,7 +415,7 @@ void ReactiveOANode::closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle:
     computeRepulsiveVector();
 }
 
-void ReactiveOANode::perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg){
+void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){
     lost_perception_counter = 0;
 
     last_perception = msg;

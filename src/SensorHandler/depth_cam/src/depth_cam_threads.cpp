@@ -180,7 +180,7 @@ alpha_brain::HazardPointThread::HazardPointThread(
     const int num_worker
 ) : m_thisNode(thisNode), m_num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
     // Create Publisher
-    m_hazard_voxel_PUB = m_thisNode->create_publisher<ros2_msgs::msg::VoxelBlock>(
+    m_hazard_voxel_PUB = m_thisNode->create_publisher<alpha_msgs::msg::VoxelBlock>(
         Topic::VOXEL_HAZARD_SEEING,
         rclcpp::SensorDataQoS()
     );
@@ -229,7 +229,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
 }
 
 void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *oc_tree) {
-    ros2_msgs::msg::Point32Array pa;
+    alpha_msgs::msg::Point32Array pa;
     pa.points.reserve(128);
     for(auto it = oc_tree->begin_leafs(), end = oc_tree->end_leafs(); it != end; ++it) {
         if(oc_tree->isNodeOccupied(*it)) {
@@ -246,7 +246,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
         RCLCPP_INFO(m_thisNode->get_logger(), YELLOW "Obstacle clear" RESET);
         return;
     }
-    ros2_msgs::msg::VoxelBlock msg;
+    alpha_msgs::msg::VoxelBlock msg;
     msg.header.frame_id = "alpha_minus_2_0/base_link";
     msg.header.stamp = m_thisNode->get_clock()->now();
     msg.size = pa.points.size();

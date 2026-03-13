@@ -8,7 +8,7 @@
 #include "global_utils/blockingconcurrentqueue.h" // Moody Camel MPMC Queue with wait blocking
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
-#include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+#include "alpha_msgs/msg/lidar2d_obstacle.hpp"
 
 #include <thread>
 #include <queue>
@@ -29,8 +29,8 @@ public:
 
 private:
     // Publishers
-    rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr obstacle_close_PUB;
-    rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr obstacle_far_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr obstacle_close_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr obstacle_far_PUB;
 
     // Subscriber
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr raw_scan_SUB;
@@ -59,13 +59,13 @@ private:
 
     // Methods
     void ConsumerLoop(moodycamel::BlockingConcurrentQueue<Point>& queue,
-        rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
+        rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
         const std::string& publish_dir,
         const std::string& label);
     float ClampLidar(float range);
     void sendPublishSignal(moodycamel::BlockingConcurrentQueue<Point>& queue);
     bool checkPublishSignal(const Point& point);
-    void publishData(rclcpp::Publisher<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
+    void publishData(rclcpp::Publisher<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr& pub,
         Obstacle& obstacle,
         const std::string& label
     ); // If Obstacle empty then no publish

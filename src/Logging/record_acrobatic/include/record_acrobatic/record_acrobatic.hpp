@@ -42,10 +42,10 @@ episode structure:
 #include "global_utils/system_config.hpp"
 
 // ROS Messages
-#include "ros2_msgs/msg/control_interface.hpp"
-#include "ros2_msgs/msg/record_control.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp"
-#include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+#include "alpha_msgs/msg/control_interface.hpp"
+#include "alpha_msgs/msg/record_control.hpp"
+#include "alpha_msgs/msg/fuse_perception.hpp"
+#include "alpha_msgs/msg/lidar2d_obstacle.hpp"
 #include "sensor_msgs/msg/image.hpp"
 
 // OpenCV & CV Bridge
@@ -68,11 +68,11 @@ struct DataCache {
 };
 
 struct PerceptionCache : DataCache {
-    ros2_msgs::msg::FusePerception::SharedPtr msg;
+    alpha_msgs::msg::FusePerception::SharedPtr msg;
 };
 
 struct LidarCache : DataCache {
-    ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg;
+    alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg;
 };
 
 class RecordAcrobaticNode : public rclcpp::Node {
@@ -112,12 +112,12 @@ private:
     cv_bridge::CvImagePtr cache_img_overview_;
 
     // --- ROS Interfaces ---
-    rclcpp::Subscription<ros2_msgs::msg::RecordControl>::SharedPtr sub_record_control_;
-    rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr sub_expert_action_;
+    rclcpp::Subscription<alpha_msgs::msg::RecordControl>::SharedPtr sub_record_control_;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr sub_expert_action_;
     
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr sub_perception_;
-    rclcpp::Subscription<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr sub_lidar_close_;
-    rclcpp::Subscription<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr sub_lidar_far_;
+    rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr sub_perception_;
+    rclcpp::Subscription<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr sub_lidar_close_;
+    rclcpp::Subscription<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr sub_lidar_far_;
 
     // Dynamic Image Subs
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_img_rgb_;
@@ -132,8 +132,8 @@ private:
     
     // Helpers
     bool is_alive(const DataCache& cache, double now);
-    std::vector<float> extract_sectors(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr& msg);
-    std::vector<float> msg_to_action_list(const ros2_msgs::msg::ControlInterface::SharedPtr& msg);
+    std::vector<float> extract_sectors(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr& msg);
+    std::vector<float> msg_to_action_list(const alpha_msgs::msg::ControlInterface::SharedPtr& msg);
     
     // Dynamic Subs
     void start_image_subs();
@@ -144,11 +144,11 @@ private:
     void finish_episode();
     
     // Callbacks
-    void record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg);
-    void expert_action_callback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
-    void perception_callback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
-    void lidar_close_callback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
-    void lidar_far_callback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
+    void record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg);
+    void expert_action_callback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
+    void perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
+    void lidar_close_callback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg);
+    void lidar_far_callback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg);
     
     void img_rgb_callback(const sensor_msgs::msg::Image::SharedPtr msg);
     void img_depth_callback(const sensor_msgs::msg::Image::SharedPtr msg);

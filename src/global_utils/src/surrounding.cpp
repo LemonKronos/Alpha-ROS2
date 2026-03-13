@@ -181,7 +181,7 @@ Obstacle::Obstacle() {
     }
 }
 
-void Obstacle::topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
+void Obstacle::topicToObstacle(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
     // clear all sectors
     for (auto& s : sector)
         s.contours.clear();
@@ -214,25 +214,25 @@ void Obstacle::topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr 
     }
 }
 
-ros2_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
-    auto msg = ros2_msgs::msg::Lidar2dObstacle();
+alpha_msgs::msg::Lidar2dObstacle Obstacle::obstacleToTopic() {
+    auto msg = alpha_msgs::msg::Lidar2dObstacle();
     msg.obstacles_num = this->obstacles_num;
     msg.min_distance = this->min_distance;
     msg.safe_distance = this->safe_distance;
 
-    std::vector<ros2_msgs::msg::Lidar2dSector> obstacles;
+    std::vector<alpha_msgs::msg::Lidar2dSector> obstacles;
     for(uint8_t sector_index = 0; sector_index < SECTOR_NUM; sector_index++) {
         if(sector[sector_index].contours.empty()) continue;
 
-        auto s = ros2_msgs::msg::Lidar2dSector();
+        auto s = alpha_msgs::msg::Lidar2dSector();
         s.sector_index = sector_index;
         s.min_distance = sector[sector_index].min_distance;
 
         for(const Contour& contour : sector[sector_index].contours) {
-            auto c = ros2_msgs::msg::Lidar2dContour();
+            auto c = alpha_msgs::msg::Lidar2dContour();
             // Not keep contour min_distance to reduce data size
             for(const Point& point : contour.getContour()) {
-                auto p = ros2_msgs::msg::Lidar2dPoint();
+                auto p = alpha_msgs::msg::Lidar2dPoint();
                 p.arc = point.arc;
                 p.distance = point.distance;
                 p.x = point.x;

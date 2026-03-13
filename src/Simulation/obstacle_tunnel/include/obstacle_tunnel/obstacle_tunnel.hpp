@@ -12,8 +12,8 @@
 #include <ros_gz_interfaces/srv/set_entity_pose.hpp> 
 
 // Custom & PX4 Messages
-#include "ros2_msgs/msg/fuse_perception.hpp" 
-#include "ros2_msgs/msg/record_control.hpp"
+#include "alpha_msgs/msg/fuse_perception.hpp" 
+#include "alpha_msgs/msg/record_control.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp" 
 
 #include "obstacle_tunnel/obstacle_manager.hpp"
@@ -32,7 +32,7 @@ public:
 
 private:
     // --- Callbacks ---
-    void perception_callback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+    void perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
     
     // --- Actions ---
@@ -44,11 +44,11 @@ private:
     void cleanup_all_slices(); // Helper for destructor
 
     // --- Subscriptions ---
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr perception_sub_;
+    rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_sub_;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub_;
     
     // --- Publishers ---
-    rclcpp::Publisher<ros2_msgs::msg::RecordControl>::SharedPtr record_pub_;
+    rclcpp::Publisher<alpha_msgs::msg::RecordControl>::SharedPtr record_pub_;
 
     // --- Service Clients ---
     rclcpp::Client<ros_gz_interfaces::srv::SpawnEntity>::SharedPtr spawn_client_;

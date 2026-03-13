@@ -12,7 +12,7 @@ from rclpy.node import Node
 from python_utils.utils import *
 
 # Adjust this import path to match your message package
-from ros2_msgs.msg import ControlInterface
+from alpha_msgs.msg import ControlInterface
 
 
 MODULE_TEST = False

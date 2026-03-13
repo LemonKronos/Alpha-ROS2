@@ -9,10 +9,10 @@ RecordAcrobaticNode::RecordAcrobaticNode()
       dim_input_(640, 480),
       dim_overview_(1280, 720)
 {
-    setup_for_simulation(this);
+    Global::setup_for_simulation(this);
 
     // Path Config
-    fs::create_directories(RECORD_ACROBATIC_DIR);
+    fs::create_directories(Path::RECORD_ACROBATIC);
 
     // Init Action buffer
     current_action_ = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -22,31 +22,31 @@ RecordAcrobaticNode::RecordAcrobaticNode()
     auto qos_reliable = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
 
     // Subs
-    sub_record_control_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
-        LOGGER_RECORD_TOPIC,
+    sub_record_control_ = this->create_subscription<alpha_msgs::msg::RecordControl>(
+        Topic::LOGGER_RECORD,
         qos_reliable, 
         std::bind(&RecordAcrobaticNode::record_control_callback, this, std::placeholders::_1));
 
-    sub_expert_action_ = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        CONTROL_INPUT_TOPIC,
+    sub_expert_action_ = this->create_subscription<alpha_msgs::msg::ControlInterface>(
+        Topic::CONTROL_INPUT,
         qos_reliable,
         std::bind(&RecordAcrobaticNode::expert_action_callback, this, std::placeholders::_1));
 
-    sub_perception_ = this->create_subscription<ros2_msgs::msg::FusePerception>(
-        FUSE_PERCEPTION_TOPIC, qos_sensor,
+    sub_perception_ = this->create_subscription<alpha_msgs::msg::FusePerception>(
+        Topic::FUSE_PERCEPTION, qos_sensor,
         std::bind(&RecordAcrobaticNode::perception_callback, this, std::placeholders::_1));
 
-    sub_lidar_close_ = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        LIDAR_2D_CONTOUR_CLOSE_TOPIC, qos_sensor,
+    sub_lidar_close_ = this->create_subscription<alpha_msgs::msg::Lidar2dObstacle>(
+        Topic::LIDAR_2D_CONTOUR_CLOSE, qos_sensor,
         std::bind(&RecordAcrobaticNode::lidar_close_callback, this, std::placeholders::_1));
 
-    sub_lidar_far_ = this->create_subscription<ros2_msgs::msg::Lidar2dObstacle>(
-        LIDAR_2D_CONTOUR_FAR_TOPIC, qos_sensor,
+    sub_lidar_far_ = this->create_subscription<alpha_msgs::msg::Lidar2dObstacle>(
+        Topic::LIDAR_2D_CONTOUR_FAR, qos_sensor,
         std::bind(&RecordAcrobaticNode::lidar_far_callback, this, std::placeholders::_1));
 
     // Timer
     timer_ = this->create_timer(
-        std::chrono::nanoseconds(SYSTEM_LOOP_CYCLE_NANOSEC), 
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_NANOSEC), 
         std::bind(&RecordAcrobaticNode::node_loop_callback, this));
 }
 
@@ -91,7 +91,7 @@ void RecordAcrobaticNode::node_loop_callback() {
         auto sectors = extract_sectors(cache_lidar_close_.msg);
         vec.insert(vec.end(), sectors.begin(), sectors.end());
     } else {
-        vec.insert(vec.end(), LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
+        vec.insert(vec.end(), Sensor::LIDAR_2D_SECTOR_NUM, Sensor::LIDAR_2D_RANGE_MAX);
     }
 
     // 3. Lidar Far
@@ -99,7 +99,7 @@ void RecordAcrobaticNode::node_loop_callback() {
         auto sectors = extract_sectors(cache_lidar_far_.msg);
         vec.insert(vec.end(), sectors.begin(), sectors.end());
     } else {
-        vec.insert(vec.end(), LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
+        vec.insert(vec.end(), Sensor::LIDAR_2D_SECTOR_NUM, Sensor::LIDAR_2D_RANGE_MAX);
     }
 
     // 4. Append to Buffer (RAM)
@@ -122,20 +122,20 @@ void RecordAcrobaticNode::node_loop_callback() {
 // ------------------ Helpers ------------------
 bool RecordAcrobaticNode::is_alive(const DataCache& cache, double now) {
     if (!cache.valid) return false;
-    return (now - cache.timestamp) <= (SYSTEM_LOOP_CYCLE* TIMEOUT_CYCLES);
+    return (now - cache.timestamp) <= (Clock::LOOP_CYCLE * TIMEOUT_CYCLES);
 }
 
-std::vector<float> RecordAcrobaticNode::extract_sectors(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr& msg) {
-    std::vector<float> sectors(LIDAR_2D_SECTOR_NUM, LIDAR_2D_RANGE_MAX);
+std::vector<float> RecordAcrobaticNode::extract_sectors(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr& msg) {
+    std::vector<float> sectors(Sensor::LIDAR_2D_SECTOR_NUM, Sensor::LIDAR_2D_RANGE_MAX);
     for (const auto& sec : msg->obstacles) {
-        if (sec.sector_index < LIDAR_2D_SECTOR_NUM) {
+        if (sec.sector_index < Sensor::LIDAR_2D_SECTOR_NUM) {
             sectors[sec.sector_index] = sec.min_distance;
         }
     }
     return sectors;
 }
 
-std::vector<float> RecordAcrobaticNode::msg_to_action_list(const ros2_msgs::msg::ControlInterface::SharedPtr& msg) {
+std::vector<float> RecordAcrobaticNode::msg_to_action_list(const alpha_msgs::msg::ControlInterface::SharedPtr& msg) {
     return {
         msg->roll, msg->pitch, msg->yaw,
         msg->forward, msg->left, msg->up,
@@ -173,7 +173,7 @@ void RecordAcrobaticNode::stop_image_subs() {
 // ------------------ Episode Mgmt ------------------
 void RecordAcrobaticNode::start_episode() {
     // 1. Meta Logic
-    fs::path root_meta_path = fs::path(RECORD_ACROBATIC_DIR) / "meta.json";
+    fs::path root_meta_path = fs::path(Path::RECORD_ACROBATIC) / "meta.json";
     int episode_idx = 0;
 
     if (fs::exists(root_meta_path)) {
@@ -186,7 +186,7 @@ void RecordAcrobaticNode::start_episode() {
 
     char idx_str[16];
     snprintf(idx_str, sizeof(idx_str), "episode_%03d", episode_idx);
-    episode_dir_ = fs::path(RECORD_ACROBATIC_DIR) / idx_str;
+    episode_dir_ = fs::path(Path::RECORD_ACROBATIC) / idx_str;
     fs::create_directories(episode_dir_);
 
     // Update root meta
@@ -207,9 +207,9 @@ void RecordAcrobaticNode::start_episode() {
 
     // 3. Init Video
     int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-    vw_rgb_.open((episode_dir_ / "rgb_front.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_input_, true);
-    vw_depth_.open((episode_dir_ / "depth_front.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_input_, true);
-    vw_overview_.open((episode_dir_ / "overview.mp4").string(), fourcc, SYSTEM_LOOP_RATE, dim_overview_, true);
+    vw_rgb_.open((episode_dir_ / "rgb_front.mp4").string(), fourcc, Clock::LOOP_RATE, dim_input_, true);
+    vw_depth_.open((episode_dir_ / "depth_front.mp4").string(), fourcc, Clock::LOOP_RATE, dim_input_, true);
+    vw_overview_.open((episode_dir_ / "overview.mp4").string(), fourcc, Clock::LOOP_RATE, dim_overview_, true);
 
     // 4. Start
     start_image_subs();
@@ -238,8 +238,8 @@ void RecordAcrobaticNode::finish_episode() {
 
     // Save Meta
     json meta;
-    meta["expert_manuever"] = RECORD_ACROBATIC_MANUEVER_NAME;
-    meta["fps"] = SYSTEM_LOOP_RATE;
+    meta["expert_manuever"] = Path::RECORD_ACROBATIC_MANUEVER_NAME;
+    meta["fps"] = Clock::LOOP_RATE;
     meta["timestamp_start"] = start_timestamp_;
     meta["timestamp_end"] = end_ts;
     meta["duration"] = end_ts - start_timestamp_;
@@ -254,28 +254,28 @@ void RecordAcrobaticNode::finish_episode() {
 }
 
 // ------------------ Callbacks ------------------
-void RecordAcrobaticNode::record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg) {
+void RecordAcrobaticNode::record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg) {
     if (msg->record && !recording_) start_episode();
     else if (!msg->record && recording_) finish_episode();
 }
 
-void RecordAcrobaticNode::expert_action_callback(const ros2_msgs::msg::ControlInterface::SharedPtr msg) {
+void RecordAcrobaticNode::expert_action_callback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     current_action_ = msg_to_action_list(msg);
 }
 
-void RecordAcrobaticNode::perception_callback(const ros2_msgs::msg::FusePerception::SharedPtr msg) {
+void RecordAcrobaticNode::perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
     cache_perc_.msg = msg;
     cache_perc_.timestamp = this->now().seconds();
     cache_perc_.valid = true;
 }
 
-void RecordAcrobaticNode::lidar_close_callback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
+void RecordAcrobaticNode::lidar_close_callback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
     cache_lidar_close_.msg = msg;
     cache_lidar_close_.timestamp = this->now().seconds();
     cache_lidar_close_.valid = true;
 }
 
-void RecordAcrobaticNode::lidar_far_callback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
+void RecordAcrobaticNode::lidar_far_callback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg) {
     cache_lidar_far_.msg = msg;
     cache_lidar_far_.timestamp = this->now().seconds();
     cache_lidar_far_.valid = true;

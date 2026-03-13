@@ -10,8 +10,8 @@ from rclpy.clock import Clock, ClockType
 import rclpy.clock 
 
 from advance_control.web_socket_controller import WebSocketController
-from ros2_msgs.msg import RecordControl
-from ros2_msgs.msg import ControlInterface
+from alpha_msgs.msg import RecordControl
+from alpha_msgs.msg import ControlInterface
 from python_utils.utils import *
 
 class AdvanceControlNode(Node):

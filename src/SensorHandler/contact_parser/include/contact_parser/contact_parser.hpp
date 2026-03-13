@@ -3,7 +3,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
-#include "ros2_msgs/msg/contact_sensor.hpp"
+#include "alpha_msgs/msg/contact_sensor.hpp"
 #include "ros_gz_interfaces/msg/contact.hpp"
 #include "ros_gz_interfaces/msg/contacts.hpp"
 
@@ -17,7 +17,7 @@ public:
     ~ContactParserNode();
 private:
     // Publisher
-    rclcpp::Publisher<ros2_msgs::msg::ContactSensor>::SharedPtr contact_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::ContactSensor>::SharedPtr contact_PUB;
 
     // Subscriber
     rclcpp::Subscription<ros_gz_interfaces::msg::Contacts>::SharedPtr contact_body_SUB;

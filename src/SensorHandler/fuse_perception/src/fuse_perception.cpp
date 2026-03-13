@@ -9,7 +9,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     broadcaster_TF = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     
     // Create Publisher
-    fuse_PUB = this->create_publisher<ros2_msgs::msg::FusePerception>(Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS());
+    fuse_PUB = this->create_publisher<alpha_msgs::msg::FusePerception>(Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS());
 
     // Create Subscriber
     odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
@@ -18,7 +18,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
         std::bind(&FusePerceptionNode::OdoCallback, this, _1)
     );
 
-    contact_SUB = this->create_subscription<ros2_msgs::msg::ContactSensor>(
+    contact_SUB = this->create_subscription<alpha_msgs::msg::ContactSensor>(
         Topic::CONTACT_PARSER,
         rclcpp::SensorDataQoS(),
         std::bind(&FusePerceptionNode::ContactCallback, this, _1)
@@ -55,7 +55,7 @@ float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::Shar
     else return msg->ranges[0];
 }
 
-void FusePerceptionNode::doFrameTransform(ros2_msgs::msg::FusePerception msg) {
+void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     geometry_msgs::msg::TransformStamped tf;
     tf.header.stamp = this->get_clock()->now();
     tf.header.frame_id = "world";
@@ -74,7 +74,7 @@ void FusePerceptionNode::doFrameTransform(ros2_msgs::msg::FusePerception msg) {
  * @brief Parse all data in last_ into the msg and publish
  */
 void FusePerceptionNode::PublishCallback() {
-    auto msg = ros2_msgs::msg::FusePerception();
+    auto msg = alpha_msgs::msg::FusePerception();
     
     // Odometry - stream
     if(missed_odometry < Threshold::MISSED_FAST_TOPIC) missed_odometry++;
@@ -145,7 +145,7 @@ void FusePerceptionNode::OdoCallback(const px4_msgs::msg::VehicleOdometry::Share
     missed_odometry = 0;
 }
 
-void FusePerceptionNode::ContactCallback(const ros2_msgs::msg::ContactSensor::SharedPtr msg) {
+void FusePerceptionNode::ContactCallback(const alpha_msgs::msg::ContactSensor::SharedPtr msg) {
     last_contact = msg;
 }
 

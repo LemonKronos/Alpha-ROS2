@@ -11,7 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(global_utils REQUIRED)
 
 include_directories(
@@ -29,7 +29,7 @@ ament_target_dependencies(lidar_2d_handler
   std_msgs
   px4_msgs
   sensor_msgs
-  ros2_msgs
+  alpha_msgs
   global_utils
 )
 

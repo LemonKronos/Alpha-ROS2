@@ -3,7 +3,7 @@ import math
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
-from ros2_msgs.msg import Lidar2dObstacle
+from alpha_msgs.msg import Lidar2dObstacle
 from python_utils.utils import *
 from rclpy.qos import qos_profile_sensor_data
 

@@ -8,7 +8,7 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     Global::setup_for_simulation(this);
     
     // Create Subscriber
-    final_ctrl_SUB = this->create_subscription<ros2_msgs::msg::ControlInterface>(
+    final_ctrl_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_REACTIVE,
         10,
         std::bind(&FinalizeControlNode::FinalCtrlCallback, this, _1)
@@ -65,7 +65,7 @@ FinalizeControlNode::~FinalizeControlNode() {
 
 /*########################################## Callbacks */
 
-void FinalizeControlNode::FinalCtrlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg) {
+void FinalizeControlNode::FinalCtrlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     last_final_ctrl = msg;
 }
 

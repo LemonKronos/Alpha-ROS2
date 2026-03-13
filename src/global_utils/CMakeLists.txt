@@ -9,7 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 # build the library (no main function needed)
@@ -31,7 +31,7 @@ target_include_directories(${PROJECT_NAME}
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   std_msgs
-  ros2_msgs
+  alpha_msgs
   Eigen3
 )
 

@@ -4,9 +4,9 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
 #include "global_utils/surrounding.hpp"
-#include "ros2_msgs/msg/control_interface.hpp"
-#include "ros2_msgs/msg/lidar2d_obstacle.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp"
+#include "alpha_msgs/msg/control_interface.hpp"
+#include "alpha_msgs/msg/lidar2d_obstacle.hpp"
+#include "alpha_msgs/msg/fuse_perception.hpp"
 
 #define VISUALIZE true // uncomment to disable visualize in this node
 #ifndef VISUALIZE
@@ -29,7 +29,7 @@ public:
     ~ReactiveOANode();
 private:
     // Publisher
-    rclcpp::Publisher<ros2_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
     #ifdef VISUALIZE
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
@@ -38,13 +38,13 @@ private:
     #endif
 
     // Subscriber
-    rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
-    rclcpp::Subscription<ros2_msgs::msg::Lidar2dObstacle>::SharedPtr close_contour_SUB;
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr perception_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr close_contour_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
 
     // Stored data
-    ros2_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
-    ros2_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+    alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
+    alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
     
     // Variables
     bool lost_control_signal = true;
@@ -96,9 +96,9 @@ private:
     rclcpp::TimerBase::SharedPtr node_loop_TIME;
 
     // Callbacks
-    void inputControlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
-    void closeContourCallback(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
-    void perceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+    void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
+    void closeContourCallback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg);
+    void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 
 };

@@ -9,8 +9,8 @@
 #include "global_utils/system_config.hpp"
 
 // ROS Messages
-#include "ros2_msgs/msg/control_interface.hpp"
-#include "ros2_msgs/msg/record_control.hpp"
+#include "alpha_msgs/msg/control_interface.hpp"
+#include "alpha_msgs/msg/record_control.hpp"
 
 // External Libs
 #include <opencv2/opencv.hpp>
@@ -27,8 +27,8 @@ public:
 
 private:
     // --- Callbacks ---
-    void input_callback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
-    void record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg);
+    void input_callback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
+    void record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg);
     void game_loop();
 
     // --- Logic Helpers ---
@@ -53,8 +53,8 @@ private:
     cv::Mat last_frame_; // For pause display
 
     // --- ROS ---
-    rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr sub_input_;
-    rclcpp::Subscription<ros2_msgs::msg::RecordControl>::SharedPtr sub_record_;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr sub_input_;
+    rclcpp::Subscription<alpha_msgs::msg::RecordControl>::SharedPtr sub_record_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
 

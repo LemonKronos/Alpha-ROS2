@@ -7,7 +7,7 @@
 
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
-#include "ros2_msgs/msg/fuse_perception.hpp" 
+#include "alpha_msgs/msg/fuse_perception.hpp" 
 #include "depth_cam/depth_cam_threads.hpp"
 
 namespace alpha_brain {
@@ -26,7 +26,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener;
 
     // Subscriber
-    rclcpp::Subscription<ros2_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
 
     // Variables
     std::unique_ptr<HazardPointThread> hazard_point_thread;
@@ -36,7 +36,7 @@ private:
     std::unique_ptr<ProcessingThread> right_processing_thread;
 
     // Callbacks
-    void FusePerceptionCallback(const ros2_msgs::msg::FusePerception::SharedPtr msg);
+    void FusePerceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
 
 };
 

@@ -7,7 +7,7 @@
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
 
-  <depend>ros2_msgs</depend>
+  <depend>alpha_msgs</depend>
   <exec_depend>pygame</exec_depend>
 
   <test_depend>ament_copyright</test_depend>

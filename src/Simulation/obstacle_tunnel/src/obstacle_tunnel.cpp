@@ -24,7 +24,7 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
     set_pose_client_ = this->create_client<ros_gz_interfaces::srv::SetEntityPose>("/world/" + world_name + "/set_pose");
 
     // --- Subscriptions ---
-    perception_sub_ = this->create_subscription<ros2_msgs::msg::FusePerception>(
+    perception_sub_ = this->create_subscription<alpha_msgs::msg::FusePerception>(
         Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS(), 
         std::bind(&ObstacleTunnelNode::perception_callback, this, _1));
 
@@ -40,7 +40,7 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
     );
 
     // --- Publishers ---
-    record_pub_ = this->create_publisher<ros2_msgs::msg::RecordControl>(
+    record_pub_ = this->create_publisher<alpha_msgs::msg::RecordControl>(
         Topic::LOGGER_RECORD, 10);
 
     // --- Shutdown Hook ---
@@ -84,7 +84,7 @@ void ObstacleTunnelNode::cleanup_all_slices() {
     active_slice_indices_.clear();
 }
 
-void ObstacleTunnelNode::perception_callback(const ros2_msgs::msg::FusePerception::SharedPtr msg) {
+void ObstacleTunnelNode::perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
     if (current_state_ != TunnelState::RUNNING) return;
 
     // --- FIX: NaN Protection ---
@@ -120,7 +120,7 @@ void ObstacleTunnelNode::perception_callback(const ros2_msgs::msg::FusePerceptio
         current_state_ = TunnelState::WAITING_FOR_DISARM;
 
         // Stop Recording
-        auto rec_msg = ros2_msgs::msg::RecordControl();
+        auto rec_msg = alpha_msgs::msg::RecordControl();
         rec_msg.record = false;
         rec_msg.pause = false; 
         record_pub_->publish(rec_msg);

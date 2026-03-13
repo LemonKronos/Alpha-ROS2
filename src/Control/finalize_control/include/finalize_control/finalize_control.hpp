@@ -3,7 +3,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
-#include "ros2_msgs/msg/control_interface.hpp"
+#include "alpha_msgs/msg/control_interface.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "px4_msgs/msg/vehicle_land_detected.hpp"
@@ -35,14 +35,14 @@ private:
     rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr trajectory_set_PUB;
 
     // Subcriber
-    rclcpp::Subscription<ros2_msgs::msg::ControlInterface>::SharedPtr final_ctrl_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr final_ctrl_SUB;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_SUB;
     rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_SUB;
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odometry_SUB;
     // rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
 
     // Stored SharedPtr
-    ros2_msgs::msg::ControlInterface::SharedPtr last_final_ctrl = nullptr;
+    alpha_msgs::msg::ControlInterface::SharedPtr last_final_ctrl = nullptr;
 
     // Variables
     uint8_t loss_final_control_count = 0;
@@ -81,7 +81,7 @@ private:
     rclcpp::TimerBase::SharedPtr node_loop_TIME;
 
     // Callbacks
-    void FinalCtrlCallback(const ros2_msgs::msg::ControlInterface::SharedPtr msg);
+    void FinalCtrlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
     void VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
     void OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);

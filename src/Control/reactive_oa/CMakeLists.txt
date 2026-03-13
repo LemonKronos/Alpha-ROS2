@@ -8,7 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(global_utils REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
@@ -24,7 +24,7 @@ add_executable(reactive_oa
 
 ament_target_dependencies(reactive_oa
   rclcpp
-  ros2_msgs
+  alpha_msgs
   global_utils
   visualization_msgs
 )

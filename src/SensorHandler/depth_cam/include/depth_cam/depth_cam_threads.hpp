@@ -16,7 +16,7 @@
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h"
-#include "ros2_msgs/msg/voxel_block.hpp"
+#include "alpha_msgs/msg/voxel_block.hpp"
 
 namespace alpha_brain {
 
@@ -85,7 +85,7 @@ public:
 
 private:
     rclcpp::Node* m_thisNode;
-    rclcpp::Publisher<ros2_msgs::msg::VoxelBlock>::SharedPtr m_hazard_voxel_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr m_hazard_voxel_PUB;
 
     const int m_num_worker;
     const octomap::point3d origin; 

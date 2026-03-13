@@ -8,7 +8,7 @@
   <license>Proprietary</license>
 
   <depend>rclpy</depend>
-  <depend>ros2_msgs</depend>
+  <depend>alpha_msgs</depend>
   <depend>python_utils</depend>
   <exec_depend>websockets</exec_depend>
 

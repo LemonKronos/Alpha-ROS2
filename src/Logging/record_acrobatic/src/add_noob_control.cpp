@@ -13,7 +13,7 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
     
     char dir_name[32];
     snprintf(dir_name, sizeof(dir_name), "episode_%03d", ep_num);
-    episode_path_ = fs::path(RECORD_ACROBATIC_DIR) / dir_name;
+    episode_path_ = fs::path(Path::RECORD_ACROBATIC) / dir_name;
 
     if (!fs::exists(episode_path_)) {
         RCLCPP_ERROR(this->get_logger(), RED "Directory not found: %s" RESET, episode_path_.c_str());
@@ -49,13 +49,13 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
     current_input_ = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
     // 5. Subscribers
-    sub_input_ = this->create_subscription<ros2_msgs::msg::ControlInterface>(
-        CONTROL_INPUT_TOPIC, 
+    sub_input_ = this->create_subscription<alpha_msgs::msg::ControlInterface>(
+        Topic::CONTROL_INPUT, 
         10,
         std::bind(&AddNoobControlNode::input_callback, this, std::placeholders::_1));
 
-    sub_record_ = this->create_subscription<ros2_msgs::msg::RecordControl>(
-        LOGGER_RECORD_TOPIC,
+    sub_record_ = this->create_subscription<alpha_msgs::msg::RecordControl>(
+        Topic::LOGGER_RECORD,
         10,
         std::bind(&AddNoobControlNode::record_control_callback, this, std::placeholders::_1));
 
@@ -73,7 +73,7 @@ AddNoobControlNode::~AddNoobControlNode() {
     cv::destroyAllWindows();
 }
 
-void AddNoobControlNode::input_callback(const ros2_msgs::msg::ControlInterface::SharedPtr msg) {
+void AddNoobControlNode::input_callback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     current_input_ = {
         msg->roll, msg->pitch, msg->yaw,
         msg->forward, msg->left, msg->up,
@@ -81,7 +81,7 @@ void AddNoobControlNode::input_callback(const ros2_msgs::msg::ControlInterface::
     };
 }
 
-void AddNoobControlNode::record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg) {
+void AddNoobControlNode::record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg) {
     // Start Trigger
     if (msg->record && state_ == "WAITING") {
         start_recording();
@@ -116,7 +116,7 @@ void AddNoobControlNode::game_loop() {
         if (!last_frame_.empty()) {
             cv::Mat disp = last_frame_.clone();
             cv::putText(disp, "PAUSED", cv::Point(20, 80), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 255), 3);
-            cv::imshow(WINDOW_OVERVIEW_FPV, disp);
+            cv::imshow(Window::OVERVIEW_FPV, disp);
             cv::waitKey(1);
         }
         return;
@@ -157,7 +157,7 @@ void AddNoobControlNode::game_loop() {
     cv::Scalar color = (state_ == "RECORDING") ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
     cv::putText(frame, txt, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2);
 
-    cv::imshow(WINDOW_OVERVIEW_FPV, frame);
+    cv::imshow(Window::OVERVIEW_FPV, frame);
     cv::waitKey(1); // 1ms wait allows OpenCV to draw
 
     // 5. Logic

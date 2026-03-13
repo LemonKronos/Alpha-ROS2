@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ros2_msgs/msg/lidar2d_obstacle.hpp"
+#include "alpha_msgs/msg/lidar2d_obstacle.hpp"
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 
@@ -62,8 +62,8 @@ public:
 
     Obstacle();
     float safe_distance = FLT_MAX;
-    void topicToObstacle(const ros2_msgs::msg::Lidar2dObstacle::SharedPtr msg);
-    ros2_msgs::msg::Lidar2dObstacle obstacleToTopic();
+    void topicToObstacle(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg);
+    alpha_msgs::msg::Lidar2dObstacle obstacleToTopic();
     void addContour(const uint8_t& sector_index, Contour& new_contour);
     uint8_t angleToSector(float angle);
     void sectorItoratorInit(const uint8_t& start_index);

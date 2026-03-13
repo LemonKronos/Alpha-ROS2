@@ -8,7 +8,7 @@
 #include <ros_gz_interfaces/srv/control_world.hpp>
 #include <mutex>
 
-#include "ros2_msgs/msg/record_control.hpp"
+#include "alpha_msgs/msg/record_control.hpp"
 #include "global_utils/system_config.hpp"
 
 constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
@@ -24,7 +24,7 @@ private:
 
     // --- ROS Interfaces ---
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_img_;
-    rclcpp::Subscription<ros2_msgs::msg::RecordControl>::SharedPtr sub_record_control_; // NEW
+    rclcpp::Subscription<alpha_msgs::msg::RecordControl>::SharedPtr sub_record_control_; // NEW
     rclcpp::Client<ros_gz_interfaces::srv::ControlWorld>::SharedPtr client_gz_;
     rclcpp::TimerBase::SharedPtr timer_;
 
@@ -35,7 +35,7 @@ private:
 
     // --- Methods ---
     void img_callback(const sensor_msgs::msg::Image::SharedPtr msg);
-    void record_control_callback(const ros2_msgs::msg::RecordControl::SharedPtr msg); // NEW
+    void record_control_callback(const alpha_msgs::msg::RecordControl::SharedPtr msg); // NEW
 
     // Main Node Loop (Visuals + Service Logic)
     void node_loop();

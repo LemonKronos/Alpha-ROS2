@@ -9,7 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
 find_package(global_utils REQUIRED)
 
@@ -26,7 +26,7 @@ add_executable(finalize_control
 ament_target_dependencies(finalize_control
   rclcpp
   px4_msgs
-  ros2_msgs
+  alpha_msgs
   rosgraph_msgs
   global_utils
 )

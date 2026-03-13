@@ -8,7 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(ros2_msgs REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(ros_gz_interfaces REQUIRED)
 find_package(global_utils REQUIRED)
 
@@ -24,7 +24,7 @@ add_executable(contact_parser
 
 ament_target_dependencies(contact_parser
   rclcpp
-  ros2_msgs
+  alpha_msgs
   ros_gz_interfaces
   global_utils
 )
