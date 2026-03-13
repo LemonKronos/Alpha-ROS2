@@ -22,8 +22,8 @@ namespace alpha_brain {
 
 class DepthCamNode; // Forward declaration
 
-constexpr int HAZARD_BATCH_SIZE = 256; // #CanBeOptimize
-constexpr int WORLD_BATCH_SIZE = 1024;
+constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
+constexpr int WORLD_BATCH_SIZE = 512;
 
 using std::placeholders::_1;
 

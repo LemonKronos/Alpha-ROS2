@@ -3,7 +3,7 @@
     {
       "name": "ROS2",
       "includePath": [
-        "${workspaceFolder}/**",
+        // "${workspaceFolder}/**",
         "${workspaceFolder}/install/**",
         "${workspaceFolder}/build/**",
         "${workspaceFolder}/src/**",

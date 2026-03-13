@@ -128,10 +128,11 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             bool x_cliped = (Drone::MIN_X < body_point.x() && body_point.x() < Drone::MAX_X);
             bool y_cliped = (Drone::MIN_Y < body_point.y() && body_point.y() < Drone::MAX_Y);
             bool z_cliped = (Drone::MIN_Z < body_point.z() && body_point.z() < Drone::MAX_Z);
-            if(x_cliped || y_cliped || z_cliped) continue;
+            if(x_cliped && y_cliped && z_cliped) continue;
 
             // For hazard point
             double distance_sq = body_point.squaredNorm();
+            // hazard_distance_sq = 25.0f; // #Test
             if(distance_sq < hazard_distance_sq) {
                 if(hazard_exist) {
                     if(hazard_cloud->size() >= HAZARD_BATCH_SIZE) {

@@ -45,9 +45,9 @@ class HazardVoxelVisualizer(Node):
         marker.scale.y = Sensor.OCTREE_VOXEL_RESOLUTION
         marker.scale.z = Sensor.OCTREE_VOXEL_RESOLUTION
         
-        # Color: Semi-transparent Red for hazards
+        # Color: Semi-transparent Orange for hazards
         marker.color.r = 1.0
-        marker.color.g = 0.0
+        marker.color.g = 0.36
         marker.color.b = 0.0
         marker.color.a = 0.6
         
