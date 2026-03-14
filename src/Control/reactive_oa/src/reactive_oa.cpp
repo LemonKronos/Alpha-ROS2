@@ -39,6 +39,8 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     // Init variables
     control_vec.setZero();
     movement_vec.setZero();
+    last_movement_vec.setZero();
+    der_movement_vec.setZero();
     repulsive_vec.setZero();
     correction_vec.setZero();
     // control_angular_vec.setZero();
@@ -71,7 +73,7 @@ void ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
         last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
         last_control_signal->left * Drone::SPEED_MAX_FORWARD,
-        0 // last_control_signal->up * SPEED_MAX_UP // Still in 2D
+        last_control_signal->up * Drone::SPEED_MAX_UP
     ); // body frame
 
     // control_angular_vec = Eigen::Vector3f(
@@ -82,6 +84,7 @@ void ReactiveOANode::computeControlVector() {
 }
 
 void ReactiveOANode::computeMovementVector() {
+    last_movement_vec = movement_vec;
     movement_vec = Eigen::Vector3f(
         last_perception->velocity[0],
         last_perception->velocity[1],
@@ -89,7 +92,8 @@ void ReactiveOANode::computeMovementVector() {
     ); // world frame
     Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
     movement_vec = q.inverse() * movement_vec; // body frame
-    movement_vec(2) = 0; // Still in 2D
+
+    der_movement_vec = movement_vec - last_movement_vec;
 
     // movement_angular_vec = Eigen::Vector3f(
     //     last_perception->angular_velocity[0],
@@ -223,7 +227,7 @@ void ReactiveOANode::computeCorrectionVector() {
     correction_vec = Eigen::Vector3f(
         std::clamp(correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
         std::clamp(correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
-        0 // std::clamp(correction_vec.x(), -SPEED_MAX_UP, SPEED_MAX_UP) // Still in 2D
+        std::clamp(correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
     );
 }
 
@@ -329,7 +333,7 @@ void ReactiveOANode::nodeLoopCallback() {
 
     msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
     msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
-    // msg.up = correction_vec.z() / SPEED_MAX_UP_FW; // Still in 2D
+    msg.up = correction_vec.z() / Drone::SPEED_MAX_UP;
 
     // Odometry callback check
     if(lost_perception_counter < Threshold::MISSED_FAST_TOPIC) lost_perception_counter++;
@@ -361,7 +365,7 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.roll = last_control_signal->roll;
         msg.pitch = last_control_signal->pitch;
         msg.yaw = last_control_signal->yaw;
-        msg.up = last_control_signal->up; // Still in 2D
+        msg.up = last_control_signal->up;
         msg.control_by = last_control_signal->control_by;
         msg.wings_mode = last_control_signal->wings_mode;
     }

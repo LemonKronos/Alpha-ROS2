@@ -59,6 +59,8 @@ private:
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
+    Eigen::Vector3f last_movement_vec;
+    Eigen::Vector3f der_movement_vec;
     Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f correction_vec;
     // Eigen::Vector3f control_angular_vec;
