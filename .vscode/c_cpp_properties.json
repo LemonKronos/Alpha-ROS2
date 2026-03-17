@@ -4,8 +4,7 @@
       "name": "ROS2",
       "includePath": [
         // "${workspaceFolder}/**",
-        "${workspaceFolder}/install/**",
-        "${workspaceFolder}/build/**",
+        "${workspaceFolder}/install/*_msgs/**",
         "${workspaceFolder}/src/**",
         "/opt/ros/jazzy/include/**",
         "/usr/include/**"

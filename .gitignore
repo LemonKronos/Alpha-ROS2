@@ -5,8 +5,8 @@ install/
 log/
 others/
 pyvenv/*
-src/px4_msgs
-src/px4_ros_com
+**/px4_msgs
+**/px4_ros_com
 src/ros_gz
 src/simulation_interfaces
 **/__pycache__/

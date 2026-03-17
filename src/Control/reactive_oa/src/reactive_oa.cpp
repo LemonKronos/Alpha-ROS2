@@ -39,8 +39,6 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     // Init variables
     control_vec.setZero();
     movement_vec.setZero();
-    last_movement_vec.setZero();
-    der_movement_vec.setZero();
     repulsive_vec.setZero();
     correction_vec.setZero();
     // control_angular_vec.setZero();
@@ -50,8 +48,6 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
 
     repulsive_damping_counter = 0;
     obstacle_clear_damping_counter = 0;
-
-    reactive_state = IDLING;
 
     safe_distance = Drone::HAZARD_DISTANCE;
 
@@ -76,6 +72,8 @@ void ReactiveOANode::computeControlVector() {
         last_control_signal->up * Drone::SPEED_MAX_UP
     ); // body frame
 
+    // RCLCPP_INFO(this->get_logger(), BLUE "Control vec = %0.2f" RESET, control_vec.norm());
+
     // control_angular_vec = Eigen::Vector3f(
     //     last_control_signal->roll,
     //     last_control_signal->pitch,
@@ -84,16 +82,17 @@ void ReactiveOANode::computeControlVector() {
 }
 
 void ReactiveOANode::computeMovementVector() {
-    last_movement_vec = movement_vec;
     movement_vec = Eigen::Vector3f(
         last_perception->velocity[0],
         last_perception->velocity[1],
         last_perception->velocity[2]
     ); // world frame
+    if(movement_vec.hasNaN()) {
+        movement_vec.setZero();
+        // RCLCPP_WARN(this->get_logger(), RED "Movement has NaN" RESET);
+    }
     Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
     movement_vec = q.inverse() * movement_vec; // body frame
-
-    der_movement_vec = movement_vec - last_movement_vec;
 
     // movement_angular_vec = Eigen::Vector3f(
     //     last_perception->angular_velocity[0],
@@ -156,20 +155,24 @@ void ReactiveOANode::computeRepulsiveVector() {
         repulsive_vec += f;
     }
     repulsive_vec = repulsive_vec.normalized();
+    
+    const float approach_angle = fabs(movement_vec.normalized().dot(repulsive_vec));
+    std::clamp(approach_angle, 0.01f, 1.0f);
 
     float min_dist = obstacle.getMinDistance();
     if(min_dist > safe_distance) min_dist = safe_distance;
     if(min_dist <= Drone::RADIUS) {
         RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
     }
-    float urgency = (safe_distance - min_dist) / (safe_distance - Drone::HAZARD_DISTANCE + 0.001f); // Cut depth urgency
-    urgency = std::clamp(urgency, 0.01f, 2.7f);
 
-    const float relative_speed = fabs(movement_vec.dot(repulsive_vec));
-    const float movement_bias = 0.5f; // Tune-able
-    const float repulsive_force = urgency * (movement_bias*relative_speed + (1.0f - movement_bias)*Drone::SPEED_MAX_FORWARD);
-    
-    repulsive_vec = repulsive_vec * repulsive_force;
+    float urgency = (safe_distance - min_dist) / (safe_distance - Drone::HAZARD_DISTANCE + 0.01f); // Cut depth urgency
+    urgency = std::clamp(urgency, 0.01f, 1.0f);
+
+    const float repulsive_force = control_vec.norm() + urgency * Drone::SPEED_MAX_FORWARD;
+
+    repulsive_vec = repulsive_vec * repulsive_force * approach_angle;
+
+    RCLCPP_INFO(this->get_logger(), BLUE "Repulsive vec = %0.2f" RESET, repulsive_vec.norm());
     // RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
 }
 
@@ -187,65 +190,31 @@ void ReactiveOANode::computeCorrectionVector() {
         }
     }
 
-    // Damping base on state
-    switch(reactive_state) {
-        case IDLING: // No damping
-        {
-            correction_vec = new_correction_vec;
-            break; 
-        }
-
-        case ENTERING: // Damping base on current movement
-        {
-            const float entering_bias = 0.9f; // Tune-able
-            correction_vec = (1 - entering_bias)*new_correction_vec + entering_bias*movement_vec;
-            break;
-        }
-
-        case RUNNING: // Damping base on previous correction
-        {
-            const float running_bias = 0.3f; // Tune-able
-            correction_vec = (1 - running_bias)*new_correction_vec + running_bias*correction_vec;
-            break;
-        }
-
-        case LEAVING: // Damping base on current movement
-        {
-            const float leaving_bias = 0.7f; // Tune-able
-            correction_vec = (1 - leaving_bias)*new_correction_vec + leaving_bias*movement_vec;
-            break;
-        }
-
-        default:
-        {
-            correction_vec = new_correction_vec;
-            break;
-        }
-    }
-
     // Clamp correction vector to max speed
-    correction_vec = Eigen::Vector3f(
-        std::clamp(correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
-        std::clamp(correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
-        std::clamp(correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
+    new_correction_vec = Eigen::Vector3f(
+        std::clamp(new_correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
+        std::clamp(new_correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
+        std::clamp(new_correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
     );
+
+    // Damping 0
+    correction_vec = new_correction_vec;
+
+    // RCLCPP_INFO(this->get_logger(), BLUE "Correction vec = %0.2f" RESET, correction_vec.norm());
 }
 
-void ReactiveOANode::resetVectors(){
+void ReactiveOANode::resetVectors() {
     // Reset control signal
     if(lost_control_signal) {
         control_vec.setZero();
     }
 
-    // Damping repulsive vector
+    // Mismatch topic reset
     if(obstacle_clear_damping_counter == 0) {
         repulsive_vec.setZero();
     }
-    else {
-        repulsive_vec = repulsive_vec * REPULSIVE_DAMPING_CONSTANT;
-    }
 
-    // Keep correction as reference to last
+    // Leave correctin vec for damping
     // correction_vec.setZero();
 
     // Reset movement
@@ -296,39 +265,8 @@ void ReactiveOANode::publishVectorArrow(
 /*################################################# Node Loop */
 
 void ReactiveOANode::nodeLoopCallback() {
-    // State update
-    switch(reactive_state) {
-        case IDLING:
-            if(obstacle_clear_damping_counter) {
-                reactive_state = ENTERING;
-                RCLCPP_INFO(this->get_logger(), TEAL "ENTERING" RESET);
-            }
-            break;
-        case ENTERING:
-            reactive_state = RUNNING;
-            RCLCPP_INFO(this->get_logger(), PINK "RUNNING" RESET);
-            break;
-        case RUNNING:
-            if(obstacle_clear_damping_counter == OBSTACLE_DAMPING_INIT - 1) {
-                reactive_state = LEAVING;
-                RCLCPP_INFO(this->get_logger(), TEAL "LEAVING" RESET);
-            }
-            break;
-        case LEAVING:
-            if(obstacle_clear_damping_counter == OBSTACLE_DAMPING_INIT) {
-                reactive_state = RUNNING;
-                RCLCPP_INFO(this->get_logger(), TEAL "RUNNING" RESET);
-            }
-            else if(obstacle_clear_damping_counter == 1) {
-                reactive_state = IDLING;
-                RCLCPP_INFO(this->get_logger(), TEAL "IDLING" RESET);
-            }
-            break;
-        default:
-            reactive_state = IDLING;
-    }
-
     computeCorrectionVector();
+
     auto msg = alpha_msgs::msg::ControlInterface();
 
     msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;

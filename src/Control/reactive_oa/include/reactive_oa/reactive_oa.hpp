@@ -59,8 +59,6 @@ private:
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
-    Eigen::Vector3f last_movement_vec;
-    Eigen::Vector3f der_movement_vec;
     Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f correction_vec;
     // Eigen::Vector3f control_angular_vec;
@@ -70,15 +68,6 @@ private:
 
     uint8_t repulsive_damping_counter = 0;
     uint8_t obstacle_clear_damping_counter = 0;
-
-    enum ReactiveState {
-        IDLING,
-        ENTERING,
-        RUNNING,
-        LEAVING
-    };
-    ReactiveState reactive_state = IDLING;
-    
 
     // Methods
     void computeControlVector();
