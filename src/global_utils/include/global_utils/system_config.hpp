@@ -42,6 +42,11 @@ namespace Threshold {
 
 }
 
+// Scales
+namespace Scale {
+    constexpr float SAFE_DISTANCE_BUFFER = 1.125f;
+}
+
 // Machine file directories
 namespace Path {
     constexpr const char* RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
@@ -98,7 +103,7 @@ namespace Drone {
     constexpr float SPEED_MAX_UP = 8.0f;
     constexpr float SPEED_MAX_DOWN = 4.0f;
     constexpr float THRUST_SAFE_LIMIT = 0.9f;
-    constexpr float HOVER_THRUST = -0.51f;
+    constexpr float HOVER_THRUST = 0.51f;
 
     // Safety
     constexpr float RADIUS = 1.2f; // drone radius in meter

@@ -291,7 +291,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         // Body velocity rate to world quaternion
         Eigen::Vector3f omega( // in velocity
             last_final_ctrl->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
-            -last_final_ctrl->pitch * Drone::SPEED_MAX_ANGLE * 8, // No idea why it negative :(
+            last_final_ctrl->pitch * Drone::SPEED_MAX_ANGLE * 8,
             last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE * 8
         );
         float angle = omega.norm() * Clock::LOOP_CYCLE_FAST;
@@ -309,8 +309,8 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust);
         
         Eigen::Vector3f move_body(
-            last_final_ctrl->forward, // Do not matter in acrobatic control for multicopter
-            last_final_ctrl->left,  // Do not matter in acrobatic control for multicopter
+            0.0f, // Do not matter in acrobatic control for multicopter
+            0.0f,  // Do not matter in acrobatic control for multicopter
             last_final_ctrl->up // See as throttle in acrobatic control for multicopter
         );
         
