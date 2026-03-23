@@ -80,21 +80,8 @@ start_gz_ros_bridge() {
     
     # Wait for clock to ensure GZ is up
     until gz topic -l | grep -q "/clock"; do sleep 1; done
-    
-    CONFIG_FILE="$HOME/MyCode/Project/Drone/ROS2/config/gz_ros_bridge/${WORLD_NAME}-${DRONE_NAME}.YAML"
 
-    if [[ -f "$CONFIG_FILE" ]]; then
-      ros2 run ros_gz_bridge parameter_bridge \
-        "/world/${WORLD_NAME}/control@ros_gz_interfaces/srv/ControlWorld" \
-        "/world/${WORLD_NAME}/create@ros_gz_interfaces/srv/SpawnEntity" \
-        "/world/${WORLD_NAME}/remove@ros_gz_interfaces/srv/DeleteEntity" \
-        "/world/${WORLD_NAME}/set_pose@ros_gz_interfaces/srv/SetEntityPose" \
-        --ros-args -p config_file:="$CONFIG_FILE"
-    else
-      printf "\033[33m[GZ_ROS2_BRIDGE] No config file for this run!\033[0m\n"
-      echo "$WORLD_NAME-$DRONE_NAME.YAML - file = $CONFIG_FILE"
-      exit 1
-    fi
+    ros2 launch launch_utils ros_gz_bridge_launch.py world_name:="${WORLD_NAME}" drone_name:="${DRONE_NAME}"
   ' & echo $! >> /tmp/sim_pids.txt
   printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 }

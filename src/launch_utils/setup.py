@@ -19,6 +19,7 @@ setup(
             'launch_utils/record_acrobatic_noob.py',
             'launch_utils/reactive_oa_test_static.py',
             'launch_utils/depth_cam_test_launch.py',
+            'launch_utils/ros_gz_bridge_launch.py',
         ]),
     ],
     install_requires=['setuptools'],

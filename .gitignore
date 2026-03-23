@@ -5,9 +5,9 @@ install/
 log/
 others/
 pyvenv/*
-src/Out_source/*
 **/__pycache__/
 **/*.bak
+COLCON_IGNORE
 
 # Keep
 !pyvenv/
