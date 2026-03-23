@@ -177,30 +177,112 @@ void ReactiveOANode::computeRepulsiveVector() {
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    Eigen::Vector3f new_correction_vec = control_vec + repulsive_vec;
-
-    // Ensure correction vector is at most perpendicular to repulsive vector
-    if (!repulsive_vec.isZero(1e-3f)) {
-        Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        const double dot = repulsive_dir.dot(new_correction_vec);
-
-        const double bounce_bias = 0.08; // Tune-able, about 85 degree
-        if (dot < bounce_bias){
-            new_correction_vec -= (dot - bounce_bias) * repulsive_dir;
+    // 1. Gather all active constraints (obstacle points within a threshold)
+    std::vector<Eigen::Vector3f> hazards;
+    for(uint8_t index = 0; index < SECTOR_NUM; index++) {
+        for(const auto& contour : obstacle.getContours(index)) {
+            for(const auto& pt : contour.getContour()) {
+                Eigen::Vector3f p(pt.x, pt.y, 0);
+                float dist = p.norm();
+                if(dist > 0.1f && dist < safe_distance) { 
+                    hazards.push_back(p);
+                }
+            }
         }
     }
 
-    // Clamp correction vector to max speed
-    new_correction_vec = Eigen::Vector3f(
-        std::clamp(new_correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
-        std::clamp(new_correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
-        std::clamp(new_correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
-    );
+    int num_hazards = hazards.size();
+    int num_vars = 3; // u_x, u_y, u_z
+    int num_constraints = num_hazards + 3; // hazards + 3 kinematic speed limits
 
-    // Damping 0
-    correction_vec = new_correction_vec;
+    // 2. Setup Objective Matrix P and Vector q
+    // Minimize: 0.5 * u^T * P * u + q^T * u
+    // To minimize ||u - control_vec||^2, P = 2*I, q = -2*control_vec
+    Eigen::SparseMatrix<double> P(num_vars, num_vars);
+    P.insert(0,0) = 3.0;
+    P.insert(1,1) = 2.0;
+    P.insert(2,2) = 5.0;
 
-    // RCLCPP_INFO(this->get_logger(), BLUE "Correction vec = %0.2f" RESET, correction_vec.norm());
+    Eigen::VectorXd q(num_vars);
+    q << -2.0 * control_vec.x(), -2.0 * control_vec.y(), -2.0 * control_vec.z();
+
+    // 3. Setup Constraint Matrix A, and Bounds (lower_bound <= A*u <= upper_bound)
+    Eigen::SparseMatrix<double> A(num_constraints, num_vars);
+    Eigen::VectorXd lower_bound(num_constraints);
+    Eigen::VectorXd upper_bound(num_constraints);
+
+    // Populate Matrix A with triplets for efficiency
+    std::vector<Eigen::Triplet<double>> A_triplets;
+    
+    float gamma = 1.0f; // Tuning parameter: how aggressively to brake near the wall
+
+    for(int i = 0; i < num_hazards; ++i) {
+        Eigen::Vector3f h = hazards[i];
+        float dist = h.norm();
+        Eigen::Vector3f dir = h.normalized();
+
+        // A matrix row: the direction vector to the hazard
+        A_triplets.push_back(Eigen::Triplet<double>(i, 0, dir.x()));
+        A_triplets.push_back(Eigen::Triplet<double>(i, 1, dir.y()));
+        A_triplets.push_back(Eigen::Triplet<double>(i, 2, dir.z()));
+
+        // We only care about upper bound (max speed towards wall). Lower bound is negative infinity.
+        lower_bound(i) = -OsqpEigen::INFTY; 
+        
+        // CBF Rule: velocity towards wall <= gamma * (distance - safe_distance)
+        float max_safe_approach_speed = gamma * (dist - Drone::HAZARD_DISTANCE);
+        upper_bound(i) = static_cast<double>(max_safe_approach_speed);
+    }
+
+    // Add Kinematic Speed Limits to the QP so it doesn't solve for impossible speeds
+    // u_x limit
+    A_triplets.push_back(Eigen::Triplet<double>(num_hazards, 0, 1.0));
+    lower_bound(num_hazards) = -Drone::SPEED_MAX_FORWARD;
+    upper_bound(num_hazards) = Drone::SPEED_MAX_FORWARD;
+
+    // u_y limit
+    A_triplets.push_back(Eigen::Triplet<double>(num_hazards + 1, 1, 1.0));
+    lower_bound(num_hazards + 1) = -Drone::SPEED_MAX_STRAFE;
+    upper_bound(num_hazards + 1) = Drone::SPEED_MAX_STRAFE;
+
+    // u_z limit
+    A_triplets.push_back(Eigen::Triplet<double>(num_hazards + 2, 2, 1.0));
+    lower_bound(num_hazards + 2) = -Drone::SPEED_MAX_UP;
+    upper_bound(num_hazards + 2) = Drone::SPEED_MAX_UP;
+
+    A.setFromTriplets(A_triplets.begin(), A_triplets.end());
+
+    // 4. Feed the solver
+    // Because the number of constraints changes dynamically, we must completely clear 
+    // the workspace and the matrix data, rather than trying to update them in place.
+    solver.clearSolver();
+    solver.data()->clearHessianMatrix();
+    solver.data()->clearLinearConstraintsMatrix();
+    
+    solver.data()->setNumberOfVariables(num_vars);
+    solver.data()->setNumberOfConstraints(num_constraints);
+    
+    if(!solver.data()->setHessianMatrix(P)) return;
+    if(!solver.data()->setGradient(q)) return;
+    if(!solver.data()->setLinearConstraintsMatrix(A)) return;
+    if(!solver.data()->setLowerBound(lower_bound)) return;
+    if(!solver.data()->setUpperBound(upper_bound)) return;
+
+    // SHUT OSQP UP
+    solver.settings()->setVerbosity(false);
+
+    // Initialize the fresh solver
+    if(!solver.initSolver()) return;
+
+    // 5. Extract the safe correction vector
+    if(solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError) {
+        Eigen::VectorXd QPSolution = solver.getSolution();
+        correction_vec = Eigen::Vector3f(QPSolution(0), QPSolution(1), QPSolution(2));
+    } else {
+        // If the solver fails (usually means completely trapped), default to a hard hover
+        RCLCPP_WARN(this->get_logger(), RED "CBF Solver Failed! Forcing Hover" RESET);
+        correction_vec.setZero();
+    }
 }
 
 void ReactiveOANode::resetVectors() {
@@ -215,7 +297,7 @@ void ReactiveOANode::resetVectors() {
     }
 
     // Leave correctin vec for damping
-    correction_vec.setZero();
+    // correction_vec.setZero();
 
     // Reset movement
     if(lost_perception) {
@@ -362,4 +444,12 @@ void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::S
 
     last_perception = msg;
     computeMovementVector();
+}
+
+void ReactiveOANode::initCBFSolver() {
+    solver.settings()->setVerbosity(false); // Keep the terminal clean
+    solver.settings()->setWarmStart(true);  // Speeds up consecutive solves
+    solver.settings()->setMaxIteration(4000);
+    solver.settings()->setAbsoluteTolerance(1e-4);
+    solver.settings()->setRelativeTolerance(1e-4);
 }

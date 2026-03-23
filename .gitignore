@@ -5,10 +5,7 @@ install/
 log/
 others/
 pyvenv/*
-**/px4_msgs
-**/px4_ros_com
-src/ros_gz
-src/simulation_interfaces
+src/Out_source/*
 **/__pycache__/
 **/*.bak
 

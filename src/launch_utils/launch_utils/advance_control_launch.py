@@ -53,13 +53,13 @@ def generate_launch_description():
         #     output='screen',
         #     arguments=['--ros-args', '--log-level', 'warn']
         # ),
-        Node(
-            package='lidar_2d_handler',
-            executable='lidar_2d_handler',
-            name='lidar_2d_handler',
-            output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='lidar_2d_handler',
+        #     executable='lidar_2d_handler',
+        #     name='lidar_2d_handler',
+        #     output='screen',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
          Node(
             package='contact_parser',
             executable='contact_parser',

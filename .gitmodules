@@ -1,0 +1,9 @@
+[submodule "src/Out_source/px4_msgs"]
+	path = src/Out_source/px4_msgs
+	url = https://github.com/PX4/px4_msgs
+[submodule "src/Out_source/px4_ros_com"]
+	path = src/Out_source/px4_ros_com
+	url = https://github.com/PX4/px4_ros_com
+[submodule "src/Out_source/voxblox_ros2_minimal"]
+	path = src/Out_source/voxblox_ros2_minimal
+	url = https://github.com/snt-arg/voxblox_ros2_minimal

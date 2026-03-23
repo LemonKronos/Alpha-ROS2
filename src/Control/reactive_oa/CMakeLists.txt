@@ -11,6 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(alpha_msgs REQUIRED)
 find_package(global_utils REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(osqp REQUIRED)
+find_package(OsqpEigen REQUIRED)
 
 include_directories(
   include
@@ -27,6 +30,11 @@ ament_target_dependencies(reactive_oa
   alpha_msgs
   global_utils
   visualization_msgs
+)
+
+target_link_libraries(reactive_oa
+  osqp::osqp
+  OsqpEigen::OsqpEigen
 )
 
 install(TARGETS

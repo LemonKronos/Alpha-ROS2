@@ -17,7 +17,7 @@
 #endif
 #define PUBLISH_CORRECTION_CONTROL 1
 
-#include <Eigen/Dense>
+#include <OsqpEigen/OsqpEigen.h>
 
 using std::placeholders::_1;
 constexpr uint8_t OBSTACLE_DAMPING_INIT = 5;
@@ -69,13 +69,17 @@ private:
     uint8_t repulsive_damping_counter = 0;
     uint8_t obstacle_clear_damping_counter = 0;
 
+    OsqpEigen::Solver solver;
+
     // Methods
+    void initCBFSolver();
+    
     void computeControlVector();
     void computeMovementVector();
     void computeRepulsiveVector();
     void computeCorrectionVector();
     void resetVectors();
-    
+
     #ifdef VISUALIZE
         void publishVectorArrow(
             const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
