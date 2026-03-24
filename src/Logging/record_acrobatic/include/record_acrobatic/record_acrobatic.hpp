@@ -94,6 +94,10 @@ private:
     // Current Action Buffer
     std::vector<float> current_action_;
 
+    // // Dynamic info
+    // DynamicInfo* recordStorage;
+    // DynamicInfo* maneuverName;
+
     // --- Video Writers ---
     cv::VideoWriter vw_rgb_;
     cv::VideoWriter vw_depth_;

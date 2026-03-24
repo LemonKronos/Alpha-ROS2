@@ -5,6 +5,8 @@
 #include <set>
 #include <memory>
 
+#include "global_utils/system_config.hpp"
+
 // Native Gazebo Interfaces
 #include <ros_gz_interfaces/srv/spawn_entity.hpp>
 #include <ros_gz_interfaces/srv/delete_entity.hpp>

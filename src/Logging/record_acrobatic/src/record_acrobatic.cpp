@@ -11,6 +11,10 @@ RecordAcrobaticNode::RecordAcrobaticNode()
 {
     Global::setup_for_simulation(this);
 
+    // // Dynamic info
+    // recordStorage = &Path::RECORD_STORAGE();
+    // maneuverName = &Name::RECORDED_MANUEVER();
+
     // Path Config
     fs::create_directories(Path::RECORD_ACROBATIC);
 
@@ -238,7 +242,7 @@ void RecordAcrobaticNode::finish_episode() {
 
     // Save Meta
     json meta;
-    meta["expert_manuever"] = Path::RECORD_ACROBATIC_MANUEVER_NAME;
+    meta["expert_manuever"] = Name::RECORDED_MANUEVER;
     meta["fps"] = Clock::LOOP_RATE;
     meta["timestamp_start"] = start_timestamp_;
     meta["timestamp_end"] = end_ts;

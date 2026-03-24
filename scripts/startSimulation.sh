@@ -1,16 +1,12 @@
 #!/bin/bash
 
-# ==========================================
-# Global Variables
-# ==========================================
-export WORLD_NAME="grasslands"
-# export WORLD_NAME="obstacle_tunnel"
+GLOBAL_ENV="$HOME/MyCode/Project/Drone/ROS2/scripts/global.sh"
 
-# export DRONE_NAME="gz_alpha_minus_1"
-export DRONE_NAME="gz_alpha_minus_2"
-# export DRONE_NAME="gz_standard_vtol"
-# export DRONE_NAME="gz_tiltrotor"
-# export DRONE_NAME="gz_x500"
+if [ -f "$GLOBAL_ENV" ]; then
+    source "$GLOBAL_ENV"
+else
+    echo '[Missing Global ENV setup]'
+fi
 
 export FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
 export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
@@ -52,7 +48,7 @@ PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=0 \\
 PX4_GZ_MODEL_POSE="0,13,1" \\
-make px4_sitl "$DRONE_NAME"
+make px4_sitl "gz_$DRONE_NAME"
 exec zsh
 EOF
 )" & echo $! >> /tmp/sim_pids.txt &&
@@ -81,7 +77,7 @@ start_gz_ros_bridge() {
     # Wait for clock to ensure GZ is up
     until gz topic -l | grep -q "/clock"; do sleep 1; done
 
-    ros2 launch launch_utils ros_gz_bridge_launch.py world_name:="${WORLD_NAME}" drone_name:="${DRONE_NAME}"
+    ros2 launch launch_utils ros_gz_bridge_launch.py
   ' & echo $! >> /tmp/sim_pids.txt
   printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 }

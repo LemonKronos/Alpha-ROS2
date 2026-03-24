@@ -32,6 +32,7 @@ public:
     ProcessingThread(
         const std::string& name,
         rclcpp::Node* thisNode,
+        const std::string& drone_name,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
         moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
@@ -44,13 +45,13 @@ public:
 
 private:
     std::string m_name;
-
     rclcpp::Node* m_thisNode;
-
+    std::string m_base_link;
     const std::string& m_topic;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_depth_cam_SUB;
 
     std::shared_ptr<tf2_ros::Buffer> m_tf_buffer;
+
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_depth_cam_SUB;
 
     bool m_has_tf_body;
     Eigen::Isometry3d m_iso_body;
@@ -78,6 +79,7 @@ class HazardPointThread {
 public:
     HazardPointThread(
         rclcpp::Node* thisNode,
+        const std::string& drone_name,
         const int num_worker
     );
     ~HazardPointThread();
@@ -85,7 +87,9 @@ public:
 
 private:
     rclcpp::Node* m_thisNode;
+
     rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr m_hazard_voxel_PUB;
+    std::string m_base_link;
 
     const int m_num_worker;
     const octomap::point3d origin; 
@@ -103,6 +107,7 @@ class WorldUpdateThread {
 public:
     WorldUpdateThread(
         rclcpp::Node* thisNode,
+        const std::string& drone_name,
         const int num_worker
     );
     ~WorldUpdateThread();
@@ -112,6 +117,8 @@ public:
     
 private:
     rclcpp::Node* m_thisNode;
+
+    std::string m_base_link;
 
     rclcpp::TimerBase::SharedPtr world_update_TIME;
 

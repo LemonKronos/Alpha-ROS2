@@ -1,12 +1,12 @@
-from launch import LaunchDescription, LaunchContext
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
+from launch import LaunchDescription
 from launch_ros.actions import Node
+from python_utils.utils import *
 
-def generate_bridge_node(context: LaunchContext, *args, **kwargs):
+def generate_launch_description():
     # 1. Grab the dynamic variables
-    world_name = LaunchConfiguration('world_name').perform(context)
-    drone_name = LaunchConfiguration('drone_name').perform(context)
+    info = Global.Info()
+    drone_name = info.getDroneName() + "_0"
+    world_name = info.getWorldName()
 
     # 2. Define the topics to bridge (Topics need type mapping and remapping)
     topics_to_bridge = [
@@ -39,12 +39,12 @@ def generate_bridge_node(context: LaunchContext, *args, **kwargs):
         {"gz_topic": f"/world/{world_name}/model/{drone_name}/link/rotor_3/sensor/alpha_rotor_3_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor3/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
     ]
 
-    # 3. Define the Services (Services bridge directly, no remapping array needed)
+    # 3. Define the Services using a dictionary for auto-remapping
     services_to_bridge = [
-        f"/world/{world_name}/control@ros_gz_interfaces/srv/ControlWorld",
-        f"/world/{world_name}/create@ros_gz_interfaces/srv/SpawnEntity",
-        f"/world/{world_name}/remove@ros_gz_interfaces/srv/DeleteEntity",
-        f"/world/{world_name}/set_pose@ros_gz_interfaces/srv/SetEntityPose",
+        {"base_name": "control", "type": "ros_gz_interfaces/srv/ControlWorld"},
+        {"base_name": "create", "type": "ros_gz_interfaces/srv/SpawnEntity"},
+        {"base_name": "remove", "type": "ros_gz_interfaces/srv/DeleteEntity"},
+        {"base_name": "set_pose", "type": "ros_gz_interfaces/srv/SetEntityPose"},
     ]
 
     bridge_args = []
@@ -60,8 +60,19 @@ def generate_bridge_node(context: LaunchContext, *args, **kwargs):
         if topic['gz_topic'] != topic['ros_topic']:
             bridge_remappings.append((topic['gz_topic'], topic['ros_topic']))
 
-    # 5. Append the services straight to the argument list
-    bridge_args.extend(services_to_bridge)
+    # 5. Parse our services and auto-generate the remappings
+    for srv in services_to_bridge:
+        # Build the dynamic Gazebo name (e.g., /world/grasslands/control)
+        gz_srv = f"/world/{world_name}/{srv['base_name']}"
+        
+        # Build the clean ROS name (e.g., /world/control)
+        ros_srv = f"/world/{srv['base_name']}"
+
+        # Bridge argument format for services is simpler: gz_service@ros_type
+        bridge_args.append(f"{gz_srv}@{srv['type']}")
+
+        # Tell the node to remap the messy Gazebo name to your clean ROS name
+        bridge_remappings.append((gz_srv, ros_srv))
 
     # 6. Create the Node, passing everything directly in memory
     bridge_node = Node(
@@ -73,11 +84,4 @@ def generate_bridge_node(context: LaunchContext, *args, **kwargs):
         remappings=bridge_remappings
     )
 
-    return [bridge_node]
-
-def generate_launch_description():
-    return LaunchDescription([
-        DeclareLaunchArgument('world_name', default_value='grasslands', description='Gazebo world name'),
-        DeclareLaunchArgument('drone_name', default_value='alpha_minus_2_0', description='Drone model name'),
-        OpaqueFunction(function=generate_bridge_node)
-    ])
+    return LaunchDescription([bridge_node])

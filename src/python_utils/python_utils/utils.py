@@ -1,4 +1,5 @@
 import time
+import os
 import math
 from rclpy.parameter import Parameter
 
@@ -107,49 +108,66 @@ class Sensor:
 WINDOW_OVERVIEW_FPV = "Alpha FPV"
 
 # ################################################ Function
-def setup_for_simulation(node):
-    """
-    Auto-detects if /clock exists by polling the graph.
-    Does NOT create a temporary node to avoid 'Publisher already registered' warnings.
-    """
-    # 1. Check if the user manually set the param already. If so, respect it.
-    if node.has_parameter("use_sim_time"):
-        if node.get_parameter("use_sim_time").value:
-            return
 
-    # node.get_logger().info(f"{PINK}Auto check if node run in simulation...{RESET}")
-
-    # 2. Loop Wait (Polling the Graph)
-    clock_found = False
-    retries = 30 # 3 seconds
-
-    while retries > 0:
-        # Get list of all topics currently known [('topic_name', ['type']), ...]
-        topic_names_and_types = node.get_topic_names_and_types()
-        
-        # Extract just the names for checking
-        topic_names = [t[0] for t in topic_names_and_types]
-
-        if "/clock" in topic_names:
-            clock_found = True
-            break
-        
-        # Wait a bit for discovery
-        time.sleep(0.1)
-        retries -= 1
-
-    # 3. Apply Setting
-    if clock_found:
+class Global:
+    def setup_for_simulation(node):
+        """
+        Auto-detects if /clock exists by polling the graph.
+        Does NOT create a temporary node to avoid 'Publisher already registered' warnings.
+        """
+        # 1. Check if the user manually set the param already. If so, respect it.
         if node.has_parameter("use_sim_time"):
-            node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
-        else:
-            node.declare_parameter("use_sim_time", True)
+            if node.get_parameter("use_sim_time").value:
+                return
+
+        # node.get_logger().info(f"{PINK}Auto check if node run in simulation...{RESET}")
+
+        # 2. Loop Wait (Polling the Graph)
+        clock_found = False
+        retries = 30 # 3 seconds
+
+        while retries > 0:
+            # Get list of all topics currently known [('topic_name', ['type']), ...]
+            topic_names_and_types = node.get_topic_names_and_types()
             
-        # Pink color warning (Standard ANSI escape codes work in most terminals)
-        node.get_logger().warn(f"{YELLOW}Node run using simulation clock!{RESET}")
-    else:
-        # Default to Realtime if not found
-        node.get_logger().info(f"{PINK}No simulation clock found, run in realtime.{RESET}")
-        if not node.has_parameter("use_sim_time"):
-            node.declare_parameter("use_sim_time", False)
-    
+            # Extract just the names for checking
+            topic_names = [t[0] for t in topic_names_and_types]
+
+            if "/clock" in topic_names:
+                clock_found = True
+                break
+            
+            # Wait a bit for discovery
+            time.sleep(0.1)
+            retries -= 1
+
+        # 3. Apply Setting
+        if clock_found:
+            if node.has_parameter("use_sim_time"):
+                node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+            else:
+                node.declare_parameter("use_sim_time", True)
+                
+            # Pink color warning (Standard ANSI escape codes work in most terminals)
+            node.get_logger().warn(f"{YELLOW}Node run using simulation clock!{RESET}")
+        else:
+            # Default to Realtime if not found
+            node.get_logger().info(f"{PINK}No simulation clock found, run in realtime.{RESET}")
+            if not node.has_parameter("use_sim_time"):
+                node.declare_parameter("use_sim_time", False)
+
+    class Info:
+        drone_name = "error_drone_name"
+        world_name = "error_world_name"
+
+        def __init__(self):
+            self.drone_name = os.getenv('DRONE_NAME', 'error_drone_name')
+            self.world_name = os.getenv('WORLD_NAME', 'error_world_name')
+            
+            # print(f"Loaded - World: {self.world_name}, Drone: {self.drone_name}")
+
+        def getDroneName(self):
+            return self.drone_name
+        
+        def getWorldName(self):
+            return self.world_name

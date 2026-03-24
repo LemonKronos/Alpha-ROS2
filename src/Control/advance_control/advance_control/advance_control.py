@@ -18,7 +18,7 @@ class AdvanceControlNode(Node):
     def __init__(self):
         super().__init__('advance_control_node')
         
-        setup_for_simulation(self)
+        Global.setup_for_simulation(self)
 
         # 1. Setup Wall Clock (Thread-safe, steady)
         self.wall_clock = rclpy.clock.Clock(clock_type=rclpy.clock.ClockType.STEADY_TIME)

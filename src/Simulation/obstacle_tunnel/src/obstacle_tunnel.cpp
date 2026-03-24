@@ -9,19 +9,17 @@ using namespace std::chrono_literals;
 
 ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
     // Parameters
-    this->declare_parameter("drone_name", "alpha_minus_2_0");
-    drone_name_ = this->get_parameter("drone_name").as_string();
+    Global::Info info;
+    drone_name_ = info.getDroneName() + "_0";
 
     manager_ = std::make_unique<ObstacleManager>();
     slice_depth_ = manager_->get_slice_depth();
-
-    std::string world_name = "obstacle_tunnel"; 
     
     // --- GZ Clients ---
-    spawn_client_ = this->create_client<ros_gz_interfaces::srv::SpawnEntity>("/world/" + world_name + "/create");
-    delete_client_ = this->create_client<ros_gz_interfaces::srv::DeleteEntity>("/world/" + world_name + "/remove");
-    control_world_client_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>("/world/" + world_name + "/control");
-    set_pose_client_ = this->create_client<ros_gz_interfaces::srv::SetEntityPose>("/world/" + world_name + "/set_pose");
+    spawn_client_ = this->create_client<ros_gz_interfaces::srv::SpawnEntity>(Service::WORLD_SPAWN);
+    delete_client_ = this->create_client<ros_gz_interfaces::srv::DeleteEntity>(Service::WORLD_KILL);
+    control_world_client_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(Service::WORLD_CONTROL);
+    set_pose_client_ = this->create_client<ros_gz_interfaces::srv::SetEntityPose>(Service::WORLD_SET_POSE);
 
     // --- Subscriptions ---
     perception_sub_ = this->create_subscription<alpha_msgs::msg::FusePerception>(

@@ -8,7 +8,7 @@ SimulationControlNode::SimulationControlNode()
       new_frame_available_(false)
 {
     // 1. Setup Window
-    cv::namedWindow(WINDOW_OVERVIEW_FPV, cv::WINDOW_AUTOSIZE);
+    cv::namedWindow(Window::OVERVIEW_FPV, cv::WINDOW_AUTOSIZE);
 
     // 2. Image Subscription (Best Effort)
     sub_img_ = this->create_subscription<sensor_msgs::msg::Image>(
@@ -23,18 +23,18 @@ SimulationControlNode::SimulationControlNode()
         std::bind(&SimulationControlNode::record_control_callback, this, std::placeholders::_1));
 
     // 4. World Control Client
-    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(Service::CONTROL_WORLD_NAME);
+    client_gz_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(Service::WORLD_CONTROL);
 
     // 5. Wall Timer Real
     timer_ = this->create_wall_timer(
-        16ms, 
+        33ms, 
         std::bind(&SimulationControlNode::node_loop, this));
 
     RCLCPP_INFO(this->get_logger(), GREEN "Simulation Control Node Started. Listening to %s for Pause." RESET, Topic::LOGGER_RECORD);
 }
 
 SimulationControlNode::~SimulationControlNode() {
-    cv::destroyWindow(WINDOW_OVERVIEW_FPV);
+    cv::destroyWindow(Window::OVERVIEW_FPV);
 }
 
 void SimulationControlNode::img_callback(const sensor_msgs::msg::Image::SharedPtr msg) {
@@ -84,7 +84,7 @@ void SimulationControlNode::node_loop() {
                 cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
         }
         
-        cv::imshow(WINDOW_OVERVIEW_FPV, frame_to_show);
+        cv::imshow(Window::OVERVIEW_FPV, frame_to_show);
     }
 }
 

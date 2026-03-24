@@ -34,6 +34,22 @@ namespace Clock {
 
 // ################################# SYSTEM PARAMETER
 
+// Dynamic info: data taken from env, json, yaml, etc ...
+// class DynamicInfo {
+// public:
+//     DynamicInfo() { info = "Missing derive class update()"; };
+//     inline const char* get() { return info.c_str(); }
+//     virtual void update() = 0;
+//     void updateENV(const char* env_name);
+// protected:
+//     std::string info;
+// };
+
+namespace Name {
+    // class RECORDED_MANUEVER : public DynamicInfo { public: void update(); };
+    constexpr const char* RECORDED_MANUEVER = "obstacle_tunnel_demo";
+}
+
 // System thesholds
 namespace Threshold {
     constexpr uint8_t MISSED_TOPIC = Clock::LOOP_RATE / 10.0f;
@@ -44,8 +60,8 @@ namespace Threshold {
 
 // Machine file directories
 namespace Path {
+    // class RECORD_STORAGE : public DynamicInfo { public: void update(); };
     constexpr const char* RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
-    constexpr const char* RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo";
 
 }
 
@@ -79,14 +95,14 @@ namespace Topic {
 
 // Service path
 namespace Service {
-    constexpr const char* CONTROL_WOLRD_GRASSLAND = "/world/grasslands/control";
-    constexpr const char* CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control";
-    constexpr const char* CONTROL_WORLD_NAME = CONTROL_WOLRD_GRASSLAND;
+    constexpr const char* WORLD_CONTROL = "/world/control";
+    constexpr const char* WORLD_SPAWN = "/world/create";
+    constexpr const char* WORLD_KILL = "/world/remove";
+    constexpr const char* WORLD_SET_POSE = "/world/set_pose";
 
 }
 
 namespace Drone {
-    constexpr const char* NAME = "alpha_minus_2_0";
     constexpr float WIDTH = 2.15f;
     constexpr float LENGTH = 0.93f;
     constexpr float HEIGHT = 0.31f;
@@ -133,6 +149,16 @@ namespace Window {
 // ################################# FUNCTION
 namespace Global {
     void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
-
+    
+    class Info {
+    private:
+        std::string drone_name;
+        std::string world_name;
+    public:
+        Info();
+        ~Info();
+        std::string getDroneName() { return drone_name;};
+        std::string getWorldName() { return world_name;};
+    };
 }
 

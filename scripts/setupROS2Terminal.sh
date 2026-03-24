@@ -1,10 +1,18 @@
 #!/bin/zsh
 
 ALL_GOOD=1
+GLOBAL_ENV="$HOME/MyCode/Project/Drone/ROS2/scripts/global.sh"
 ROS_SETUP="/opt/ros/jazzy/setup.zsh"
 ROS_LOCAL_SETUP="$HOME/MyCode/Project/Drone/ROS2/install/local_setup.zsh"
 ROS_DDS_CONFIG="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
 ROS_PYVENV="$HOME/MyCode/Project/Drone/ROS2/pyvenv/bin/activate"
+
+if [ -f "$GLOBAL_ENV" ]; then
+    source "$GLOBAL_ENV"
+else
+    echo '[Missing Global ENV setup]'
+    ALL_GOOD=0
+fi
 
 if [ -f "$ROS_SETUP" ]; then
     source "$ROS_SETUP"

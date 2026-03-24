@@ -11,8 +11,6 @@
 #include "alpha_msgs/msg/record_control.hpp"
 #include "global_utils/system_config.hpp"
 
-constexpr const char* WINDOW_OVERVIEW_FPV = "Alpha FPV";
-
 class SimulationControlNode : public rclcpp::Node {
 public:
     SimulationControlNode();

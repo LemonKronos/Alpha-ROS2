@@ -46,13 +46,13 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='depth_cam',
-        #     executable='depth_cam',
-        #     name='depth_cam',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='depth_cam',
+            executable='depth_cam',
+            name='depth_cam',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
         Node(
             package='lidar_2d_handler',
             executable='lidar_2d_handler',
@@ -81,11 +81,11 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='hazard_voxels',
-        #     executable='hazard_voxels',
-        #     name='hazard_voxels',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='hazard_voxels',
+            executable='hazard_voxels',
+            name='hazard_voxels',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
     ])

@@ -29,7 +29,7 @@ class PygameControlNode:
     def __init__(self, node: Node):
         self.node = node
 
-        setup_for_simulation(self.node)
+        Global.setup_for_simulation(self.node)
 
         # Movement / tuning params
         self.WASD_SPEED = 10.0

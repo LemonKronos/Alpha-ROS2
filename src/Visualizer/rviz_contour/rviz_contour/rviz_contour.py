@@ -13,7 +13,10 @@ class RvizContour(Node):
     def __init__(self):
         super().__init__('rviz_contour')
 
-        setup_for_simulation(self)
+        Global.setup_for_simulation(self)
+
+        info = Global.Info()
+        self.drone_base = info.getDroneName() + "_0/base_link"
 
         # Set up both pairs easily
         self._setup_contour_pair(
@@ -58,7 +61,7 @@ class RvizContour(Node):
                     point_array.append(Point(x=point.x, y=point.y, z=0.0))
                 
             marker = Marker()
-            marker.header.frame_id = "alpha_minus_2_0/base_link"
+            marker.header.frame_id = self.drone_base
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = ns
             marker.id = index

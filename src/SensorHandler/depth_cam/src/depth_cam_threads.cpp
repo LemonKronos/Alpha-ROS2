@@ -4,12 +4,13 @@
 alpha_brain::ProcessingThread::ProcessingThread(
     const std::string& name,
     rclcpp::Node* thisNode,
+    const std::string& drone_name,
     const std::string& topic,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
     const std::atomic<bool>& world_update,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue
-) : m_name(name), m_thisNode(thisNode), m_topic(topic), m_tf_buffer(tf_buffer), m_world_update(world_update), m_hazard_point_queue(hazard_point_queue), m_world_update_queue(world_update_queue) {
+) : m_name(name), m_thisNode(thisNode), m_base_link(drone_name + "_0/base_link"), m_topic(topic), m_tf_buffer(tf_buffer), m_world_update(world_update), m_hazard_point_queue(hazard_point_queue), m_world_update_queue(world_update_queue) {
     // Create subscriber
     m_depth_cam_SUB = thisNode->create_subscription<sensor_msgs::msg::PointCloud2>(
         m_topic,
@@ -39,7 +40,7 @@ void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::Sh
     if(!m_has_tf_body) {
         try {
             geometry_msgs::msg::TransformStamped tf_body = m_tf_buffer->lookupTransform(
-                "alpha_minus_2_0/base_link", // Target frame: body
+                m_base_link, // Target frame: body
                 msg->header.frame_id, // Current frame: depth camera
                 rclcpp::Time(0) // Time stamp don't matter
             );
@@ -178,8 +179,9 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
 alpha_brain::HazardPointThread::HazardPointThread(
     rclcpp::Node* thisNode,
+    const std::string& drone_name,
     const int num_worker
-) : m_thisNode(thisNode), m_num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
+) : m_thisNode(thisNode), m_base_link(drone_name + "_0/base_link"), m_num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
     // Create Publisher
     m_hazard_voxel_PUB = m_thisNode->create_publisher<alpha_msgs::msg::VoxelBlock>(
         Topic::VOXEL_HAZARD_SEEING,
@@ -248,7 +250,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
         return;
     }
     alpha_msgs::msg::VoxelBlock msg;
-    msg.header.frame_id = "alpha_minus_2_0/base_link";
+    msg.header.frame_id = m_base_link;
     msg.header.stamp = m_thisNode->get_clock()->now();
     msg.size = pa.points.size();
     msg.point_array = pa;
@@ -262,8 +264,9 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
 
 alpha_brain::WorldUpdateThread::WorldUpdateThread(
     rclcpp::Node* thisNode,
+    const std::string& drone_name,
     const int num_worker
-) : m_thisNode(thisNode), m_num_worker(num_worker) {
+) : m_thisNode(thisNode), m_base_link(drone_name + "_0/base_link"), m_num_worker(num_worker) {
     // Init variables
     m_running.store(false);
 

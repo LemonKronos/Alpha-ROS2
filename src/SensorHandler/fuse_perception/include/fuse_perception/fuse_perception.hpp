@@ -36,6 +36,7 @@ private:
     sensor_msgs::msg::LaserScan::SharedPtr last_scan_down = nullptr;
 
     // Variales
+    std::string drone_base;
     bool lost_lidar_down;
     uint8_t missed_lidar_down;
     bool lost_odometry;
