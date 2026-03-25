@@ -31,7 +31,7 @@ class ProcessingThread {
 public:
     ProcessingThread(
         const std::string& name,
-        rclcpp::Node* thisNode,
+        rclcpp::Node* theNode,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
         moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
@@ -44,7 +44,7 @@ public:
 
 private:
     std::string name;
-    rclcpp::Node* thisNode;
+    rclcpp::Node* theNode;
     const std::string& topic;
 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer;
@@ -77,14 +77,14 @@ private:
 class HazardPointThread {
 public:
     HazardPointThread(
-        rclcpp::Node* thisNode,
+        rclcpp::Node* theNode,
         const int num_worker
     );
     ~HazardPointThread();
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& getQueue();
 
 private:
-    rclcpp::Node* thisNode;
+    rclcpp::Node* theNode;
 
     Name::Dynamic::BASE_LINK base_link;
     rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr hazard_voxel_PUB;
@@ -104,7 +104,7 @@ private:
 class WorldUpdateThread {
 public:
     WorldUpdateThread(
-        rclcpp::Node* thisNode,
+        rclcpp::Node* theNode,
         const int num_worker
     );
     ~WorldUpdateThread();
@@ -113,7 +113,7 @@ public:
     void doWorldUpdate();
     
 private:
-    rclcpp::Node* thisNode;
+    rclcpp::Node* theNode;
 
     Name::Dynamic::BASE_LINK base_link;
 

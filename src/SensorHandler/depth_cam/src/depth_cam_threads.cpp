@@ -3,15 +3,15 @@
 #pragma region ProcessingThread class
 alpha_brain::ProcessingThread::ProcessingThread(
     const std::string& name,
-    rclcpp::Node* thisNode,
+    rclcpp::Node* theNode,
     const std::string& topic,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
     const std::atomic<bool>& world_update,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue
-) : name(name), thisNode(thisNode), topic(topic), tf_buffer(tf_buffer), world_update(world_update), hazard_point_queue(hazard_point_queue), world_update_queue(world_update_queue) {
+) : name(name), theNode(theNode), topic(topic), tf_buffer(tf_buffer), world_update(world_update), hazard_point_queue(hazard_point_queue), world_update_queue(world_update_queue) {
     // Create subscriber
-    this->depth_cam_SUB = thisNode->create_subscription<sensor_msgs::msg::PointCloud2>(
+    this->depth_cam_SUB = theNode->create_subscription<sensor_msgs::msg::PointCloud2>(
         this->topic,
         rclcpp::SensorDataQoS(),
         std::bind(&alpha_brain::ProcessingThread::DepthCamCallback, this, _1)
@@ -25,14 +25,14 @@ alpha_brain::ProcessingThread::ProcessingThread(
 
     // Spawn thread
     this->processing_thread = std::thread(&ProcessingThread::ConsumerLoop, this);
-    RCLCPP_INFO(this->thisNode->get_logger(), GREEN "Spawn worker %s processing thread" RESET, this->name.c_str());
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn worker %s processing thread" RESET, this->name.c_str());
 }
 
 alpha_brain::ProcessingThread::~ProcessingThread() {
     this->running.store(false);
     this->msg_queue.enqueue(nullptr);
     if(this->processing_thread.joinable()) this->processing_thread.join();
-    RCLCPP_INFO(this->thisNode->get_logger(), BLUE "%s processing thread destructor called" RESET, this->name.c_str());
+    RCLCPP_INFO(this->theNode->get_logger(), BLUE "%s processing thread destructor called" RESET, this->name.c_str());
 }
 
 void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg) {
@@ -45,10 +45,10 @@ void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::Sh
             );
             this->iso_body = tf2::transformToEigen(tf_body);
             this->has_tf_body = true;
-            RCLCPP_INFO(this->thisNode->get_logger(), GREEN "%s depth camera STATIC tf lookup complete" RESET, this->name.c_str());
+            RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera STATIC tf lookup complete" RESET, this->name.c_str());
         }
         catch(const tf2::TransformException& ex) {
-            RCLCPP_WARN(this->thisNode->get_logger(), RED "%s point clouds msg denied, cause by STATIC tf: %s" RESET, this->name.c_str(), ex.what());
+            RCLCPP_WARN(this->theNode->get_logger(), RED "%s point clouds msg denied, cause by STATIC tf: %s" RESET, this->name.c_str(), ex.what());
             return;
         }
     }
@@ -70,7 +70,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         sensor_msgs::msg::PointCloud2::SharedPtr msg;
         this->msg_queue.wait_dequeue(msg);
         while(this->msg_queue.try_dequeue(msg)) {
-            RCLCPP_WARN(this->thisNode->get_logger(), YELLOW "%s flushed a mesage" RESET, this->name.c_str());
+            RCLCPP_WARN(this->theNode->get_logger(), YELLOW "%s flushed a mesage" RESET, this->name.c_str());
         } // FLush to only use latest msg
         if(!this->running.load(std::memory_order_relaxed)) break;
 
@@ -85,7 +85,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         std::optional<Eigen::Isometry3d> iso_world;
         bool has_tf_world = false;
         if(world_update && !this->done_world_update) {
-            RCLCPP_INFO(this->thisNode->get_logger(), YELLOW "%s thread called world update" RESET, this->name.c_str());
+            RCLCPP_INFO(this->theNode->get_logger(), YELLOW "%s thread called world update" RESET, this->name.c_str());
             try {
                 geometry_msgs::msg::TransformStamped tf_world = this->tf_buffer->lookupTransform(
                     "world",
@@ -95,10 +95,10 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                 );
                 iso_world = tf2::transformToEigen(tf_world);
                 has_tf_world = true;
-                RCLCPP_INFO(this->thisNode->get_logger(), GREEN "%s depth camera DYNAMIC tf lookup complete" RESET, this->name.c_str());
+                RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera DYNAMIC tf lookup complete" RESET, this->name.c_str());
             }
             catch(const tf2::TransformException& ex) {
-                RCLCPP_WARN(this->thisNode->get_logger(), RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
+                RCLCPP_WARN(this->theNode->get_logger(), RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
                 has_tf_world = false;
             }
         }
@@ -177,11 +177,11 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 #pragma region HazardPointThread class
 
 alpha_brain::HazardPointThread::HazardPointThread(
-    rclcpp::Node* thisNode,
+    rclcpp::Node* theNode,
     const int num_worker
-) : thisNode(thisNode), num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
+) : theNode(theNode), num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
     // Create Publisher
-    this->hazard_voxel_PUB = this->thisNode->create_publisher<alpha_msgs::msg::VoxelBlock>(
+    this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VoxelBlock>(
         Topic::VOXEL_HAZARD_SEEING,
         rclcpp::SensorDataQoS()
     );
@@ -191,14 +191,14 @@ alpha_brain::HazardPointThread::HazardPointThread(
 
     // Spawn persistent thread
     this->hazard_point_thread = std::thread(&HazardPointThread::ConsumerLoop, this);
-    RCLCPP_INFO(this->thisNode->get_logger(), GREEN "Spawn Consumer thread Hazard Point" RESET);
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn Consumer thread Hazard Point" RESET);
 }
 
 alpha_brain::HazardPointThread::~HazardPointThread() {
     this->running.store(false);
     this->hazard_point_queue.enqueue(nullptr);
     if(this->hazard_point_thread.joinable()) this->hazard_point_thread.join();
-    RCLCPP_INFO(this->thisNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
+    RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 }
 
 moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& alpha_brain::HazardPointThread::getQueue() {
@@ -244,16 +244,16 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
     }
 
     if(pa.points.empty()) {
-        RCLCPP_INFO(this->thisNode->get_logger(), YELLOW "Obstacle clear" RESET);
+        RCLCPP_INFO(this->theNode->get_logger(), YELLOW "Obstacle clear" RESET);
         return;
     }
     alpha_msgs::msg::VoxelBlock msg;
     msg.header.frame_id = this->base_link.get();
-    msg.header.stamp = this->thisNode->get_clock()->now();
+    msg.header.stamp = this->theNode->get_clock()->now();
     msg.size = pa.points.size();
     msg.point_array = pa;
     this->hazard_voxel_PUB->publish(msg);
-    RCLCPP_INFO(this->thisNode->get_logger(), GREEN "Published %d hazard points" RESET, pa.points.size());
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Published %d hazard points" RESET, pa.points.size());
 }
 
 #pragma endregion
@@ -261,14 +261,14 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
 #pragma region WorlUpdateThread class
 
 alpha_brain::WorldUpdateThread::WorldUpdateThread(
-    rclcpp::Node* thisNode,
+    rclcpp::Node* theNode,
     const int num_worker
-) : thisNode(thisNode), num_worker(num_worker) {
+) : theNode(theNode), num_worker(num_worker) {
     // Init variables
     this->running.store(false);
 
     // Create wall timer
-    world_update_TIME = this->thisNode->create_timer(
+    world_update_TIME = this->theNode->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_SLOW_NANOSEC),
         std::bind(&alpha_brain::WorldUpdateThread::doWorldUpdate, this)
     );
@@ -278,7 +278,7 @@ alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
     this->running.store(false);
     this->world_update_queue.enqueue(nullptr);
     if(this->world_update_thread.joinable()) this->world_update_thread.join();
-    RCLCPP_INFO(this->thisNode->get_logger(), BLUE "World update thread destructor called" RESET);
+    RCLCPP_INFO(this->theNode->get_logger(), BLUE "World update thread destructor called" RESET);
 }
 
 const std::atomic<bool>& alpha_brain::WorldUpdateThread::getStatus() {
@@ -298,7 +298,7 @@ void alpha_brain::WorldUpdateThread::doWorldUpdate() {
 
     this->running.store(true);
     this->world_update_thread = std::thread(&WorldUpdateThread::ConsumerLoop, this);
-    RCLCPP_INFO(this->thisNode->get_logger(), GREEN "Spawn Consumer thread World Update" RESET);
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn Consumer thread World Update" RESET);
 }
 
 void alpha_brain::WorldUpdateThread::ConsumerLoop() {
@@ -320,9 +320,9 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
         // I had no idea whether this batch cloud will get push to the existing octomap or make new octomap, so for now the batch cloud just sit here and die
     }
     this->running.store(false);
-    if(has_data && worker_finished >= 3) RCLCPP_INFO(this->thisNode->get_logger(), GREEN "Wolrd update complete" RESET);
-    else if(has_data && worker_finished < 3) RCLCPP_WARN(this->thisNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
-    else RCLCPP_WARN(this->thisNode->get_logger(), PINK "Wolrd update empty" RESET);
+    if(has_data && worker_finished >= 3) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
+    else if(has_data && worker_finished < 3) RCLCPP_WARN(this->theNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
+    else RCLCPP_WARN(this->theNode->get_logger(), PINK "Wolrd update empty" RESET);
     // Thread naturally die here
 }
 
