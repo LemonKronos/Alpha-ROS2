@@ -67,7 +67,7 @@ private:
     float slice_depth_;
     float render_buffer_ = 30.0f; 
     float current_drone_x_ = 0.0f;
-    std::string drone_name_;
+    Name::Dynamic::DRONE drone_name;
     
     int bearable_crash_count_ = 0;
     

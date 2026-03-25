@@ -17,19 +17,53 @@
 
 #pragma region DynamicInfo
 
-// void DynamicInfo::updateENV(const char* env_name) {
-//     this->info = "UNSET";
-//     const char* env_info = std::getenv(env_name);
-//     if(env_info) this->info = std::string(env_info);
-// }
+DynamicInfo::DynamicInfo(std::function<std::string()> logic) 
+    : update_logic(logic), info("UNSET") {
+    
+    if (update_logic) {
+        info = update_logic(); // Auto-runs on construction!
+    }
+}
 
-// void Name::RECORDED_MANUEVER::update() {
-//     this->updateENV("NAME_RECORDED_MANUEVER");
-// }
+void DynamicInfo::update() {
+    if (update_logic) {
+        info = update_logic();
+    }
+}
 
-// void Path::RECORD_STORAGE::update() {
-//     this->updateENV("RECORD_STORAGE");
-// }
+std::string DynamicInfoHelper::updateENV(const char* env_name) {
+    const char* env_info = std::getenv(env_name);
+    if(env_info) {
+        // printf(GREEN "Get ENV success %s = %s\n" RESET, env_name, env_info);
+        return std::string(env_info);
+    }
+    else {
+        printf(RED "Get ENV error %s\n" RESET, env_name);
+        return "UNSET";
+    }
+}
+
+Name::Dynamic::DRONE::DRONE() : DynamicInfo([]() -> std::string {
+    return DynamicInfoHelper::updateENV("DRONE_NAME") + "_0";
+}) {}
+
+Name::Dynamic::BASE_LINK::BASE_LINK() : DynamicInfo([]() -> std::string {
+    Name::Dynamic::DRONE drone_name;
+    return std::string(drone_name.get()) + "/base_link";
+}) {}
+
+Name::Dynamic::WORLD::WORLD() : DynamicInfo([]() -> std::string {
+    return DynamicInfoHelper::updateENV("WOLRD_NAME");
+}) {}
+
+Name::Dynamic::RECORDED_MANUEVER::RECORDED_MANUEVER() : DynamicInfo([]() -> std::string {
+    return DynamicInfoHelper::updateENV("RECORDED_MANUEVER_NAME");
+}) {}
+
+Path::Dynamic::RECORD_STORAGE::RECORD_STORAGE() : DynamicInfo([]() -> std::string {
+    return DynamicInfoHelper::updateENV("RECORD_STORAGE_PATH");
+}) {}
+
 
 #pragma endregion
 
@@ -83,22 +117,22 @@ void Global::setup_for_simulation(rclcpp::Node *node) {
 
 #pragma endregion
 
-Global::Info::Info() {
-    // Setup fallback
-    drone_name = "error_drone_name";
-    world_name = "error_world_name";
+// Global::Info::Info() {
+//     // Setup fallback
+//     drone_name = "error_drone_name";
+//     world_name = "error_world_name";
 
-    // Get info
-    const char* env_drone = std::getenv("DRONE_NAME");
-    const char* env_world = std::getenv("WORLD_NAME");
+//     // Get info
+//     const char* env_drone = std::getenv("DRONE_NAME");
+//     const char* env_world = std::getenv("WORLD_NAME");
 
-    // Check null
-    if(env_drone) drone_name = std::string(env_drone);
-    if(env_world) world_name = std::string(env_world);
+//     // Check null
+//     if(env_drone) drone_name = std::string(env_drone);
+//     if(env_world) world_name = std::string(env_world);
 
-    // printf(GREEN "Loaded %s in %s" RESET, drone_name.c_str(), world_name.c_str());
-}
+//     // printf(GREEN "Loaded %s in %s" RESET, drone_name.c_str(), world_name.c_str());
+// }
 
-Global::Info::~Info() {
-    // Destructor (can stay empty for this)
-}
+// Global::Info::~Info() {
+//     // Destructor (can stay empty for this)
+// }

@@ -15,9 +15,10 @@
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker.hpp>
 #endif
-#define PUBLISH_CORRECTION_CONTROL 1
 
-#include <Eigen/Dense>
+#ifndef DO_REACTIVE_OA
+    #define DO_REACTIVE_OA 1
+#endif
 
 using std::placeholders::_1;
 constexpr uint8_t OBSTACLE_DAMPING_INIT = 5;
@@ -77,6 +78,7 @@ private:
     void resetVectors();
     
     #ifdef VISUALIZE
+        Name::Dynamic::BASE_LINK base_link;
         void publishVectorArrow(
             const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
             const Eigen::Vector3f& vec,

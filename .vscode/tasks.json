@@ -4,7 +4,7 @@
         {
             "label": "Build ROS2 Single Node",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; ionice -c2 -n7 nice -n 10 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --packages-up-to ${input:packageName}",
+            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --packages-up-to ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {

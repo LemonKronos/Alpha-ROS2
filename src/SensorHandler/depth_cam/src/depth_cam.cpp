@@ -5,7 +5,7 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     {
 
     Global::setup_for_simulation(this);
-    info = std::make_unique<Global::Info>();
+
 
     // Frame transform
     tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -19,12 +19,11 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     );
 
     // Init variables
-    hazard_point_thread = std::make_unique<HazardPointThread>(this, info->getDroneName(), 3);
-    world_update_thread = std::make_unique<WorldUpdateThread>(this, info->getDroneName(), 3);
+    hazard_point_thread = std::make_unique<HazardPointThread>(this, 3);
+    world_update_thread = std::make_unique<WorldUpdateThread>(this, 3);
     front_processing_thread = std::make_unique<ProcessingThread>(
         "Front",
         this,
-        info->getDroneName(), 
         Topic::DEPTH_CAM_FRONT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
@@ -35,7 +34,6 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     left_processing_thread = std::make_unique<ProcessingThread>(
         "Left",
         this,
-        info->getDroneName(), 
         Topic::DEPTH_CAM_LEFT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
@@ -46,7 +44,6 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     right_processing_thread = std::make_unique<ProcessingThread>(
         "Right", 
         this, 
-        info->getDroneName(), 
         Topic::DEPTH_CAM_RIGHT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),

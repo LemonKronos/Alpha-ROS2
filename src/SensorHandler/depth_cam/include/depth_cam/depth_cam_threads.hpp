@@ -32,7 +32,6 @@ public:
     ProcessingThread(
         const std::string& name,
         rclcpp::Node* thisNode,
-        const std::string& drone_name,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
         moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
@@ -44,29 +43,29 @@ public:
     void updateSafeBubble(const float hazard_distance_sq);
 
 private:
-    std::string m_name;
-    rclcpp::Node* m_thisNode;
-    std::string m_base_link;
-    const std::string& m_topic;
+    std::string name;
+    rclcpp::Node* thisNode;
+    const std::string& topic;
 
-    std::shared_ptr<tf2_ros::Buffer> m_tf_buffer;
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer;
 
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_depth_cam_SUB;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr depth_cam_SUB;
 
-    bool m_has_tf_body;
-    Eigen::Isometry3d m_iso_body;
+    Name::Dynamic::BASE_LINK base_link;
+    bool has_tf_body;
+    Eigen::Isometry3d iso_body;
 
-    std::atomic<float> m_hazard_distance_sq; // metter square
+    std::atomic<float> hazard_distance_sq; // metter square
 
-    std::atomic<bool> m_running;
-    const std::atomic<bool>& m_world_update;
-    bool m_done_world_update;
+    std::atomic<bool> running;
+    const std::atomic<bool>& world_update;
+    bool done_world_update;
 
-    std::thread m_processing_thread;
+    std::thread processing_thread;
 
-    moodycamel::BlockingConcurrentQueue<sensor_msgs::msg::PointCloud2::SharedPtr> m_msg_queue;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& m_hazard_point_queue; // Send in batch of smaler point cloud
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& m_world_update_queue; // Send in batch of smaler point cloud
+    moodycamel::BlockingConcurrentQueue<sensor_msgs::msg::PointCloud2::SharedPtr> msg_queue;
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue; // Send in batch of smaler point cloud
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue; // Send in batch of smaler point cloud
     
     void ConsumerLoop();
 
@@ -79,23 +78,22 @@ class HazardPointThread {
 public:
     HazardPointThread(
         rclcpp::Node* thisNode,
-        const std::string& drone_name,
         const int num_worker
     );
     ~HazardPointThread();
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& getQueue();
 
 private:
-    rclcpp::Node* m_thisNode;
+    rclcpp::Node* thisNode;
 
-    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr m_hazard_voxel_PUB;
-    std::string m_base_link;
+    Name::Dynamic::BASE_LINK base_link;
+    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr hazard_voxel_PUB;
 
-    const int m_num_worker;
+    const int num_worker;
     const octomap::point3d origin; 
-    std::atomic<bool> m_running;
-    std::thread m_hazard_point_thread;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> m_hazard_point_queue;
+    std::atomic<bool> running;
+    std::thread hazard_point_thread;
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> hazard_point_queue;
 
     void ConsumerLoop();
     void PublishHazardPoint(const octomap::OcTree *oc_tree);
@@ -107,7 +105,6 @@ class WorldUpdateThread {
 public:
     WorldUpdateThread(
         rclcpp::Node* thisNode,
-        const std::string& drone_name,
         const int num_worker
     );
     ~WorldUpdateThread();
@@ -116,17 +113,17 @@ public:
     void doWorldUpdate();
     
 private:
-    rclcpp::Node* m_thisNode;
+    rclcpp::Node* thisNode;
 
-    std::string m_base_link;
+    Name::Dynamic::BASE_LINK base_link;
 
     rclcpp::TimerBase::SharedPtr world_update_TIME;
 
-    const int m_num_worker;
+    const int num_worker;
 
-    std::atomic<bool> m_running;
-    std::thread m_world_update_thread;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> m_world_update_queue;
+    std::atomic<bool> running;
+    std::thread world_update_thread;
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> world_update_queue;
 
     void ConsumerLoop();
 };

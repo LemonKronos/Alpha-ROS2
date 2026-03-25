@@ -9,9 +9,6 @@ using namespace std::chrono_literals;
 
 ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
     // Parameters
-    Global::Info info;
-    drone_name_ = info.getDroneName() + "_0";
-
     manager_ = std::make_unique<ObstacleManager>();
     slice_depth_ = manager_->get_slice_depth();
     
@@ -147,7 +144,7 @@ void ObstacleTunnelNode::execute_soft_reset() {
     // 2. Teleport Drone (NO DELETING SLICES)
     if (set_pose_client_->service_is_ready()) {
         auto pose_req = std::make_shared<ros_gz_interfaces::srv::SetEntityPose::Request>();
-        pose_req->entity.name = drone_name_;
+        pose_req->entity.name = drone_name.get();
         pose_req->entity.type = 2; // MODEL
         
         // --- SAFE X CALCULATION (THE SEAM) ---
@@ -162,7 +159,7 @@ void ObstacleTunnelNode::execute_soft_reset() {
         pose_req->pose.orientation.w = 1.0;
         
         set_pose_client_->async_send_request(pose_req);
-        RCLCPP_INFO(this->get_logger(), "Teleporting %s to Sector Seam X: %.2f...", drone_name_.c_str(), safe_x);
+        RCLCPP_INFO(this->get_logger(), "Teleporting %s to Sector Seam X: %.2f...", this->drone_name.get(), safe_x);
     } else {
         RCLCPP_ERROR(this->get_logger(), "Teleport Service Unavailable!");
     }

@@ -63,7 +63,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
 }
 ReactiveOANode::~ReactiveOANode(){}
 
-/*################################################# Methods*/
+#pragma region Compute vectors
 
 void ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
@@ -172,33 +172,30 @@ void ReactiveOANode::computeRepulsiveVector() {
 
     repulsive_vec = repulsive_vec * repulsive_force * approach_angle;
 
-    RCLCPP_INFO(this->get_logger(), BLUE "Repulsive vec = %0.2f" RESET, repulsive_vec.norm());
+    // RCLCPP_INFO(this->get_logger(), BLUE "Repulsive vec = %0.2f" RESET, repulsive_vec.norm());
     // RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    Eigen::Vector3f new_correction_vec = control_vec + repulsive_vec;
+    correction_vec = control_vec + repulsive_vec;
 
     // Ensure correction vector is at most perpendicular to repulsive vector
     if (!repulsive_vec.isZero(1e-3f)) {
         Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        const double dot = repulsive_dir.dot(new_correction_vec);
+        const double dot = repulsive_dir.dot(correction_vec);
 
         const double bounce_bias = 0.08; // Tune-able, about 85 degree
         if (dot < bounce_bias){
-            new_correction_vec -= (dot - bounce_bias) * repulsive_dir;
+            correction_vec -= (dot - bounce_bias) * repulsive_dir;
         }
     }
 
     // Clamp correction vector to max speed
-    new_correction_vec = Eigen::Vector3f(
-        std::clamp(new_correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
-        std::clamp(new_correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
-        std::clamp(new_correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
+    correction_vec = Eigen::Vector3f(
+        std::clamp(correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
+        std::clamp(correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
+        std::clamp(correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
     );
-
-    // Damping 0
-    correction_vec = new_correction_vec;
 
     // RCLCPP_INFO(this->get_logger(), BLUE "Correction vec = %0.2f" RESET, correction_vec.norm());
 }
@@ -212,9 +209,10 @@ void ReactiveOANode::resetVectors() {
     // Mismatch topic reset
     if(obstacle_clear_damping_counter == 0) {
         repulsive_vec.setZero();
+        safe_distance = Sensor::LIDAR_2D_RANGE_MAX;
     }
 
-    // Leave correctin vec for damping
+    // Reset correction vector
     correction_vec.setZero();
 
     // Reset movement
@@ -223,13 +221,15 @@ void ReactiveOANode::resetVectors() {
     }
 }
 
+#pragma endregion
+
 #ifdef VISUALIZE
 void ReactiveOANode::publishVectorArrow(
     const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
     const Eigen::Vector3f& vec,
     float r, float g, float b) {
     visualization_msgs::msg::Marker arrow;
-    arrow.header.frame_id = "alpha_minus_2_0/base_link";
+    arrow.header.frame_id = this->base_link.get();
     arrow.header.stamp = this->now();
     arrow.ns = "oa_vectors";
     arrow.id = 0;
@@ -262,16 +262,20 @@ void ReactiveOANode::publishVectorArrow(
 }
 #endif
 
-/*################################################# Node Loop */
-
 void ReactiveOANode::nodeLoopCallback() {
     computeCorrectionVector();
 
     auto msg = alpha_msgs::msg::ControlInterface();
 
+    #if DO_REACTIVE_OA
     msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
     msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
     msg.up = correction_vec.z() / Drone::SPEED_MAX_UP;
+    #else
+    msg.forward  = last_control_signal->forward;
+    msg.left = last_control_signal->left;
+    msg.up = last_control_signal->up;
+    #endif
 
     // Odometry callback check
     if(lost_perception_counter < Threshold::MISSED_FAST_TOPIC) lost_perception_counter++;
@@ -300,10 +304,11 @@ void ReactiveOANode::nodeLoopCallback() {
     // Build msg
     if(!lost_control_signal) {
         msg.control_state = last_control_signal->control_state;
+
         msg.roll = last_control_signal->roll;
         msg.pitch = last_control_signal->pitch;
         msg.yaw = last_control_signal->yaw;
-        msg.up = last_control_signal->up;
+        
         msg.control_by = last_control_signal->control_by;
         msg.wings_mode = last_control_signal->wings_mode;
     }
@@ -324,21 +329,19 @@ void ReactiveOANode::nodeLoopCallback() {
 
     // Publish msg
     msg.header.stamp = this->get_clock()->now();
-    #if PUBLISH_CORRECTION_CONTROL
     final_control_PUB->publish(msg);
-    #endif
 
     #ifdef VISUALIZE
-    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 0.0f, 1.0f); // Blue
-    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.7f, 0.7f); // Teal
-    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.1f, 0.7f); // Pink
-    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 0.0f, 0.0f); // Red
+    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green
+    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); // Blue
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.0f, 0.0f); // Red
+    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); // Yellow 
     #endif
 
     resetVectors();
 }
 
-/*################################################# Callbacks*/
+#pragma region Callbacks 
 
 void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg){
     lost_control_signal = false;
@@ -363,3 +366,5 @@ void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::S
     last_perception = msg;
     computeMovementVector();
 }
+
+#pragma endregion 

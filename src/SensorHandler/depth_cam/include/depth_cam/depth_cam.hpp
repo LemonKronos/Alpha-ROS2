@@ -29,8 +29,6 @@ private:
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr fuse_perception_SUB;
 
     // Variables
-    std::unique_ptr<Global::Info> info;
-
     std::unique_ptr<HazardPointThread> hazard_point_thread;
     std::unique_ptr<WorldUpdateThread> world_update_thread;
     std::unique_ptr<ProcessingThread> front_processing_thread;

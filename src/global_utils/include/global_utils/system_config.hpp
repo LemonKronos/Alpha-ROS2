@@ -11,6 +11,7 @@
 // ################################# SYSTEM CONFIG
 
 #define VISUALIZE true
+#define DO_REACTIVE_OA true
 
 // Time related settings
 namespace Clock {
@@ -35,19 +36,27 @@ namespace Clock {
 // ################################# SYSTEM PARAMETER
 
 // Dynamic info: data taken from env, json, yaml, etc ...
-// class DynamicInfo {
-// public:
-//     DynamicInfo() { info = "Missing derive class update()"; };
-//     inline const char* get() { return info.c_str(); }
-//     virtual void update() = 0;
-//     void updateENV(const char* env_name);
-// protected:
-//     std::string info;
-// };
+class DynamicInfo {
+public:
+    DynamicInfo(std::function<std::string()> logic);
+    inline const char* get() { return info.c_str(); }
+    void update();
+protected:
+    std::function<std::string()> update_logic;
+    std::string info;
+};
+namespace DynamicInfoHelper {
+    std::string updateENV(const char* env_name);
+}
 
 namespace Name {
-    // class RECORDED_MANUEVER : public DynamicInfo { public: void update(); };
-    constexpr const char* RECORDED_MANUEVER = "obstacle_tunnel_demo";
+    namespace Dynamic {
+        class DRONE : public DynamicInfo { public: DRONE(); };
+        class BASE_LINK : public DynamicInfo { public: BASE_LINK(); };
+        class WORLD : public DynamicInfo { public: WORLD(); };
+        class RECORDED_MANUEVER : public DynamicInfo { public: RECORDED_MANUEVER(); };
+
+    }
 }
 
 // System thesholds
@@ -60,8 +69,10 @@ namespace Threshold {
 
 // Machine file directories
 namespace Path {
-    // class RECORD_STORAGE : public DynamicInfo { public: void update(); };
-    constexpr const char* RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel";
+    namespace Dynamic {
+        class RECORD_STORAGE : public DynamicInfo { public: RECORD_STORAGE(); };
+
+    }
 
 }
 
@@ -150,15 +161,15 @@ namespace Window {
 namespace Global {
     void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
     
-    class Info {
-    private:
-        std::string drone_name;
-        std::string world_name;
-    public:
-        Info();
-        ~Info();
-        std::string getDroneName() { return drone_name;};
-        std::string getWorldName() { return world_name;};
-    };
+    // class Info {
+    // private:
+    //     std::string drone_name;
+    //     std::string world_name;
+    // public:
+    //     Info();
+    //     ~Info();
+    //     std::string getDroneName() { return drone_name;};
+    //     std::string getWorldName() { return world_name;};
+    // };
 }
 

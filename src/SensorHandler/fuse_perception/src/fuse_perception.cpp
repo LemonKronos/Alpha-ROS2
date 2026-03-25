@@ -37,8 +37,6 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     );
 
     // Init variable
-    Global::Info info;
-    drone_base = info.getDroneName() + "_0/base_link";
     lost_lidar_down = true;
     missed_lidar_down = Threshold::MISSED_FAST_TOPIC;
     lost_odometry = true;
@@ -61,7 +59,7 @@ void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     geometry_msgs::msg::TransformStamped tf;
     tf.header.stamp = this->get_clock()->now();
     tf.header.frame_id = "world";
-    tf.child_frame_id = drone_base;
+    tf.child_frame_id = base_link.get();
     tf.transform.translation.x = msg.position[0];
     tf.transform.translation.y = msg.position[1];
     tf.transform.translation.z = msg.position[2];
