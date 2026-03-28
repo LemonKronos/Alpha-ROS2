@@ -94,8 +94,10 @@ void FusePerceptionNode::PublishCallback() {
         msg.velocity = frame_utils::frameNEDtoENU(last_odo->velocity);
         msg.angular_velocity = frame_utils::frameFRDtoFLU(last_odo->angular_velocity);
 
-        float speed = std::sqrt(msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2]);
-        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + ((speed * speed) / (2 * Drone::DECELERATE_MAX));
+        // Compute safe_distance
+        float speed_sq = msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2];
+        float speed = std::sqrt(speed_sq);
+        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
         msg.hazard_distance_sq = hazard_distance*hazard_distance;
 
         doFrameTransform(msg);

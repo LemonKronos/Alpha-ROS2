@@ -7,6 +7,7 @@
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/lidar2d_obstacle.hpp"
 #include "alpha_msgs/msg/fuse_perception.hpp"
+#include "alpha_msgs/msg/voxel_block.hpp"
 
 #define VISUALIZE true // uncomment to disable visualize in this node
 #ifndef VISUALIZE
@@ -15,11 +16,13 @@
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker.hpp>
 #endif
-#define PUBLISH_CORRECTION_CONTROL 1
 
-#include <OsqpEigen/OsqpEigen.h>
+#ifndef DO_REACTIVE_OA
+    #define DO_REACTIVE_OA 1
+#endif
 
 using std::placeholders::_1;
+constexpr uint8_t HAS_SEEING_VOXEL_COUNTER_INIT = 3;
 constexpr uint8_t OBSTACLE_DAMPING_INIT = 5;
 constexpr float REPULSIVE_DAMPING_CONSTANT = 0.8f;
 
@@ -41,21 +44,25 @@ private:
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<alpha_msgs::msg::Lidar2dObstacle>::SharedPtr close_contour_SUB;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::VoxelBlock>::SharedPtr seeing_voxel_SUB;
 
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+    alpha_msgs::msg::VoxelBlock::SharedPtr last_seeing_voxel = nullptr;
     
     // Variables
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
     bool lost_perception = true;
     uint8_t lost_perception_counter = 0;
+    uint8_t has_seeing_voxel_counter = 0;
 
     uint8_t obstacle_rate_mismatch_counter = 0;
 
     Obstacle obstacle;
     float safe_distance = Drone::HAZARD_DISTANCE;
+    float seeing_voxel_safe_distance = Drone::HAZARD_DISTANCE;
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
@@ -69,18 +76,15 @@ private:
     uint8_t repulsive_damping_counter = 0;
     uint8_t obstacle_clear_damping_counter = 0;
 
-    OsqpEigen::Solver solver;
-
     // Methods
-    void initCBFSolver();
-    
     void computeControlVector();
     void computeMovementVector();
     void computeRepulsiveVector();
     void computeCorrectionVector();
     void resetVectors();
-
+    
     #ifdef VISUALIZE
+        Name::Dynamic::BASE_LINK base_link;
         void publishVectorArrow(
             const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
             const Eigen::Vector3f& vec,

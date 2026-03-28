@@ -132,7 +132,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
             // For hazard point
             double distance_sq = body_point.squaredNorm();
-            // hazard_distance_sq = 25.0f; // #Test
+            // hazard_distance_sq = 400.0f; // #Test
             if(distance_sq < hazard_distance_sq) {
                 if(hazard_exist) {
                     if(hazard_cloud->size() >= HAZARD_BATCH_SIZE) {
@@ -253,7 +253,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *o
     msg.size = pa.points.size();
     msg.point_array = pa;
     this->hazard_voxel_PUB->publish(msg);
-    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Published %d hazard points" RESET, pa.points.size());
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Published %d hazard voxels" RESET, pa.points.size());
 }
 
 #pragma endregion
@@ -322,7 +322,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
     this->running.store(false);
     if(has_data && worker_finished >= 3) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
     else if(has_data && worker_finished < 3) RCLCPP_WARN(this->theNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
-    else RCLCPP_WARN(this->theNode->get_logger(), PINK "Wolrd update empty" RESET);
+    else RCLCPP_INFO(this->theNode->get_logger(), PINK "Wolrd update empty" RESET);
     // Thread naturally die here
 }
 

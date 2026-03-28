@@ -10,7 +10,6 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     #ifdef VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
         movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
-        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
         correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
     #endif
 
@@ -18,17 +17,20 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
         10,
-        std::bind(&ReactiveOANode::inputControlCallback, this, _1));
+        std::bind(&ReactiveOANode::inputControlCallback, this, _1)
+    );
 
-    close_contour_SUB = this->create_subscription<alpha_msgs::msg::Lidar2dObstacle>(
-        Topic::LIDAR_2D_CONTOUR_CLOSE,
+    seeing_voxel_SUB = this->create_subscription<alpha_msgs::msg::VoxelBlock>(
+        Topic::VOXEL_HAZARD_SEEING,
         rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::closeContourCallback, this, _1));
+        std::bind(&ReactiveOANode::seeingVoxelCallback, this, _1)
+    );
 
     perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
         Topic::FUSE_PERCEPTION,
         rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::perceptionCallback, this, _1));
+        std::bind(&ReactiveOANode::perceptionCallback, this, _1)
+    );
 
     // Timer
     node_loop_TIME = this->create_timer(
@@ -39,17 +41,13 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     // Init variables
     control_vec.setZero();
     movement_vec.setZero();
-    repulsive_vec.setZero();
     correction_vec.setZero();
     // control_angular_vec.setZero();
     // movement_angular_vec.setZero();
     // repulsive_angular_vec.setZero();
     // correction_angular_vec.setZero();
 
-    repulsive_damping_counter = 0;
-    obstacle_clear_damping_counter = 0;
-
-    safe_distance = Drone::HAZARD_DISTANCE;
+    VFH.reset();
 
     lost_control_signal = true;
     lost_control_signal_counter = Threshold::MISSED_FAST_TOPIC;
@@ -59,7 +57,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     lost_perception_counter = Threshold::MISSED_FAST_TOPIC;
     last_perception = nullptr;
 
-    obstacle_rate_mismatch_counter = 0;
+    has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
 }
 ReactiveOANode::~ReactiveOANode(){}
 
@@ -102,102 +100,112 @@ void ReactiveOANode::computeMovementVector() {
     // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
 
-void ReactiveOANode::computeRepulsiveVector() {
-    std::vector<Eigen::Vector3f> distinct_forces;
-    distinct_forces.reserve(SECTOR_NUM);
-    
-    for(uint8_t index = 0; index < SECTOR_NUM; index++) {
-        for(const auto& contour : obstacle.getContours(index)) {
-            const auto& points = contour.getContour();
-            if(points.size() < 2) continue;
+void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VoxelBlock::SharedPtr msg) {
+    VFH.reset();
 
-            for(size_t i = 0; i < points.size() - 1; ++i) {
-                Eigen::Vector3f p1(points[i].x, points[i].y, 0);
-                Eigen::Vector3f p2(points[i+1].x, points[i+1].y, 0);
-                Eigen::Vector3f segment = p2 - p1;
-                
-                if(segment.squaredNorm() < 1e-6f) continue;
+    for(const auto &voxel : msg->point_array.points) {
+        // Get distances
+        float distance_spherical = std::sqrt(voxel.x*voxel.x + voxel.y*voxel.y + voxel.z*voxel.z);
+        float distance_planal = std::sqrt(voxel.x*voxel.x +voxel.y*voxel.y);
 
-                float t = -p1.dot(segment) / segment.squaredNorm();
-                t = std::clamp(t, 0.0f, 1.0f);
+        // Get angles
+        float yaw = std::atan2(voxel.y, voxel.x);
+        float pitch = std::atan2(-voxel.z, distance_planal);
 
-                Eigen::Vector3f closest_point = p1 + segment * t;
-                float dist = closest_point.norm();
+        // Scale VFH occupancy with distance
+        float distance_spherical_ratio = std::min(1.0f, Drone::HAZARD_DISTANCE / distance_spherical);
+        float scaling = std::asin(distance_spherical_ratio);
 
-                // Calculate Raw Force for this specific segment
-                if(dist < safe_distance && dist > 1e-3f) {
-                    float factor = (safe_distance - dist); 
-                    Eigen::Vector3f new_force = -closest_point.normalized() * factor;
+        // Get VFH bin
 
-                    // --- CORE CLUSTERING LOGIC ---
-                    bool merged = false;
-                    for(auto& existing_force : distinct_forces) {
-                        float similarity = new_force.normalized().dot(existing_force.normalized());
+        int center_yaw_bin = static_cast<int>((yaw + M_PI) / Sensor::VFH_RESOLUTION);
+        int center_pitch_bin = static_cast<int>((pitch + M_PI_2) / Sensor::VFH_RESOLUTION);
 
-                        if(similarity > 0.9f) { // About 25 degree, keep max amplitude
-                            if(new_force.squaredNorm() > existing_force.squaredNorm()) existing_force = new_force;
-                            merged = true;
-                            break; 
-                        }
-                    }
+        // Get scaling
+        int scaled_shadow_bins = static_cast<int>(std::ceil(scaling / Sensor::VFH_RESOLUTION));
 
-                    // New unique direction, add it
-                    if(!merged) {
-                        distinct_forces.push_back(new_force);
-                    }
-                }
+        // Cast the shadow on the VFH
+        for(int p = center_pitch_bin - scaled_shadow_bins; p <= center_pitch_bin + scaled_shadow_bins; p++) {
+            // Avoid pitch Top/Down wrap around
+            int clamped_pitch = std::clamp(p, 0, Sensor::VFH_LATITUDE_BINS -1);
+
+            for(int y = center_yaw_bin - scaled_shadow_bins; y <= center_yaw_bin + scaled_shadow_bins; y++) {
+                // Do yaw Back wrapping
+                int wrapped_yaw = y % Sensor::VFH_AZIMUTH_BINS;
+                while(wrapped_yaw < 0) wrapped_yaw += Sensor::VFH_AZIMUTH_BINS;
+
+                // Get index
+                int index = (clamped_pitch * Sensor::VFH_AZIMUTH_BINS) + wrapped_yaw;
+                VFH.set(index);
             }
         }
     }
-
-    repulsive_vec.setZero();
-    for(const auto& f : distinct_forces) {
-        repulsive_vec += f;
-    }
-    repulsive_vec = repulsive_vec.normalized();
-    
-    const float approach_angle = fabs(movement_vec.normalized().dot(repulsive_vec));
-    std::clamp(approach_angle, 0.01f, 1.0f);
-
-    float min_dist = obstacle.getMinDistance();
-    if(min_dist > safe_distance) min_dist = safe_distance;
-    if(min_dist <= Drone::RADIUS) {
-        RCLCPP_WARN(this->get_logger(), RED "⚠️ OBSTACLE ARE TOO CLOSE! ⚠️" RESET);
-    }
-
-    float urgency = (safe_distance - min_dist) / (safe_distance - Drone::HAZARD_DISTANCE + 0.01f); // Cut depth urgency
-    urgency = std::clamp(urgency, 0.01f, 1.0f);
-
-    const float repulsive_force = control_vec.norm() + urgency * Drone::SPEED_MAX_FORWARD;
-
-    repulsive_vec = repulsive_vec * repulsive_force * approach_angle;
-
-    // RCLCPP_INFO(this->get_logger(), BLUE "Repulsive vec = %0.2f" RESET, repulsive_vec.norm());
-    // RCLCPP_INFO(this->get_logger(), "%s Urgecy = %.1f%%, Repulsive = %.2f" RESET, urgency <= 1.0f ? YELLOW : PINK, urgency * 100, repulsive_vec.norm());
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    correction_vec = control_vec + repulsive_vec;
+    float control_speed = control_vec.norm();
+    if(control_speed < 1e-3f) {
+        correction_vec.setZero();
+        return;
+    }
 
-    // Ensure correction vector is at most perpendicular to repulsive vector
-    if (!repulsive_vec.isZero(1e-3f)) {
-        Eigen::Vector3f repulsive_dir = repulsive_vec.normalized();
-        const double dot = repulsive_dir.dot(correction_vec);
+    Eigen::Vector3f control_direction = control_vec.normalized();
+    float control_planal = std::sqrt(control_vec.x()*control_vec.x() + control_vec.y()*control_vec.y());
+    float control_yaw = std::atan2(control_vec.y(), control_vec.x());
+    float control_pitch = std::atan2(-control_vec.z(), control_planal);
+    RCLCPP_INFO(this->get_logger(), GREEN "Control = %.2f, yaw = %.0f, pitch = %.0f" RESET, control_vec.norm(), control_yaw / DEGREE, control_pitch / DEGREE);
 
-        const double bounce_bias = 0.08; // Tune-able, about 85 degree
-        if (dot < bounce_bias){
-            correction_vec -= (dot - bounce_bias) * repulsive_dir;
+    Eigen::Vector3f movement_direction = control_direction;
+    if(movement_vec.norm() > 1e-3f) movement_direction = movement_vec.normalized();
+
+    const float CONTROL_WEIGHT = 1.0f;
+    const float MOVEMENT_WEIGHT = 0.3f;
+
+    float min_cost = std::numeric_limits<float>::max();
+    float c_yaw = 0, c_pitch = 0;
+    Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
+    bool found_safe_path = false;
+
+    for(int i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
+        if(VFH[i]) continue; // Blocked path
+
+        int row = i / Sensor::VFH_AZIMUTH_BINS;
+        int col = i % Sensor::VFH_AZIMUTH_BINS;
+
+        float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2);
+        float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2);
+
+        Eigen::Vector3f canditate_direction(
+            cosf(pitch) * cosf(yaw),
+            cosf(pitch) * sinf(yaw),
+            -sinf(pitch)
+        );
+
+        float control_cost = 1.0f - canditate_direction.dot(control_direction);
+        float movement_cost = 1.0f - canditate_direction.dot(movement_direction);
+
+        float total_cost = CONTROL_WEIGHT * control_cost + MOVEMENT_WEIGHT * movement_cost;
+
+        if(total_cost < min_cost) {
+            min_cost = total_cost;
+            c_yaw = yaw;
+            c_pitch = pitch;
+            best_direction = canditate_direction;
+            found_safe_path = true;
         }
     }
 
-    // Clamp correction vector to max speed
-    correction_vec = Eigen::Vector3f(
-        std::clamp(correction_vec.x(), -Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_FORWARD),
-        std::clamp(correction_vec.y(), -Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_STRAFE),
-        std::clamp(correction_vec.z(), -Drone::SPEED_MAX_UP, Drone::SPEED_MAX_UP)
-    );
+    if(!found_safe_path) {
+        correction_vec.setZero();
+        return;
+    }
 
-    // RCLCPP_INFO(this->get_logger(), BLUE "Correction vec = %0.2f" RESET, correction_vec.norm());
+    float deviation_factor = std::max(0.0f, best_direction.dot(control_direction));
+
+    float safe_speed = control_speed * deviation_factor;
+    
+    correction_vec = best_direction * safe_speed;
+    RCLCPP_INFO(this->get_logger(), YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, correction_vec.norm(), c_yaw / DEGREE, c_pitch / DEGREE);
 }
 
 void ReactiveOANode::resetVectors() {
@@ -206,12 +214,9 @@ void ReactiveOANode::resetVectors() {
         control_vec.setZero();
     }
 
-    // Mismatch topic reset
-    if(obstacle_clear_damping_counter == 0) {
-        repulsive_vec.setZero();
-        safe_distance = Sensor::LIDAR_2D_RANGE_MAX;
+    if(!has_seeing_voxel_counter) {
+        VFH.reset();
     }
-
     // Reset correction vector
     correction_vec.setZero();
 
@@ -316,16 +321,9 @@ void ReactiveOANode::nodeLoopCallback() {
         msg.control_state = alpha_msgs::msg::ControlInterface::ARM;
         msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
     }
-    
-    // Obstacle callback check
-    if(obstacle_rate_mismatch_counter < Threshold::MISMATCH_RATE_TOPIC) obstacle_rate_mismatch_counter++;
-    else {
-        // Obstacle damping
-        if(obstacle_clear_damping_counter) {
-            msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
-            obstacle_clear_damping_counter--;
-        }
-    }
+
+    // Check seeing hazard voxel callback
+    if(has_seeing_voxel_counter > 0) has_seeing_voxel_counter--;
 
     // Publish msg
     msg.header.stamp = this->get_clock()->now();
@@ -334,7 +332,6 @@ void ReactiveOANode::nodeLoopCallback() {
     #ifdef VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green
     publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); // Blue
-    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.0f, 0.0f); // Red
     publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); // Yellow 
     #endif
 
@@ -351,13 +348,9 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
     computeControlVector();
 }
 
-void ReactiveOANode::closeContourCallback(const alpha_msgs::msg::Lidar2dObstacle::SharedPtr msg){
-    obstacle_clear_damping_counter = OBSTACLE_DAMPING_INIT;
-    obstacle_rate_mismatch_counter = 0;
-
-    obstacle.topicToObstacle(msg);
-    safe_distance = obstacle.safe_distance;
-    computeRepulsiveVector();
+void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VoxelBlock::SharedPtr msg) {
+    has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
+    computeVectorFieldHistogram(msg);
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){

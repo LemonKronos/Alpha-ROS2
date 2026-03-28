@@ -132,8 +132,8 @@ namespace Drone {
     constexpr float UNCERTAINTY = 0.05f; // Tune-able
     constexpr float SAFE_BUFFER = 0.15f; // Tune-able
     constexpr float HAZARD_DISTANCE = RADIUS + SAFE_BUFFER + UNCERTAINTY;
-    constexpr float REACT_TIME = Clock::LOOP_CYCLE_FAST; // s
-    constexpr float DECELERATE_MAX = 4.0f; // m/s^2
+    constexpr float REACT_TIME = Clock::LOOP_CYCLE; // s
+    constexpr float DECELERATE_MAX = 1.0f; // m/s^2
 
     // Body box anti clipping, independent with sensor mount point, sensor data have to be body frame transformed
     constexpr float MAX_X = 0.53f + UNCERTAINTY;
@@ -150,6 +150,10 @@ namespace Sensor {
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
     constexpr float DEPTH_CAM_RANGE = 30.0f;
     constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f;
+    constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
+    constexpr int VFH_AZIMUTH_BINS = 2.0f * M_PI / VFH_RESOLUTION;
+    constexpr int VFH_LATITUDE_BINS = M_PI / VFH_RESOLUTION;
+    constexpr int VFH_TOTAL_BINS = VFH_AZIMUTH_BINS * VFH_LATITUDE_BINS;
 
 }
 

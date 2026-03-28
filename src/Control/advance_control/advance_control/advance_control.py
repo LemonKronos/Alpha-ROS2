@@ -5,8 +5,9 @@ advance_control.py
 ROS2 node for advance 6 DoF input from a phone through web socket
 """
 import rclpy
+import sys
 from rclpy.node import Node
-from rclpy.clock import Clock, ClockType
+from rclpy.clock import Clock
 import rclpy.clock 
 
 from advance_control.web_socket_controller import WebSocketController
@@ -15,15 +16,18 @@ from alpha_msgs.msg import ControlInterface
 from python_utils.utils import *
 
 class AdvanceControlNode(Node):
-    def __init__(self):
+    def __init__(self, debug=False):
         super().__init__('advance_control_node')
-        
+
         Global.setup_for_simulation(self)
+        self.do_debug = debug
 
         # 1. Setup Wall Clock (Thread-safe, steady)
         self.wall_clock = rclpy.clock.Clock(clock_type=rclpy.clock.ClockType.STEADY_TIME)
     
         # 2. Start Web Controller
+        self.is_connected = False
+        self.last_is_connected = False
         self.web_controller = WebSocketController()
         self.web_controller.start()
         
@@ -58,7 +62,7 @@ class AdvanceControlNode(Node):
 
         self.control_interface_PUB.publish(control_msg)
 
-        if False:
+        if self.do_debug:
             if self.no_input_log and self.no_input:
                 self.get_logger().info(f"{'🎮' if control_msg.control_state else '❌'}Forwar _.__🔼   Left _.__◀️   Up _.__⬆️   Roll _.__🔄   Pitch _.__↕️   Yaw _.__↔️")
                 self.no_input_log = False
@@ -72,6 +76,14 @@ class AdvanceControlNode(Node):
                 self.no_input = True
 
     def timer_realtime_callback(self):
+        self.is_connected = self.web_controller.check_is_connected()
+        if self.is_connected != self.last_is_connected:
+            self.last_is_connected = self.is_connected
+            if self.is_connected:
+                self.get_logger().warn(f"{GREEN} 🔌 Controller connected {RESET}")
+            else:
+                self.get_logger().warn(f"{RED} ❌ Controller disconnected {RESET}")
+
         commands = self.web_controller.get_latest_record_cmd()
 
         new_record = commands.get('record', False)
@@ -103,9 +115,11 @@ class AdvanceControlNode(Node):
         super().destroy_node()
 
 
-def main():
-    rclpy.init()
-    node = AdvanceControlNode()
+def main(args=None):
+    rclpy.init(args=args)
+    passed_args = rclpy.utilities.remove_ros_args(args=sys.argv)
+    is_debug = len(passed_args) > 1 and passed_args[1] == 'debug'
+    node = AdvanceControlNode(debug=is_debug)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
