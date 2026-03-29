@@ -29,5 +29,5 @@ bool critical_contact
 float32 below_distance
 
 # Safety
-float32 hazard_distance_sq
+float32 hazard_distance
 

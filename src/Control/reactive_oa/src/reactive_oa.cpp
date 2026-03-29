@@ -10,6 +10,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     #ifdef VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
         movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
+        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
         correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
     #endif
 
@@ -20,7 +21,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         std::bind(&ReactiveOANode::inputControlCallback, this, _1)
     );
 
-    seeing_voxel_SUB = this->create_subscription<alpha_msgs::msg::VoxelBlock>(
+    seeing_VFH_SUB = this->create_subscription<alpha_msgs::msg::VectorFieldHistogram>(
         Topic::VOXEL_HAZARD_SEEING,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::seeingVoxelCallback, this, _1)
@@ -38,9 +39,17 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );
 
+    // Check sycn
+    alpha_msgs::msg::VectorFieldHistogram test_msg;
+    if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
+        RCLCPP_ERROR(this->get_logger(), RED "Wrong VFH msg size, please update to %d" RESET, Sensor::VFH_MSG_CHUNK_SIZE);
+        return;
+    }
+
     // Init variables
     control_vec.setZero();
     movement_vec.setZero();
+    repulsive_vec.setZero();
     correction_vec.setZero();
     // control_angular_vec.setZero();
     // movement_angular_vec.setZero();
@@ -57,6 +66,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     lost_perception_counter = Threshold::MISSED_FAST_TOPIC;
     last_perception = nullptr;
 
+    hazard_distance = Drone::HAZARD_DISTANCE;
     has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
 }
 ReactiveOANode::~ReactiveOANode(){}
@@ -100,69 +110,50 @@ void ReactiveOANode::computeMovementVector() {
     // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
 
-void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VoxelBlock::SharedPtr msg) {
+void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     VFH.reset();
 
-    for(const auto &voxel : msg->point_array.points) {
-        // Get distances
-        float distance_spherical = std::sqrt(voxel.x*voxel.x + voxel.y*voxel.y + voxel.z*voxel.z);
-        float distance_planal = std::sqrt(voxel.x*voxel.x +voxel.y*voxel.y);
-
-        // Get angles
-        float yaw = std::atan2(voxel.y, voxel.x);
-        float pitch = std::atan2(-voxel.z, distance_planal);
-
-        // Scale VFH occupancy with distance
-        float distance_spherical_ratio = std::min(1.0f, Drone::HAZARD_DISTANCE / distance_spherical);
-        float scaling = std::asin(distance_spherical_ratio);
-
-        // Get VFH bin
-
-        int center_yaw_bin = static_cast<int>((yaw + M_PI) / Sensor::VFH_RESOLUTION);
-        int center_pitch_bin = static_cast<int>((pitch + M_PI_2) / Sensor::VFH_RESOLUTION);
-
-        // Get scaling
-        int scaled_shadow_bins = static_cast<int>(std::ceil(scaling / Sensor::VFH_RESOLUTION));
-
-        // Cast the shadow on the VFH
-        for(int p = center_pitch_bin - scaled_shadow_bins; p <= center_pitch_bin + scaled_shadow_bins; p++) {
-            // Avoid pitch Top/Down wrap around
-            int clamped_pitch = std::clamp(p, 0, Sensor::VFH_LATITUDE_BINS -1);
-
-            for(int y = center_yaw_bin - scaled_shadow_bins; y <= center_yaw_bin + scaled_shadow_bins; y++) {
-                // Do yaw Back wrapping
-                int wrapped_yaw = y % Sensor::VFH_AZIMUTH_BINS;
-                while(wrapped_yaw < 0) wrapped_yaw += Sensor::VFH_AZIMUTH_BINS;
-
-                // Get index
-                int index = (clamped_pitch * Sensor::VFH_AZIMUTH_BINS) + wrapped_yaw;
-                VFH.set(index);
-            }
-        }
+    // Extract the VFH
+    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
+        VFH[i] = (msg->vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] >> (i % Sensor::VFH_MSG_BIT_SIZE)) & 1;
     }
+
+    // Get the closest point repulsion
+    computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+}
+
+void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
+    float strenght = (hazard_distance - point.z()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
+    strenght *= Drone::SPEED_MAX_FORWARD;
+    repulsive_vec = -math_utils::toCartesian({point.x(), point.y(), strenght});
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    float control_speed = control_vec.norm();
-    if(control_speed < 1e-3f) {
+    Eigen::Vector3f target_vec = control_vec.squaredNorm() > repulsive_vec.squaredNorm() ? control_vec : repulsive_vec;
+    float target_speed = target_vec.norm();
+    if(target_speed < 1e-3f) {
         correction_vec.setZero();
         return;
     }
 
-    Eigen::Vector3f control_direction = control_vec.normalized();
-    float control_planal = std::sqrt(control_vec.x()*control_vec.x() + control_vec.y()*control_vec.y());
-    float control_yaw = std::atan2(control_vec.y(), control_vec.x());
-    float control_pitch = std::atan2(-control_vec.z(), control_planal);
-    RCLCPP_INFO(this->get_logger(), GREEN "Control = %.2f, yaw = %.0f, pitch = %.0f" RESET, control_vec.norm(), control_yaw / DEGREE, control_pitch / DEGREE);
+#if DEBUG
+    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
+    RCLCPP_INFO(
+        this->get_logger(), GREEN "Target = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        spherical_target_vec.z(), 
+        spherical_target_vec.x() / DEGREE, 
+        spherical_target_vec.y() / DEGREE
+    );
+#endif
 
-    Eigen::Vector3f movement_direction = control_direction;
-    if(movement_vec.norm() > 1e-3f) movement_direction = movement_vec.normalized();
+    Eigen::Vector3f target_direction = target_vec.normalized();
 
-    const float CONTROL_WEIGHT = 1.0f;
-    const float MOVEMENT_WEIGHT = 0.3f;
+    Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
+
+    constexpr float CONTROL_WEIGHT = 1.0f;
+    constexpr float MOVEMENT_WEIGHT = 0.3f;
 
     float min_cost = std::numeric_limits<float>::max();
-    float c_yaw = 0, c_pitch = 0;
     Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
     bool found_safe_path = false;
 
@@ -175,21 +166,15 @@ void ReactiveOANode::computeCorrectionVector() {
         float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2);
         float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2);
 
-        Eigen::Vector3f canditate_direction(
-            cosf(pitch) * cosf(yaw),
-            cosf(pitch) * sinf(yaw),
-            -sinf(pitch)
-        );
+        Eigen::Vector3f canditate_direction(math_utils::toCartesian(yaw, pitch, 1.0f));
 
-        float control_cost = 1.0f - canditate_direction.dot(control_direction);
+        float target_cost = 1.0f - canditate_direction.dot(target_direction);
         float movement_cost = 1.0f - canditate_direction.dot(movement_direction);
 
-        float total_cost = CONTROL_WEIGHT * control_cost + MOVEMENT_WEIGHT * movement_cost;
+        float total_cost = CONTROL_WEIGHT * target_cost + MOVEMENT_WEIGHT * movement_cost;
 
         if(total_cost < min_cost) {
             min_cost = total_cost;
-            c_yaw = yaw;
-            c_pitch = pitch;
             best_direction = canditate_direction;
             found_safe_path = true;
         }
@@ -200,12 +185,22 @@ void ReactiveOANode::computeCorrectionVector() {
         return;
     }
 
-    float deviation_factor = std::max(0.0f, best_direction.dot(control_direction));
+    float deviation_factor = std::max(0.0f, best_direction.dot(target_direction));
 
-    float safe_speed = control_speed * deviation_factor;
+    float safe_speed = target_speed * deviation_factor;
     
     correction_vec = best_direction * safe_speed;
-    RCLCPP_INFO(this->get_logger(), YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, correction_vec.norm(), c_yaw / DEGREE, c_pitch / DEGREE);
+
+#if DEBUG
+    Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
+    RCLCPP_INFO(
+        this->get_logger(), 
+        YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        spherical_correction_vec.z(), 
+        spherical_correction_vec.x() / DEGREE, 
+        spherical_correction_vec.y() / DEGREE
+    );
+#endif
 }
 
 void ReactiveOANode::resetVectors() {
@@ -216,6 +211,7 @@ void ReactiveOANode::resetVectors() {
 
     if(!has_seeing_voxel_counter) {
         VFH.reset();
+        repulsive_vec.setZero();
     }
     // Reset correction vector
     correction_vec.setZero();
@@ -348,7 +344,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
     computeControlVector();
 }
 
-void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VoxelBlock::SharedPtr msg) {
+void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
     computeVectorFieldHistogram(msg);
 }

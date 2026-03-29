@@ -57,8 +57,8 @@ alpha_brain::DepthCamNode::~DepthCamNode() {
 }
 
 void alpha_brain::DepthCamNode::FusePerceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
-    float hazard_distance_sq = msg->hazard_distance_sq;
-    front_processing_thread->updateSafeBubble(hazard_distance_sq);
-    left_processing_thread->updateSafeBubble(hazard_distance_sq);
-    right_processing_thread->updateSafeBubble(hazard_distance_sq);
+    float hazard_distance = msg->hazard_distance;
+    front_processing_thread->updateSafeBubble(hazard_distance);
+    left_processing_thread->updateSafeBubble(hazard_distance);
+    right_processing_thread->updateSafeBubble(hazard_distance);
 }

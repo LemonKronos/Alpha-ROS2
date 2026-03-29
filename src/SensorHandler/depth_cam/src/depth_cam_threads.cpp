@@ -6,7 +6,7 @@ alpha_brain::ProcessingThread::ProcessingThread(
     rclcpp::Node* theNode,
     const std::string& topic,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer,
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue,
     const std::atomic<bool>& world_update,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue
 ) : name(name), theNode(theNode), topic(topic), tf_buffer(tf_buffer), world_update(world_update), hazard_point_queue(hazard_point_queue), world_update_queue(world_update_queue) {
@@ -20,7 +20,7 @@ alpha_brain::ProcessingThread::ProcessingThread(
     // Init variables
     this->has_tf_body = false;
     this->running.store(true);
-    this->hazard_distance_sq.store(Drone::HAZARD_DISTANCE);
+    this->hazard_distance.store(Drone::HAZARD_DISTANCE);
     this->done_world_update = false;
 
     // Spawn thread
@@ -59,8 +59,8 @@ void alpha_brain::ProcessingThread::DepthCamCallback(const sensor_msgs::msg::Poi
     processMsg(msg);
 }
 
-void alpha_brain::ProcessingThread::updateSafeBubble(const float hazard_distance_sq) {
-    this->hazard_distance_sq.store(hazard_distance_sq);
+void alpha_brain::ProcessingThread::updateSafeBubble(const float hazard_distance) {
+    this->hazard_distance.store(hazard_distance);
 }
 
 void alpha_brain::ProcessingThread::ConsumerLoop() {
@@ -76,7 +76,8 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
         // Load local atomic variables
         bool world_update = this->world_update.load(std::memory_order_relaxed);
-        double hazard_distance_sq = this->hazard_distance_sq.load(std::memory_order_relaxed);
+        float hazard_distance_sq = this->hazard_distance.load(std::memory_order_relaxed); // Extract hazard_distance
+        hazard_distance_sq *= hazard_distance_sq; // Square it
 
         // Check to make sure do world update only once per call
         if(!world_update) this->done_world_update = false;
@@ -103,9 +104,9 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             }
         }
 
-        // Prepare intermediate variables
+        // Prepare intermediate variables>
         bool hazard_exist = false;
-        std::unique_ptr<octomap::Pointcloud> hazard_cloud;
+        std::unique_ptr<std::vector<Eigen::Vector3f>> hazard_cloud;
 
         std::unique_ptr<octomap::Pointcloud> world_update_cloud;
         if(world_update && !this->done_world_update) {
@@ -133,20 +134,24 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             // For hazard point
             double distance_sq = body_point.squaredNorm();
             // hazard_distance_sq = 400.0f; // #Test
-            if(distance_sq < hazard_distance_sq) {
+            if(distance_sq <= hazard_distance_sq) {
+                // Convert to spherical coordinate
+                Eigen::Vector3f spherical_body_point = math_utils::toSpherical(body_point);
+
+                // Push into batch
                 if(hazard_exist) {
                     if(hazard_cloud->size() >= HAZARD_BATCH_SIZE) {
                         this->hazard_point_queue.enqueue(std::move(hazard_cloud));
-                        hazard_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+                        hazard_cloud = std::make_unique<std::vector<Eigen::Vector3f>>(); // #CanBeOptimize
                         hazard_cloud->reserve(HAZARD_BATCH_SIZE);
                     }
                 }
                 else {
-                    hazard_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
+                    hazard_cloud = std::make_unique<std::vector<Eigen::Vector3f>>(); // #CanBeOptimize
                     hazard_cloud->reserve(HAZARD_BATCH_SIZE);
                     hazard_exist = true;
                 }
-                hazard_cloud->push_back(body_point.x(), body_point.y(), body_point.z());
+                hazard_cloud->push_back(spherical_body_point);
             }
 
             // For world update
@@ -181,13 +186,20 @@ alpha_brain::HazardPointThread::HazardPointThread(
     const int num_worker
 ) : theNode(theNode), num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
     // Create Publisher
-    this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VoxelBlock>(
+    this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VectorFieldHistogram>(
         Topic::VOXEL_HAZARD_SEEING,
         rclcpp::SensorDataQoS()
     );
 
     // Init variables
     this->running.store(true);
+
+    // Check sycn
+    alpha_msgs::msg::VectorFieldHistogram test_msg;
+    if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
+        RCLCPP_ERROR(this->theNode->get_logger(), RED "Wrong VFH msg size, please update to %d" RESET, Sensor::VFH_MSG_CHUNK_SIZE);
+        return;
+    }
 
     // Spawn persistent thread
     this->hazard_point_thread = std::thread(&HazardPointThread::ConsumerLoop, this);
@@ -201,59 +213,80 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 }
 
-moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& alpha_brain::HazardPointThread::getQueue() {
+moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& alpha_brain::HazardPointThread::getQueue() {
     return this->hazard_point_queue;
 }
 
 void alpha_brain::HazardPointThread::ConsumerLoop() {
     int worker_finished = 0;
-    std::unique_ptr<octomap::OcTree> oc_tree = std::make_unique<octomap::OcTree>(Sensor::OCTREE_VOXEL_RESOLUTION);
+    std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
+    VFH.reset();
+    Eigen::Vector3f closest_point = {0.0f, 0.0f, FLT_MAX};
+
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
-        std::unique_ptr<octomap::Pointcloud> batch_cloud;
+        std::unique_ptr<std::vector<Eigen::Vector3f>> batch_cloud;
         this->hazard_point_queue.wait_dequeue(batch_cloud);
+
         if(!this->running.load(std::memory_order_relaxed)) break;
+
         if(!batch_cloud) {
             worker_finished++;
             if(worker_finished >= this->num_worker) {
-                oc_tree->updateInnerOccupancy();
-                PublishHazardPoint(oc_tree.get());
-                oc_tree->clear();
+                PublishHazardPoint(VFH, closest_point);
+                VFH.reset();
+                closest_point = {0.0f, 0.0f, FLT_MAX};
                 worker_finished = 0;
             }
             continue;
         }
 
-        // Put the batch cloud to octree
-        oc_tree->insertPointCloud((*batch_cloud), origin, Sensor::DEPTH_CAM_RANGE, true);
+        // Put the batch cloud to VFH
+        for(const auto &point : *batch_cloud) {
+            // Get VFH bin
+            int yaw_bin = static_cast<int>((point.x() + M_PI) / Sensor::VFH_RESOLUTION);
+            int pitch_bin = static_cast<int>((point.y() + M_PI_2) / Sensor::VFH_RESOLUTION);
+
+            // Avoid pitch Top/Down wrap around
+            pitch_bin = std::clamp(pitch_bin, 0, Sensor::VFH_LATITUDE_BINS -1);
+
+            // Do yaw Back wrapping
+            yaw_bin %= Sensor::VFH_AZIMUTH_BINS;
+            while(yaw_bin < 0) yaw_bin += Sensor::VFH_AZIMUTH_BINS;
+
+            // Update VFH
+            int index = (pitch_bin * Sensor::VFH_AZIMUTH_BINS) + yaw_bin;
+            VFH.set(index);
+
+            if(point.z() < closest_point.z()) closest_point = point;
+        }
     }
 }
 
-void alpha_brain::HazardPointThread::PublishHazardPoint(const octomap::OcTree *oc_tree) {
-    alpha_msgs::msg::Point32Array pa;
-    pa.points.reserve(128);
-    for(auto it = oc_tree->begin_leafs(), end = oc_tree->end_leafs(); it != end; ++it) {
-        if(oc_tree->isNodeOccupied(*it)) {
-            octomap::point3d oc_point = it.getCoordinate();
-            geometry_msgs::msg::Point32 point;
-            point.x = oc_point.x();
-            point.y = oc_point.y();
-            point.z = oc_point.z();
-            pa.points.push_back(point);
-        }
-    }
+void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& closest_point) {
+    alpha_msgs::msg::VectorFieldHistogram msg;
 
-    if(pa.points.empty()) {
+    // Check if clear
+    if(VFH.none()) {
         RCLCPP_INFO(this->theNode->get_logger(), YELLOW "Obstacle clear" RESET);
         return;
     }
-    alpha_msgs::msg::VoxelBlock msg;
+
+    // Generate payload
+    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
+        msg.vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] |= (VFH[i] << (i % Sensor::VFH_MSG_BIT_SIZE));
+    }
+
+    // Generate closest point
+    msg.closest_obstacle.set__x(closest_point.x());
+    msg.closest_obstacle.set__y(closest_point.y());
+    msg.closest_obstacle.set__z(closest_point.z());
+
+    // The rest of msg
     msg.header.frame_id = this->base_link.get();
     msg.header.stamp = this->theNode->get_clock()->now();
-    msg.size = pa.points.size();
-    msg.point_array = pa;
     this->hazard_voxel_PUB->publish(msg);
-    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Published %d hazard voxels" RESET, pa.points.size());
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Hazard VFH show occupied %d cells" RESET, VFH.count());
 }
 
 #pragma endregion

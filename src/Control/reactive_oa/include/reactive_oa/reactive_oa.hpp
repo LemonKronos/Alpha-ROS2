@@ -5,7 +5,7 @@
 #include "global_utils/system_config.hpp"
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/fuse_perception.hpp"
-#include "alpha_msgs/msg/voxel_block.hpp"
+#include "alpha_msgs/msg/vector_field_histogram.hpp"
 
 #include <bitset>
 
@@ -21,6 +21,11 @@
     #define DO_REACTIVE_OA 1
 #endif
 
+#define DEBUG 1
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 using std::placeholders::_1;
 constexpr uint8_t HAS_SEEING_VOXEL_COUNTER_INIT = 3;
 
@@ -34,20 +39,20 @@ private:
     #ifdef VISUALIZE
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr repulsive_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr correction_vec_PUB;
     #endif
 
     // Subscriber
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
-    rclcpp::Subscription<alpha_msgs::msg::VoxelBlock>::SharedPtr seeing_voxel_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_SUB;
 
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+    float hazard_distance = Drone::HAZARD_DISTANCE;
 
-    std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
-    
     // Variables
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
@@ -57,16 +62,20 @@ private:
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
+    Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f correction_vec;
     // Eigen::Vector3f control_angular_vec;
     // Eigen::Vector3f movement_angular_vec;
     // Eigen::Vector3f repulsive_angular_vec;
     // Eigen::Vector3f correction_angular_vec;
 
+    std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
+
     // Methods
     void computeControlVector();
     void computeMovementVector();
-    void computeVectorFieldHistogram(const alpha_msgs::msg::VoxelBlock::SharedPtr msg);
+    void computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
+    void computeRepulsiveVector(const Eigen::Vector3f point);
     void computeCorrectionVector();
     void resetVectors();
     
@@ -84,7 +93,7 @@ private:
 
     // Callbacks
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
-    void seeingVoxelCallback(const alpha_msgs::msg::VoxelBlock::SharedPtr msg);
+    void seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 

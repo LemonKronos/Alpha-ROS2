@@ -16,7 +16,7 @@
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h"
-#include "alpha_msgs/msg/voxel_block.hpp"
+#include "alpha_msgs/msg/vector_field_histogram.hpp"
 
 namespace alpha_brain {
 
@@ -34,7 +34,7 @@ public:
         rclcpp::Node* theNode,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
-        moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue,
+        moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue,
         const std::atomic<bool>& world_update,
         moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue
     );
@@ -55,7 +55,7 @@ private:
     bool has_tf_body;
     Eigen::Isometry3d iso_body;
 
-    std::atomic<float> hazard_distance_sq; // metter square
+    std::atomic<float> hazard_distance;
 
     std::atomic<bool> running;
     const std::atomic<bool>& world_update;
@@ -64,7 +64,7 @@ private:
     std::thread processing_thread;
 
     moodycamel::BlockingConcurrentQueue<sensor_msgs::msg::PointCloud2::SharedPtr> msg_queue;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& hazard_point_queue; // Send in batch of smaler point cloud
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue; // Send in batch of smaller point cloud
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue; // Send in batch of smaler point cloud
     
     void ConsumerLoop();
@@ -81,22 +81,22 @@ public:
         const int num_worker
     );
     ~HazardPointThread();
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& getQueue();
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& getQueue();
 
 private:
     rclcpp::Node* theNode;
 
     Name::Dynamic::BASE_LINK base_link;
-    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr hazard_voxel_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr hazard_voxel_PUB;
 
     const int num_worker;
     const octomap::point3d origin; 
     std::atomic<bool> running;
     std::thread hazard_point_thread;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>> hazard_point_queue;
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>> hazard_point_queue;
 
     void ConsumerLoop();
-    void PublishHazardPoint(const octomap::OcTree *oc_tree);
+    void PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& closest_point);
 
 };
 

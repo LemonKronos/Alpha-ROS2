@@ -1,10 +1,9 @@
 {
     "version": "2.0.0",
     "tasks": [
-        {
-            "label": "Build ROS2 single Node and it Dependencies",
+        {"label": "Build ROS2 single Node and it Upstream",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --packages-up-to ${input:packageName}",
+            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-up-to ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -26,10 +25,9 @@
                 "isDefault": false
             },
         },
-        {
-            "label": "Build ROS2 single Node and it Downstream",
+        {"label": "Build ROS2 single Node and it Downstream",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --packages-above-and-dependencies ${input:packageName}",
+            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-above-and-dependencies ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -51,8 +49,31 @@
                 "isDefault": false
             },
         },
-        {
-            "label": "Build Full ROS2 Workspace",
+        {"label": "Build ROS2 single Node Only",
+            "type": "shell",
+            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-select ${input:packageName}",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-l", "-c"]
+                }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": ["$colcon-gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+        },
+        {"label": "Build Full ROS2 Workspace",
             "type": "shell",
             "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source /opt/ros/jazzy/setup.bash && ionice -c2 -n7 nice -n 10 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 ; else echo \"Cancelled\"; fi",
             "options": {
