@@ -43,7 +43,7 @@ void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::Sh
                 msg->header.frame_id, // Current frame: depth camera
                 rclcpp::Time(0) // Time stamp don't matter
             );
-            this->iso_body = tf2::transformToEigen(tf_body);
+            this->iso_body = tf2::transformToEigen(tf_body).cast<float>();
             this->has_tf_body = true;
             RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera STATIC tf lookup complete" RESET, this->name.c_str());
         }
@@ -83,7 +83,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         if(!world_update) this->done_world_update = false;
 
         // Lookup world frame
-        std::optional<Eigen::Isometry3d> iso_world;
+        std::optional<Eigen::Isometry3f> iso_world;
         bool has_tf_world = false;
         if(world_update && !this->done_world_update) {
             RCLCPP_INFO(this->theNode->get_logger(), YELLOW "%s thread called world update" RESET, this->name.c_str());
@@ -94,7 +94,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                     msg->header.stamp, // Time stamp of the scan
                     rclcpp::Duration::from_nanoseconds(Clock::LOOP_CYCLE_NANOSEC * 2)
                 );
-                iso_world = tf2::transformToEigen(tf_world);
+                iso_world = tf2::transformToEigen(tf_world).cast<float>();
                 has_tf_world = true;
                 RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera DYNAMIC tf lookup complete" RESET, this->name.c_str());
             }
@@ -122,8 +122,8 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         for(; itx != itx.end(); ++itx, ++ity, ++itz) {
             if(!std::isfinite(*itx) || !std::isfinite(*ity) || !std::isfinite(*itz)) continue;
 
-            Eigen::Vector3d raw_point(*itx, *ity, *itz); // Raw from depth camera
-            Eigen::Vector3d body_point = this->iso_body * raw_point; // Transformed to body frame
+            Eigen::Vector3f raw_point(*itx, *ity, *itz); // Raw from depth camera
+            Eigen::Vector3f body_point = this->iso_body * raw_point; // Transformed to body frame
             
             // Body clipping check
             bool x_cliped = (Drone::MIN_X < body_point.x() && body_point.x() < Drone::MAX_X);
@@ -132,9 +132,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             if(x_cliped && y_cliped && z_cliped) continue;
 
             // For hazard point
-            double distance_sq = body_point.squaredNorm();
-            // hazard_distance_sq = 400.0f; // #Test
-            if(distance_sq <= hazard_distance_sq) {
+            if(body_point.squaredNorm() <= hazard_distance_sq) {
                 // Convert to spherical coordinate
                 Eigen::Vector3f spherical_body_point = math_utils::toSpherical(body_point);
 
@@ -156,7 +154,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
             // For world update
             if(world_update && !this->done_world_update && has_tf_world) {
-                Eigen::Vector3d world_point = (*iso_world) * raw_point;
+                Eigen::Vector3f world_point = (*iso_world) * raw_point;
                 if(world_update_cloud->size() >= WORLD_BATCH_SIZE) {
                     this->world_update_queue.enqueue(std::move(world_update_cloud));
                     world_update_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize

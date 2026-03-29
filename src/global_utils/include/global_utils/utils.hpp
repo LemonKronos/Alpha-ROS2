@@ -183,14 +183,6 @@ namespace math_utils {
         );
     }
 
-    inline std::array<float, 3> toSpherical(const float x, const float y, const float z) {
-        return {
-            std::atan2(y, x),
-            std::atan2(-z, std::sqrt(x*x + y*y)),
-            std::sqrt(x*x + y*y + z*z)
-        };
-    }
-
     inline Eigen::Vector3f toCartesian(const Eigen::Vector3f S_vector) {
         float distance = S_vector.z();
         float distance_cos_pitch = distance * std::cos(S_vector.y());
@@ -200,16 +192,6 @@ namespace math_utils {
             distance_cos_pitch * std::sin(S_vector.x()),
             -distance * std::sin(S_vector.y())
         );
-    }
-
-    inline std::array<float, 3> toCartesian(const float yaw, const float pitch, const float distance) {
-        float distance_cos_pitch = distance * std::cos(pitch);
-
-        return {
-            distance_cos_pitch * std::cos(yaw),
-            distance_cos_pitch * std::sin(yaw),
-            -distance * std::sin(pitch)
-        };
     }
 
     inline float linearMap(const float& input, const float& in_min, const float& in_max, const float& out_min, const float& out_max) {

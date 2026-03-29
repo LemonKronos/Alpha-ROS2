@@ -53,7 +53,7 @@ private:
 
     Name::Dynamic::BASE_LINK base_link;
     bool has_tf_body;
-    Eigen::Isometry3d iso_body;
+    Eigen::Isometry3f iso_body;
 
     std::atomic<float> hazard_distance;
 

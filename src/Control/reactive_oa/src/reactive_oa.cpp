@@ -129,7 +129,8 @@ void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    Eigen::Vector3f target_vec = control_vec.squaredNorm() > repulsive_vec.squaredNorm() ? control_vec : repulsive_vec;
+    Eigen::Vector3f avoidance_vec = repulsive_vec + control_vec;
+    Eigen::Vector3f target_vec = control_vec.squaredNorm() > avoidance_vec.squaredNorm() ? control_vec : avoidance_vec;
     float target_speed = target_vec.norm();
     if(target_speed < 1e-3f) {
         correction_vec.setZero();
@@ -147,7 +148,6 @@ void ReactiveOANode::computeCorrectionVector() {
 #endif
 
     Eigen::Vector3f target_direction = target_vec.normalized();
-
     Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
 
     constexpr float CONTROL_WEIGHT = 1.0f;
@@ -166,7 +166,7 @@ void ReactiveOANode::computeCorrectionVector() {
         float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2);
         float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2);
 
-        Eigen::Vector3f canditate_direction(math_utils::toCartesian(yaw, pitch, 1.0f));
+        Eigen::Vector3f canditate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
 
         float target_cost = 1.0f - canditate_direction.dot(target_direction);
         float movement_cost = 1.0f - canditate_direction.dot(movement_direction);
