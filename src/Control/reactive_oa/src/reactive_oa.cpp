@@ -117,17 +117,96 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
     for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
         VFH[i] = (msg->vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] >> (i % Sensor::VFH_MSG_BIT_SIZE)) & 1;
     }
-
-    // Get the closest point repulsion
-    computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
 void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
     float strenght = (hazard_distance - point.z()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
     strenght *= Drone::SPEED_MAX_FORWARD;
     repulsive_vec = -math_utils::toCartesian({point.x(), point.y(), strenght});
+
+#if DEBUG
+    Eigen::Vector3f spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
+    RCLCPP_INFO(
+        this->get_logger(), RED "Repulsive = %.2f, yaw = %.0f, pitch = %.0f, strenght = %d" RESET, 
+        spherical_repulsive_vec.z(), 
+        spherical_repulsive_vec.x() / DEGREE, 
+        spherical_repulsive_vec.y() / DEGREE,
+        strenght
+    );
+#endif
 }
 
+class RadicalVFHScanner {
+public:
+    RadicalVFHScanner(int target_row, int target_col) : target_row(target_row), target_col(target_col) {
+        advance();
+    }
+
+    // Return current checking VFH index, or -1 if all have been checked
+    int index() const { return current_index; }
+
+    // Compute next index for checking
+    void next() {
+        next_yaw();
+        advance();
+    }
+
+private:
+    int target_row, target_col;
+    int yaw_offset = 0, yaw_sign = 1;
+    int pitch_offset = 0, pitch_sign = 1;
+    int current_index = -1;
+
+    void advance() {
+        // Expand row until checked all columns
+        while(pitch_offset <= Sensor::VFH_LATITUDE_BINS) {
+            int row = target_row + (pitch_offset == 0 ? 0 : pitch_sign + pitch_offset);
+
+            // In bound
+            if(row > -1 && row < Sensor::VFH_LATITUDE_BINS) {
+                // Scan row until done a full 360
+                while(yaw_offset <= Sensor::VFH_AZIMUTH_BINS / 2) {
+                    int col = target_col + (yaw_offset == 0 ? 0 : yaw_sign * yaw_offset);
+
+                    // Azimuth wrap
+                    while(col < 0) col += Sensor::VFH_AZIMUTH_BINS;
+                    col %= Sensor::VFH_AZIMUTH_BINS;
+
+                    current_index = (row * Sensor::VFH_AZIMUTH_BINS) + col;
+                    return;
+                }
+            }
+            next_pitch();
+        }
+        current_index = -1;
+    }
+
+    void next_yaw() {
+        if(yaw_offset == 0) {
+            yaw_offset = 1; yaw_sign = 1;
+        }
+        else if (yaw_sign == 1) yaw_sign = -1; // Check other direction
+        else {
+            yaw_offset++; // Widen horizontal search
+            yaw_sign = 1;
+        }
+    }
+
+    void next_pitch() {
+        // Reset horizontal scan of new row
+        yaw_offset = 0; yaw_sign = 1;
+
+        if(pitch_offset == 0) {
+            pitch_offset = 1;
+            pitch_sign = 1;
+        }
+        else if(pitch_sign == 1) pitch_sign = -1; // Check other direction
+        else {
+            pitch_offset++; // Widen vertical search
+            pitch_sign = 1;
+        }
+    }
+};
 void ReactiveOANode::computeCorrectionVector() {
     Eigen::Vector3f avoidance_vec = repulsive_vec + control_vec;
     Eigen::Vector3f target_vec = control_vec.squaredNorm() > avoidance_vec.squaredNorm() ? control_vec : avoidance_vec;
@@ -137,8 +216,8 @@ void ReactiveOANode::computeCorrectionVector() {
         return;
     }
 
-#if DEBUG
     Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
+#if DEBUG
     RCLCPP_INFO(
         this->get_logger(), GREEN "Target = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
         spherical_target_vec.z(), 
@@ -150,34 +229,57 @@ void ReactiveOANode::computeCorrectionVector() {
     Eigen::Vector3f target_direction = target_vec.normalized();
     Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
 
-    constexpr float CONTROL_WEIGHT = 1.0f;
     constexpr float MOVEMENT_WEIGHT = 0.3f;
+    constexpr float CONTROL_X_WEIGHT = 1.0f;
+    constexpr float CONTROL_Y_WEIGHT = 0.5f;
+    constexpr float CONTROL_Z_WEIGHT = 2.5f;
 
+    // Dynamic this
+    float ACCEPTABLE_COST = 0.2f;
+
+    // Find search starting point
+    int start_row = static_cast<int>((spherical_target_vec.y() + M_PI) / Sensor::VFH_RESOLUTION);
+    int start_col = static_cast<int>((spherical_target_vec.x() + M_PI_2) / Sensor::VFH_RESOLUTION);
+
+    // Init search intermediates
     float min_cost = std::numeric_limits<float>::max();
     Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
     bool found_safe_path = false;
+    RadicalVFHScanner scanner(start_row, start_col);
+    
+    // Start search
+    while(scanner.index() != -1) {
+        int i = scanner.index();
 
-    for(int i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
-        if(VFH[i]) continue; // Blocked path
+        if(VFH[i] == 1) {
+            scanner.next();
+            continue;
+        }
 
         int row = i / Sensor::VFH_AZIMUTH_BINS;
-        int col = i % Sensor::VFH_AZIMUTH_BINS;
+        int col = i % Sensor::VFH_LATITUDE_BINS;
 
-        float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2);
-        float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2);
+        float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f);
+        float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f);
+        Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
 
-        Eigen::Vector3f canditate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
+        // Compute cost
+        Eigen::Vector3f diff = candinate_direction - target_direction;
+        float target_cost = 
+              CONTROL_X_WEIGHT * diff.x() * diff.x()
+            + CONTROL_Y_WEIGHT * diff.y() * diff.y()
+            + CONTROL_Z_WEIGHT * diff.z() * diff.z();
 
-        float target_cost = 1.0f - canditate_direction.dot(target_direction);
-        float movement_cost = 1.0f - canditate_direction.dot(movement_direction);
-
-        float total_cost = CONTROL_WEIGHT * target_cost + MOVEMENT_WEIGHT * movement_cost;
+        float movement_cost = 1.0f - candinate_direction.dot(movement_direction);
+        float total_cost = target_cost + MOVEMENT_WEIGHT * movement_cost;
 
         if(total_cost < min_cost) {
             min_cost = total_cost;
-            best_direction = canditate_direction;
+            best_direction = candinate_direction;
             found_safe_path = true;
+            if(min_cost <= ACCEPTABLE_COST) break;
         }
+        scanner.next();
     }
 
     if(!found_safe_path) {
@@ -186,9 +288,7 @@ void ReactiveOANode::computeCorrectionVector() {
     }
 
     float deviation_factor = std::max(0.0f, best_direction.dot(target_direction));
-
     float safe_speed = target_speed * deviation_factor;
-    
     correction_vec = best_direction * safe_speed;
 
 #if DEBUG
@@ -347,6 +447,11 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
     computeVectorFieldHistogram(msg);
+    // computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+#if 0
+    Eigen::Vector3f point = math_utils::toCartesian({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+    RCLCPP_INFO(this->get_logger(), "Closet point [%.2f, %.2f, %.2f]", point.x(), point.y(), point.z());
+#endif
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){
@@ -357,3 +462,5 @@ void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::S
 }
 
 #pragma endregion 
+
+

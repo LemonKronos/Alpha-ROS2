@@ -270,6 +270,8 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
         return;
     }
 
+    if(VFH.all()) RCLCPP_WARN(this->theNode->get_logger(), RED "NO WAY OUT" RESET);
+
     // Generate payload
     for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
         msg.vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] |= (VFH[i] << (i % Sensor::VFH_MSG_BIT_SIZE));

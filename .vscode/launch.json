@@ -15,7 +15,7 @@
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
             "stopAtEntry": false,
-            "preLaunchTask": "Build ROS2 Single Node"
+            "preLaunchTask": "Build ROS2 single Node Only"
         }
     ],
     "inputs": [
