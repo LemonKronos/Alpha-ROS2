@@ -1,6 +1,143 @@
 #include "reactive_oa/reactive_oa.hpp"
 #define DEBUG 1
 
+class VfhOrderScanner {
+public:
+    VfhOrderScanner(int target_r, int target_c) 
+        : target_row(target_r), target_col(target_c) {
+        advance(); // Run the FSM once to ready the Center bin
+    }
+
+    // Returns the flat 1D index, or -1 when the entire map is checked
+    int index() const { return current_idx; }
+
+    // Returns the exact grid coordinates
+    std::tuple<int, int> getCell() const { return {current_row, current_col}; }
+
+    // Kick the FSM to find the next valid bin
+    void next() { advance(); }
+
+private:
+    int target_row, target_col;
+    int current_row = -1, current_col = -1, current_idx = -1;
+    
+    // The FSM States
+    enum State { CENTER, HORIZ_LEFT, HORIZ_RIGHT, VERT_UP, VERT_DOWN, DONE };
+    State state = CENTER;
+    
+    // Expanding bounding box thresholds
+    int h_radius = 1;
+    int v_radius = 0;
+    int y_offset = 0;
+    int x_offset = 0;
+    
+    // Caps to prevent infinite expansion
+    const int MAX_H = Sensor::VFH_AZIMUTH_BINS / 2; // Usually 36
+    const int MAX_V = Sensor::VFH_LATITUDE_BINS;    // Usually 36
+
+    // Helper to alternate offsets: 0, 1, -1, 2, -2, 3, -3...
+    int next_alt(int val) {
+        if (val == 0) return 1;
+        if (val > 0) return -val;
+        return -val + 1;
+    }
+
+    void advance() {
+        while (state != DONE) {
+            bool valid_cell = false;
+
+            switch (state) {
+                case CENTER:
+                    current_row = target_row;
+                    current_col = target_col;
+                    state = HORIZ_LEFT;
+                    h_radius = 1;
+                    v_radius = 0;
+                    y_offset = 0;
+                    valid_cell = true;
+                    break;
+
+                case HORIZ_LEFT:
+                    if (h_radius > MAX_H && v_radius > MAX_V) {
+                        state = DONE;
+                        break;
+                    }
+                    if (h_radius <= MAX_H && std::abs(y_offset) <= v_radius) {
+                        current_row = target_row + y_offset;
+                        current_col = target_col - h_radius;
+                        valid_cell = true;
+                    }
+                    state = HORIZ_RIGHT;
+                    break;
+
+                case HORIZ_RIGHT:
+                    if (h_radius <= MAX_H && std::abs(y_offset) <= v_radius) {
+                        current_row = target_row + y_offset;
+                        current_col = target_col + h_radius;
+                        valid_cell = true;
+                    }
+                    
+                    // Advance the horizontal sweep along the Y axis
+                    y_offset = next_alt(y_offset);
+                    if (std::abs(y_offset) > v_radius) {
+                        state = VERT_UP;
+                        v_radius++; // Bump vertical threshold
+                        x_offset = 0;
+                    } else {
+                        state = HORIZ_LEFT;
+                    }
+                    break;
+
+                case VERT_UP:
+                    if (v_radius <= MAX_V && std::abs(x_offset) <= h_radius) {
+                        current_row = target_row + v_radius;
+                        current_col = target_col + x_offset;
+                        valid_cell = true;
+                    }
+                    state = VERT_DOWN;
+                    break;
+
+                case VERT_DOWN:
+                    if (v_radius <= MAX_V && std::abs(x_offset) <= h_radius) {
+                        current_row = target_row - v_radius;
+                        current_col = target_col + x_offset;
+                        valid_cell = true;
+                    }
+                    
+                    // Advance the vertical sweep along the X axis
+                    x_offset = next_alt(x_offset);
+                    if (std::abs(x_offset) > h_radius) {
+                        state = HORIZ_LEFT;
+                        h_radius++; // Bump horizontal threshold
+                        y_offset = 0;
+                    } else {
+                        state = VERT_UP;
+                    }
+                    break;
+                    
+                case DONE:
+                    break;
+            }
+
+            // If the FSM generated a cell, make sure it actually exists on the map
+            if (valid_cell) {
+                // Pitch (Latitude) doesn't wrap. If it's over the pole, we just skip it.
+                if (current_row >= 0 && current_row < Sensor::VFH_LATITUDE_BINS) {
+                    
+                    // Yaw (Azimuth) wraps infinitely like Pac-Man
+                    current_col %= Sensor::VFH_AZIMUTH_BINS;
+                    if (current_col < 0) current_col += Sensor::VFH_AZIMUTH_BINS;
+                    
+                    current_idx = (current_row * Sensor::VFH_AZIMUTH_BINS) + current_col;
+                    return; // Yield control back to your main loop!
+                }
+            }
+        }
+        
+        current_idx = -1; // The entire sphere has been mapped.
+    }
+};
+
 class RadialVfhScanner {
 public:
     RadialVfhScanner(int t_row, int t_col) 

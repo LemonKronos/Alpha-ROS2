@@ -20,7 +20,7 @@ class HazardVoxelVisualizer(Node):
         
         self.voxel_sub = self.create_subscription(
             VoxelBlock,
-            Topic.VOXEL_HAZARD_SEEING,
+            Topic.VFH_HAZARD_SEEING,
             self.voxel_callback,
             qos_profile_sensor_data
             

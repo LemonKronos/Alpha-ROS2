@@ -185,7 +185,7 @@ alpha_brain::HazardPointThread::HazardPointThread(
 ) : theNode(theNode), num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
     // Create Publisher
     this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VectorFieldHistogram>(
-        Topic::VOXEL_HAZARD_SEEING,
+        Topic::VFH_HAZARD_SEEING,
         rclcpp::SensorDataQoS()
     );
 
@@ -228,7 +228,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
 
         if(!this->running.load(std::memory_order_relaxed)) break;
 
-        if(!batch_cloud) {
+        if(batch_cloud == nullptr) {
             worker_finished++;
             if(worker_finished >= this->num_worker) {
                 PublishHazardPoint(VFH, closest_point);
@@ -270,9 +270,8 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
         return;
     }
 
-    if(VFH.all()) RCLCPP_WARN(this->theNode->get_logger(), RED "NO WAY OUT" RESET);
-
     // Generate payload
+    memset(&msg.vfh_part, 0, sizeof(msg.vfh_part)); // Init all the bits to 0s
     for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
         msg.vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] |= (VFH[i] << (i % Sensor::VFH_MSG_BIT_SIZE));
     }

@@ -99,8 +99,8 @@ namespace Topic {
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
     constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour";
     constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour";
-    constexpr const char* VOXEL_HAZARD_SEEING = "/internal/mapping/hazard/seeing/voxel_blocks";
-    constexpr const char* VOXEL_HAZARD_MEMORY = "/internal/mapping/hazard/memory/voxel_blocks";
+    constexpr const char* VFH_HAZARD_SEEING = "/internal/mapping/hazard/seeing/vfh";
+    constexpr const char* VFH_HAZARD_MEMORY = "/internal/mapping/hazard/memory/vfh";
     
 }
 

@@ -20,7 +20,7 @@
 
 namespace alpha_brain {
 
-class DepthCamNode; // Forward declaration
+// class DepthCamNode; // Forward declaration
 
 constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
 constexpr int WORLD_BATCH_SIZE = 512;
