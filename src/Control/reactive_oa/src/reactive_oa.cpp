@@ -126,17 +126,18 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
 
 void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
     float strenght = (hazard_distance - point.z()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    strenght *= Drone::SPEED_MAX_FORWARD;
+    strenght =  std::clamp(strenght * Drone::SPEED_MAX_FORWARD, 0.0f, Drone::SPEED_MAX_FORWARD * 2.0f);
     repulsive_vec = -math_utils::toCartesian({point.x(), point.y(), strenght});
 
-#if DEBUG
+#if DEBUG & 1
+    if(hazard_distance < point.z()) RCLCPP_ERROR(this->get_logger(), RED "Hazard distance < closet point distance, by %.2f" RESET, point.z() - hazard_distance);
+    if(hazard_distance < Drone::HAZARD_DISTANCE) RCLCPP_ERROR(this->get_logger(), RED "Hazard distance < Drone::HAZARD_DISTANCE" RESET);
     Eigen::Vector3f spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
     RCLCPP_INFO(
-        this->get_logger(), RED "Repulsive = %.2f, yaw = %.0f, pitch = %.0f, strenght = %d" RESET, 
-        spherical_repulsive_vec.z(), 
+        this->get_logger(), RED "Repulsive yaw = %.0f, pitch = %.0f, distance = %.2f" RESET, 
         spherical_repulsive_vec.x() / DEGREE, 
         spherical_repulsive_vec.y() / DEGREE,
-        strenght
+        spherical_repulsive_vec.z()
     );
 #endif
 }
@@ -151,7 +152,8 @@ void ReactiveOANode::computeCorrectionVector() {
     }
 
     Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
-#if DEBUG
+    
+#if DEBUG & 0
     RCLCPP_INFO(
         this->get_logger(), GREEN "Target = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
         spherical_target_vec.z(), 
@@ -163,10 +165,10 @@ void ReactiveOANode::computeCorrectionVector() {
     Eigen::Vector3f target_direction = target_vec.normalized();
     Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
 
-    constexpr float MOVEMENT_WEIGHT = 0.3f;
-    constexpr float CONTROL_X_WEIGHT = 1.0f;
-    constexpr float CONTROL_Y_WEIGHT = 0.5f;
-    constexpr float CONTROL_Z_WEIGHT = 2.5f;
+    constexpr float MOVEMENT_WEIGHT = 0.5f;
+    constexpr float CONTROL_X_WEIGHT = 5.0f;
+    constexpr float CONTROL_Y_WEIGHT = 1.0f;
+    constexpr float CONTROL_Z_WEIGHT = 50.0f;
 
     // Dynamic this
     float ACCEPTABLE_COST = -1.0f; // Set to 0 or negative for exact best direction
@@ -222,7 +224,7 @@ void ReactiveOANode::computeCorrectionVector() {
         correction_vec = best_direction * safe_speed;
     }
 
-#if DEBUG
+#if DEBUG & 0
     Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
     RCLCPP_INFO(
         this->get_logger(), 
@@ -359,6 +361,7 @@ void ReactiveOANode::nodeLoopCallback() {
     #ifdef VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green
     publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); // Blue
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.0f, 0.0f); // Red
     publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); // Yellow 
     #endif
 
@@ -378,8 +381,9 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
     computeVectorFieldHistogram(msg);
-    // computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
-#if 0
+    computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+
+#if DEBUG & 0
     Eigen::Vector3f point = math_utils::toCartesian({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
     RCLCPP_INFO(this->get_logger(), "Closet point [%.2f, %.2f, %.2f]", point.x(), point.y(), point.z());
 #endif
@@ -389,6 +393,7 @@ void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::S
     lost_perception_counter = 0;
 
     last_perception = msg;
+    hazard_distance = msg->hazard_distance;
     computeMovementVector();
 }
 

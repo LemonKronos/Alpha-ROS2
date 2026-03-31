@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# --------------------------- ROS2
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]:[{name}]: {message}"
+
 # --------------------------- NAME
 export WORLD_NAME="grasslands"
 # export WORLD_NAME="obstacle_tunnel"
