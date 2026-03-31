@@ -88,4 +88,10 @@ def generate_launch_description():
         #     output='screen',
         #     arguments=['--ros-args', '--log-level', 'warn']
         # ),
+        Node(
+            package='vfh_sphere',
+            executable='vfh_sphere',
+            name='vfh_sphere',
+            arguments=['--ros-args', '--log-level', 'warn']
+        )
     ])

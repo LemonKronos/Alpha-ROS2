@@ -42,8 +42,13 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     // Check sycn
     alpha_msgs::msg::VectorFieldHistogram test_msg;
     if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
-        RCLCPP_ERROR(this->get_logger(), RED "Wrong VFH msg size, please update to %d" RESET, Sensor::VFH_MSG_CHUNK_SIZE);
-        return;
+        std::string error_msg = 
+              "Wrong VFH msg size: expected "
+            + std::to_string(Sensor::VFH_MSG_CHUNK_SIZE)
+            + ", but got"
+            + std::to_string(test_msg.vfh_part.size());
+        RCLCPP_FATAL(this->get_logger(), RED "%s" RESET, error_msg.c_str());
+        throw std::runtime_error(error_msg);
     }
 
     // Init variables
@@ -164,9 +169,13 @@ void ReactiveOANode::computeCorrectionVector() {
     constexpr float CONTROL_Z_WEIGHT = 2.5f;
 
     // Dynamic this
-    float ACCEPTABLE_COST = -1.0f; // Set to 0 for exact best direction
+    float ACCEPTABLE_COST = -1.0f; // Set to 0 or negative for exact best direction
 
     // Init search intermediates
+    int row_target = static_cast<int>((spherical_target_vec.y() + M_PI_2) / Sensor::VFH_LATITUDE_BINS);
+    int col_target = static_cast<int>((spherical_target_vec.x() + M_PI) / Sensor::VFH_AZIMUTH_BINS);
+    int row_best = -1, col_best = -1;
+
     float min_cost = std::numeric_limits<float>::max();
     Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
     bool found_safe_path = false;
@@ -178,8 +187,8 @@ void ReactiveOANode::computeCorrectionVector() {
         int row = i / Sensor::VFH_AZIMUTH_BINS;
         int col = i % Sensor::VFH_AZIMUTH_BINS;
 
-        float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f);
-        float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f);
+        float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
+        float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
         Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
 
         // Compute cost
@@ -194,6 +203,8 @@ void ReactiveOANode::computeCorrectionVector() {
         if(total_cost < min_cost) {
             min_cost = total_cost;
             best_direction = candinate_direction;
+            row_best = row;
+            col_best = col;
             found_safe_path = true;
             if(min_cost <= ACCEPTABLE_COST) break;
         }
@@ -201,12 +212,15 @@ void ReactiveOANode::computeCorrectionVector() {
 
     if(!found_safe_path) {
         correction_vec.setZero();
-        return;
     }
-
-    float deviation_factor = std::max(0.0f, best_direction.dot(target_direction));
-    float safe_speed = target_speed * deviation_factor;
-    correction_vec = best_direction * safe_speed;
+    else if(row_best == row_target && col_best == col_target) {
+        correction_vec = target_vec;
+    }
+    else {    
+        float deviation_factor = std::max(0.0f, best_direction.dot(target_direction));
+        float safe_speed = target_speed * deviation_factor;
+        correction_vec = best_direction * safe_speed;
+    }
 
 #if DEBUG
     Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);

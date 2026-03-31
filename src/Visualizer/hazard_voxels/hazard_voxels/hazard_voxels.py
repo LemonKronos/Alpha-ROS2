@@ -10,6 +10,8 @@ from alpha_msgs.msg import VoxelBlock
 class HazardVoxelVisualizer(Node):
     def __init__(self):
         super().__init__('hazard_voxel_visualizer')
+
+        Global.setup_for_simulation(self)
         
         # Publisher for RViz
         self.marker_pub = self.create_publisher(

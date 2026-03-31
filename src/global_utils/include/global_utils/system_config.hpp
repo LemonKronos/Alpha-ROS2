@@ -134,6 +134,8 @@ namespace Drone {
     constexpr float HAZARD_DISTANCE = RADIUS + SAFE_BUFFER + UNCERTAINTY;
     constexpr float REACT_TIME = Clock::LOOP_CYCLE; // s
     constexpr float DECELERATE_MAX = 1.0f; // m/s^2
+    // hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
+    // About 14m at the speed of 5m/s
 
     // Body box anti clipping, independent with sensor mount point, sensor data have to be body frame transformed
     constexpr float MAX_X = 0.53f + UNCERTAINTY;

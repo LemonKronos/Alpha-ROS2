@@ -1,6 +1,7 @@
 #include "depth_cam/depth_cam_threads.hpp"
 
 #pragma region ProcessingThread class
+
 alpha_brain::ProcessingThread::ProcessingThread(
     const std::string& name,
     rclcpp::Node* theNode,
@@ -195,8 +196,13 @@ alpha_brain::HazardPointThread::HazardPointThread(
     // Check sycn
     alpha_msgs::msg::VectorFieldHistogram test_msg;
     if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
-        RCLCPP_ERROR(this->theNode->get_logger(), RED "Wrong VFH msg size, please update to %d" RESET, Sensor::VFH_MSG_CHUNK_SIZE);
-        return;
+        std::string error_msg = 
+              "Wrong VFH msg size: expected "
+            + std::to_string(Sensor::VFH_MSG_CHUNK_SIZE)
+            + ", but got"
+            + std::to_string(test_msg.vfh_part.size());
+        RCLCPP_FATAL(this->theNode->get_logger(), RED "%s" RESET, error_msg.c_str());
+        throw std::runtime_error(error_msg);
     }
 
     // Spawn persistent thread
@@ -241,21 +247,32 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
 
         // Put the batch cloud to VFH
         for(const auto &point : *batch_cloud) {
-            // Get VFH bin
-            int yaw_bin = static_cast<int>((point.x() + M_PI) / Sensor::VFH_RESOLUTION);
-            int pitch_bin = static_cast<int>((point.y() + M_PI_2) / Sensor::VFH_RESOLUTION);
+            // Get scaling
+            float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
+            float scale_angle = std::asin(scale_distance);
+            float scale_bin = static_cast<int>(std::ceil(scale_angle / Sensor::VFH_RESOLUTION));
 
-            // Avoid pitch Top/Down wrap around
-            pitch_bin = std::clamp(pitch_bin, 0, Sensor::VFH_LATITUDE_BINS -1);
-
-            // Do yaw Back wrapping
-            yaw_bin %= Sensor::VFH_AZIMUTH_BINS;
-            while(yaw_bin < 0) yaw_bin += Sensor::VFH_AZIMUTH_BINS;
+            // Get VFH center bin
+            int center_yaw_bin = static_cast<int>((point.x() + M_PI) / Sensor::VFH_RESOLUTION);
+            int center_pitch_bin = static_cast<int>((point.y() + M_PI_2) / Sensor::VFH_RESOLUTION);
 
             // Update VFH
-            int index = (pitch_bin * Sensor::VFH_AZIMUTH_BINS) + yaw_bin;
-            VFH.set(index);
+            for(int pitch_bin = center_pitch_bin - scale_bin; pitch_bin <= center_pitch_bin + scale_bin; pitch_bin++) {
+                // Cutoff for zenith
+                if(pitch_bin < 0 || pitch_bin >= Sensor::VFH_LATITUDE_BINS) continue;
 
+                for(int y = center_yaw_bin - scale_bin; y <= center_yaw_bin + scale_bin; y++) {
+                    // Wrapped around for azimuth
+                    int yaw_bin = y % Sensor::VFH_AZIMUTH_BINS;
+                    while(yaw_bin < 0) yaw_bin += Sensor::VFH_AZIMUTH_BINS;
+
+                    // Get index and update
+                    int index = pitch_bin * Sensor::VFH_AZIMUTH_BINS + yaw_bin;
+                    VFH.set(index);
+                }
+            }
+
+            // Update closest point
             if(point.z() < closest_point.z()) closest_point = point;
         }
     }
