@@ -176,7 +176,7 @@ void ReactiveOANode::computeCorrectionVector() {
         if(VFH[i] == 1) continue;
 
         int row = i / Sensor::VFH_AZIMUTH_BINS;
-        int col = i % Sensor::VFH_LATITUDE_BINS;
+        int col = i % Sensor::VFH_AZIMUTH_BINS;
 
         float yaw = ((col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f);
         float pitch = ((row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f);
