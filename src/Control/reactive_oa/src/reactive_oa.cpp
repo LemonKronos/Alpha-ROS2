@@ -24,7 +24,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     seeing_VFH_SUB = this->create_subscription<alpha_msgs::msg::VectorFieldHistogram>(
         Topic::VFH_HAZARD_SEEING,
         rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::seeingVoxelCallback, this, _1)
+        std::bind(&ReactiveOANode::seeingVFHCallback, this, _1)
     );
 
     perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
@@ -126,7 +126,7 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
 
 void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
     float strenght = (hazard_distance - point.z()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    strenght =  std::clamp(strenght * Drone::SPEED_MAX_FORWARD, 0.0f, Drone::SPEED_MAX_FORWARD * 2.0f);
+    strenght = std::clamp(strenght * Drone::SPEED_MAX_FORWARD, 0.0f, Drone::SPEED_MAX_FORWARD * 2.0f);
     repulsive_vec = -math_utils::toCartesian({point.x(), point.y(), strenght});
 
 #if DEBUG & 1
@@ -134,17 +134,17 @@ void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
     if(hazard_distance < Drone::HAZARD_DISTANCE) RCLCPP_ERROR(this->get_logger(), RED "Hazard distance < Drone::HAZARD_DISTANCE" RESET);
     Eigen::Vector3f spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
     RCLCPP_INFO(
-        this->get_logger(), RED "Repulsive yaw = %.0f, pitch = %.0f, distance = %.2f" RESET, 
+        this->get_logger(), RED "Repulsive = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        spherical_repulsive_vec.z(),
         spherical_repulsive_vec.x() / DEGREE, 
-        spherical_repulsive_vec.y() / DEGREE,
-        spherical_repulsive_vec.z()
+        spherical_repulsive_vec.y() / DEGREE
     );
 #endif
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    Eigen::Vector3f avoidance_vec = repulsive_vec + control_vec;
-    Eigen::Vector3f target_vec = control_vec.squaredNorm() > avoidance_vec.squaredNorm() ? control_vec : avoidance_vec;
+    float repulsive_weight = repulsive_vec.norm() / Drone::SPEED_MAX_FORWARD;
+    Eigen::Vector3f target_vec = (1.0f - repulsive_weight) * control_vec + repulsive_weight * repulsive_vec;
     float target_speed = target_vec.norm();
     if(target_speed < 1e-3f) {
         correction_vec.setZero();
@@ -153,7 +153,7 @@ void ReactiveOANode::computeCorrectionVector() {
 
     Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
     
-#if DEBUG & 0
+#if DEBUG & 1
     RCLCPP_INFO(
         this->get_logger(), GREEN "Target = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
         spherical_target_vec.z(), 
@@ -165,10 +165,10 @@ void ReactiveOANode::computeCorrectionVector() {
     Eigen::Vector3f target_direction = target_vec.normalized();
     Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
 
-    constexpr float MOVEMENT_WEIGHT = 0.5f;
+    constexpr float MOVEMENT_WEIGHT = 5.0f;
     constexpr float CONTROL_X_WEIGHT = 5.0f;
     constexpr float CONTROL_Y_WEIGHT = 1.0f;
-    constexpr float CONTROL_Z_WEIGHT = 50.0f;
+    constexpr float CONTROL_Z_WEIGHT = 20.0f;
 
     // Dynamic this
     float ACCEPTABLE_COST = -1.0f; // Set to 0 or negative for exact best direction
@@ -218,13 +218,11 @@ void ReactiveOANode::computeCorrectionVector() {
     else if(row_best == row_target && col_best == col_target) {
         correction_vec = target_vec;
     }
-    else {    
-        float deviation_factor = std::max(0.0f, best_direction.dot(target_direction));
-        float safe_speed = target_speed * deviation_factor;
-        correction_vec = best_direction * safe_speed;
+    else {
+        correction_vec = best_direction * target_speed;
     }
 
-#if DEBUG & 0
+#if DEBUG & 1
     Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
     RCLCPP_INFO(
         this->get_logger(), 
@@ -378,7 +376,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
     computeControlVector();
 }
 
-void ReactiveOANode::seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
+void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
     computeVectorFieldHistogram(msg);
     computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});

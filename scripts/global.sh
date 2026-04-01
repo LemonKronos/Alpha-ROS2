@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --------------------------- ROS2
-export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]:[{name}]: {message}"
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]: {message}"
 
 # --------------------------- NAME
 export WORLD_NAME="grasslands"

@@ -43,6 +43,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     missed_odometry = Threshold::MISSED_FAST_TOPIC;
     lidar_down_range_min = 0.1f;
     lidar_down_range_max = 30.0f;
+    last_hazard_distance = Drone::HAZARD_DISTANCE;
 }
 
 FusePerceptionNode::~FusePerceptionNode() {}
@@ -97,7 +98,16 @@ void FusePerceptionNode::PublishCallback() {
         // Compute safe_distance
         float speed_sq = msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2];
         float speed = std::sqrt(speed_sq);
-        msg.hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
+
+        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
+        constexpr float DECREASE_CONSTANT = Drone::HAZARD_DISTANCE / 20.0f;
+
+        if(hazard_distance + DECREASE_CONSTANT < last_hazard_distance) {
+            hazard_distance = last_hazard_distance - DECREASE_CONSTANT;
+        }
+
+        msg.hazard_distance = hazard_distance;
+        last_hazard_distance = msg.hazard_distance;
 
         doFrameTransform(msg);
     }

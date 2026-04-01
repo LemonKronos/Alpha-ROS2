@@ -43,6 +43,7 @@ private:
     uint8_t missed_odometry;
     float lidar_down_range_min;
     float lidar_down_range_max;
+    float last_hazard_distance;
 
     // Timers
     rclcpp::TimerBase::SharedPtr publish_TIM;

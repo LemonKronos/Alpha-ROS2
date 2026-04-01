@@ -93,7 +93,7 @@ private:
 
     // Callbacks
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
-    void seeingVoxelCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
+    void seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 

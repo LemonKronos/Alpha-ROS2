@@ -194,28 +194,30 @@ namespace math_utils {
         );
     }
 
-    inline float linearMap(const float& input, const float& in_min, const float& in_max, const float& out_min, const float& out_max) {
+    template<typename T>
+    inline T linearMap(const T input, const T in_min, const T in_max, const T out_min, const T out_max) {
         if(in_min == in_max) return (out_max - out_min)/2;
         else if(in_min < in_max) {
-            float ratio = (input - in_min) / (in_max - in_min);
+            T ratio = (input - in_min) / (in_max - in_min);
             ratio = std::clamp(ratio, 0.0f, 1.0f);
             return out_min + ratio*(out_max - out_min);
         }
         else {
-            float ratio = (input - in_max) / (in_min - in_max);
+            T ratio = (input - in_max) / (in_min - in_max);
             ratio = std::clamp(ratio, 0.0f, 1.0f);
             return out_min + (1 - ratio)*(out_max - out_min);
         }
     }
 
-    inline float expoMap(const float& input, const float& in_min, const float& in_max, const float& out_min, const float& out_max, const float& sensitivity) {
+    template <typename T>
+    inline T expoMap(const T input, const T in_min, const T in_max, const T out_min, const T out_max, const T sensitivity) {
         if (in_max <= in_min)
             return out_min;
 
-        float ratio = (input - in_min) / (in_max - in_min);
+        T ratio = (input - in_min) / (in_max - in_min);
         ratio = std::clamp(ratio, 0.0f, 1.0f);
 
-        float expo_ratio = pow(ratio, sensitivity);
+        T expo_ratio = std::pow(ratio, sensitivity);
         return out_min + expo_ratio * (out_max - out_min);
     }
 } // namespace math_utils
