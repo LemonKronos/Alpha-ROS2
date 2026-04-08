@@ -64,15 +64,15 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     VFH.reset();
 
     lost_control_signal = true;
-    lost_control_signal_counter = Threshold::MISSED_FAST_TOPIC;
+    lost_control_signal_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
     last_control_signal = nullptr;
 
     lost_perception = true;
-    lost_perception_counter = Threshold::MISSED_FAST_TOPIC;
+    lost_perception_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
     last_perception = nullptr;
 
     hazard_distance = Drone::HAZARD_DISTANCE;
-    has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
+    has_seeing_voxel_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
 }
 ReactiveOANode::~ReactiveOANode(){}
 
@@ -125,57 +125,46 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
 }
 
 void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
-    float strenght = (hazard_distance - point.z()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    strenght = std::clamp(strenght * Drone::SPEED_MAX_FORWARD, 0.0f, Drone::SPEED_MAX_FORWARD * 2.0f);
-    repulsive_vec = -math_utils::toCartesian({point.x(), point.y(), strenght});
-
-#if DEBUG & 1
-    if(hazard_distance < point.z()) RCLCPP_ERROR(this->get_logger(), RED "Hazard distance < closet point distance, by %.2f" RESET, point.z() - hazard_distance);
-    if(hazard_distance < Drone::HAZARD_DISTANCE) RCLCPP_ERROR(this->get_logger(), RED "Hazard distance < Drone::HAZARD_DISTANCE" RESET);
-    Eigen::Vector3f spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
-    RCLCPP_INFO(
-        this->get_logger(), RED "Repulsive = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_repulsive_vec.z(),
-        spherical_repulsive_vec.x() / DEGREE, 
-        spherical_repulsive_vec.y() / DEGREE
-    );
-#endif
+    float strenght = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
+    strenght = math_utils::linearMap<float>(strenght, 0, 1, 0, 1);
+    repulsive_vec = point.normalized() * -strenght * Drone::SPEED_MAX_FORWARD;
 }
 
 void ReactiveOANode::computeCorrectionVector() {
-    float repulsive_weight = repulsive_vec.norm() / Drone::SPEED_MAX_FORWARD;
-    Eigen::Vector3f target_vec = (1.0f - repulsive_weight) * control_vec + repulsive_weight * repulsive_vec;
+#if DEBUG && 1
+    auto start = std::chrono::high_resolution_clock::now();
+#endif
+
+    // Scale repulsion base on moving direction
+    if(!movement_vec.isZero(1e-3f)) {
+        float movement_weight = movement_vec.norm() / Drone::SPEED_MAX_FORWARD;
+        repulsive_vec = (1 - movement_weight) * repulsive_vec + movement_weight * repulsive_vec * repulsive_vec.dot(movement_vec);
+    }
+    
+    // Compute target vector
+    Eigen::Vector3f target_vec = control_vec + repulsive_vec;
     float target_speed = target_vec.norm();
     if(target_speed < 1e-3f) {
         correction_vec.setZero();
         return;
     }
 
-    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
-    
-#if DEBUG & 1
-    RCLCPP_INFO(
-        this->get_logger(), GREEN "Target = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_target_vec.z(), 
-        spherical_target_vec.x() / DEGREE, 
-        spherical_target_vec.y() / DEGREE
-    );
-#endif
-
+    // Get directions
     Eigen::Vector3f target_direction = target_vec.normalized();
     Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
-
-    constexpr float MOVEMENT_WEIGHT = 5.0f;
+    
+    // Setup weights
+    constexpr float MOVEMENT_WEIGHT = 1.0f;
     constexpr float CONTROL_X_WEIGHT = 5.0f;
     constexpr float CONTROL_Y_WEIGHT = 1.0f;
-    constexpr float CONTROL_Z_WEIGHT = 20.0f;
-
-    // Dynamic this
-    float ACCEPTABLE_COST = -1.0f; // Set to 0 or negative for exact best direction
-
+    constexpr float CONTROL_Z_WEIGHT = 9595959590.0f;
+    float ACCEPTABLE_COST = 0.0f; // Set to 0 or negative for exact best direction.
+    
     // Init search intermediates
-    int row_target = static_cast<int>((spherical_target_vec.y() + M_PI_2) / Sensor::VFH_LATITUDE_BINS);
-    int col_target = static_cast<int>((spherical_target_vec.x() + M_PI) / Sensor::VFH_AZIMUTH_BINS);
+    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
+
+    int row_target = static_cast<int>((spherical_target_vec.y() + M_PI_2) / Sensor::VFH_RESOLUTION);
+    int col_target = static_cast<int>((spherical_target_vec.x() + M_PI) / Sensor::VFH_RESOLUTION);
     int row_best = -1, col_best = -1;
 
     float min_cost = std::numeric_limits<float>::max();
@@ -183,12 +172,15 @@ void ReactiveOANode::computeCorrectionVector() {
     bool found_safe_path = false;
     
     // Start search
-    for(int i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
-        if(VFH[i] == 1) continue;
+    for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
+        // Skip occupied space
+        if(VFH[index] == 1) continue;
 
-        int row = i / Sensor::VFH_AZIMUTH_BINS;
-        int col = i % Sensor::VFH_AZIMUTH_BINS;
+        // Get row and column
+        int row = index / Sensor::VFH_AZIMUTH_BINS;
+        int col = index % Sensor::VFH_AZIMUTH_BINS;
 
+        // Get candinate vector
         float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
         float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
         Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
@@ -202,6 +194,7 @@ void ReactiveOANode::computeCorrectionVector() {
         float movement_cost = 1.0f - candinate_direction.dot(movement_direction);
         float total_cost = target_cost + MOVEMENT_WEIGHT * movement_cost;
 
+        // Evaluate cost
         if(total_cost < min_cost) {
             min_cost = total_cost;
             best_direction = candinate_direction;
@@ -222,11 +215,36 @@ void ReactiveOANode::computeCorrectionVector() {
         correction_vec = best_direction * target_speed;
     }
 
+#if DEBUG && 1
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    RCLCPP_INFO(this->get_logger(), "Execution time: %ld microseconds", duration.count());
+#endif
+
+#if DEBUG && 1
+    Eigen::Vector3f spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
+    RCLCPP_INFO(
+        this->get_logger(), RED "Repulsive  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        spherical_repulsive_vec.z(),
+        spherical_repulsive_vec.x() / DEGREE, 
+        spherical_repulsive_vec.y() / DEGREE
+    );
+#endif
+
+#if DEBUG && 1
+    RCLCPP_INFO(
+        this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f, min cost = %.2f" RESET, 
+        spherical_target_vec.z(), 
+        spherical_target_vec.x() / DEGREE, 
+        spherical_target_vec.y() / DEGREE,
+        min_cost
+    );
+#endif
+
 #if DEBUG & 1
     Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
     RCLCPP_INFO(
-        this->get_logger(), 
-        YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        this->get_logger(), YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
         spherical_correction_vec.z(), 
         spherical_correction_vec.x() / DEGREE, 
         spherical_correction_vec.y() / DEGREE
@@ -240,10 +258,15 @@ void ReactiveOANode::resetVectors() {
         control_vec.setZero();
     }
 
-    if(!has_seeing_voxel_counter) {
+    if(!has_seeing_voxel_counter && VFH.any()) {
         VFH.reset();
         repulsive_vec.setZero();
+
+#if DEBUG && 1
+        RCLCPP_INFO(this->get_logger(), PINK "Reset obstacles" RESET);
+#endif
     }
+
     // Reset correction vector
     correction_vec.setZero();
 
@@ -310,8 +333,8 @@ void ReactiveOANode::nodeLoopCallback() {
     #endif
 
     // Odometry callback check
-    if(lost_perception_counter < Threshold::MISSED_FAST_TOPIC) lost_perception_counter++;
-    if(lost_perception_counter >= Threshold::MISSED_FAST_TOPIC) {
+    if(lost_perception_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_perception_counter++;
+    if(lost_perception_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
         if(lost_perception == false) RCLCPP_INFO(this->get_logger(), YELLOW "Lost odometry" RESET);
         lost_perception = true;
         last_perception = nullptr;
@@ -322,8 +345,8 @@ void ReactiveOANode::nodeLoopCallback() {
     }
 
     // Control signal callback check
-    if(lost_control_signal_counter < Threshold::MISSED_FAST_TOPIC) lost_control_signal_counter++;
-    if(lost_control_signal_counter >= Threshold::MISSED_FAST_TOPIC) {
+    if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
+    if(lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
         if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
         lost_control_signal = true;
         last_control_signal = nullptr;
@@ -377,14 +400,9 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 }
 
 void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    has_seeing_voxel_counter = HAS_SEEING_VOXEL_COUNTER_INIT;
+    has_seeing_voxel_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     computeVectorFieldHistogram(msg);
-    computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
-
-#if DEBUG & 0
-    Eigen::Vector3f point = math_utils::toCartesian({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
-    RCLCPP_INFO(this->get_logger(), "Closet point [%.2f, %.2f, %.2f]", point.x(), point.y(), point.z());
-#endif
+    // computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){

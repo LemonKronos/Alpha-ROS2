@@ -17,19 +17,19 @@
 namespace Clock {
     constexpr float LOOP_CYCLE = 0.031f;
     constexpr float LOOP_RATE  = 1.0f / LOOP_CYCLE;
-    constexpr int64_t LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9;
+    constexpr int64_t LOOP_CYCLE_NANOSEC = static_cast<int64_t>(LOOP_CYCLE * 1e9);
 
     constexpr float LOOP_CYCLE_FAST = 0.013f;
     constexpr float LOOP_RATE_FAST = 1.0f / LOOP_CYCLE_FAST;
-    constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9;
+    constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_FAST * 1e9);
 
     constexpr float LOOP_CYCLE_SLOW = 1.997f;
     constexpr float LOOP_RATE_SLOW = 1.0f / LOOP_CYCLE_SLOW;
-    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_SLOW * 1e9;
+    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_SLOW * 1e9);
 
     constexpr float LOOP_CYCLE_HEAVY = 4.001f;
     constexpr float LOOP_RATE_HEAVY = 1.0f / LOOP_CYCLE_HEAVY;
-    constexpr int64_t LOOP_CYCLE_HEAVY_NANOSEC = LOOP_CYCLE_HEAVY * 1e9;
+    constexpr int64_t LOOP_CYCLE_HEAVY_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_HEAVY * 1e9);
 
 }
 
@@ -61,9 +61,9 @@ namespace Name {
 
 // System thesholds
 namespace Threshold {
-    constexpr uint8_t MISSED_TOPIC = Clock::LOOP_RATE / 10.0f;
-    constexpr uint8_t MISSED_FAST_TOPIC = Clock::LOOP_RATE_FAST / 10.0f;
-    constexpr uint8_t MISMATCH_RATE_TOPIC = std::ceil(Clock::LOOP_RATE_FAST / Clock::LOOP_RATE);
+    constexpr uint8_t ALLOW_MISSED_TOPIC = std::ceil(Clock::LOOP_RATE / 10.0f);
+    constexpr uint8_t ALLOW_MISSED_FAST_TOPIC = std::ceil(Clock::LOOP_RATE_FAST / 10.0f);
+    constexpr uint8_t ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC;
 
 }
 
@@ -153,8 +153,8 @@ namespace Sensor {
     constexpr float DEPTH_CAM_RANGE = 30.0f;
     constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f;
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
-    constexpr int VFH_AZIMUTH_BINS = 2.0f * M_PI / VFH_RESOLUTION;
-    constexpr int VFH_LATITUDE_BINS = M_PI / VFH_RESOLUTION;
+    constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
+    constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);
     constexpr int VFH_TOTAL_BINS = VFH_AZIMUTH_BINS * VFH_LATITUDE_BINS;
     constexpr int VFH_MSG_BIT_SIZE = 32;
     constexpr int VFH_MSG_CHUNK_SIZE = std::ceil(VFH_TOTAL_BINS / VFH_MSG_BIT_SIZE);

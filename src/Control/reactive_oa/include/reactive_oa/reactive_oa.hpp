@@ -27,7 +27,6 @@
 #endif
 
 using std::placeholders::_1;
-constexpr uint8_t HAS_SEEING_VOXEL_COUNTER_INIT = 3;
 
 class ReactiveOANode : public rclcpp::Node{
 public:

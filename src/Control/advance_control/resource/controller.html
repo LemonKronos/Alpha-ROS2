@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-<title>Alpha Control Minus 2 [V12 Scaled]</title>
+<title>Alpha Control Minus 2 [V15 Startfield]</title>
 <style>
     /* === CORE UI: SCI-FI GREEN === */
     body {
@@ -81,7 +80,6 @@
         -webkit-tap-highlight-color: transparent;
     }
     
-    /* Visual Feedback for Press */
     .hud-btn.btn-active, .hud-btn:active { 
         background: rgba(0, 255, 65, 0.3); 
         box-shadow: 0 0 15px #00ff41;
@@ -117,8 +115,8 @@
         position: absolute;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        z-index: 10; /* Behind joysticks (50), On top of BG */
-        pointer-events: none; /* Let touches pass through */
+        z-index: 10; 
+        pointer-events: none; 
     }
 
     /* === JOYSTICKS === */
@@ -148,9 +146,8 @@
 </head>
 <body>
 
-<div id="loader">INITIALIZING SYSTEMS...</div>
+<div id="loader">INITIALIZING NEURAL NET...</div>
 
-<!-- FLIGHT HUD LAYER -->
 <canvas id="hud-display"></canvas>
 
 <div id="hud-top">
@@ -174,478 +171,77 @@
 <div id="zone-right" class="joy-container"><canvas id="canvasRight" class="joy-canvas"></canvas></div>
 
 <script>
-// ========================
-// CONFIGURATION
-// ========================
-const WS_URL = "ws://10.54.227.129:8765";
-const SEND_RATE_MS = 12.5; 
-
-// Gyro Config
-const GYRO_DEADZONE = 5; 
-const GYRO_ACTIVE_RANGE = 45; 
-
-// Joystick Config
-const JOY_THUMB_RADIUS = 30; 
-const JOY_DEADZONE_RADIUS = 40; 
-const KEY_INPUT_MAGNITUDE = 0.75; // Clamped keyboard input
+/**
+ * ============================================================================
+ * ARCHITECTURE: SEPARATION OF CONCERNS (ROS2 FLU ALIGNED)
+ * ============================================================================
+ */
 
 // ========================
-// SYSTEM BOOT
+// 1. CONFIG
 // ========================
-window.addEventListener('load', () => {
-    try {
-        initApp();
-        const loader = document.getElementById('loader');
-        loader.style.opacity = '0';
-        setTimeout(() => loader.remove(), 500);
-    } catch (e) {
-        console.error("Boot failed", e);
-        document.getElementById('loader').innerText = "BOOT ERROR. RELOADING...";
-        setTimeout(() => location.reload(), 1000);
-    }
-});
-
-setTimeout(() => {
-    if (document.getElementById('loader')) location.reload(); 
-}, 3000); 
-
-// ========================
-// APP LOGIC
-// ========================
-let stickLeft, stickRight;
-let ws;
-let hudCtx;
-let hudCanvas;
-
-// Global State
-let flags = { 
-    record: false, 
-    pause: false, 
-    control_state: false 
-};
-let controlsActive = false;
-let gyroBase = { roll: 0, pitch: 0 }; 
-let gyroRaw = { beta: 0, gamma: 0, alpha: 0 }; 
-let output = { x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0 }; 
-
-// Keyboard State
-let keys = {
-    w: false, a: false, s: false, d: false,
-    q: false, e: false,
-    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-    Space: false, Shift: false
+const CONFIG = {
+    WS_URL: "ws://10.54.227.129:8765",
+    SEND_RATE_MS: 12.5,
+    GYRO_DEADZONE: 5,
+    GYRO_ACTIVE_RANGE: 45,
+    JOY_THUMB_RADIUS: 30,
+    JOY_DEADZONE_RADIUS: 40,
+    KEY_INPUT_MAGNITUDE: 0.75,
+    HUD_COLOR: "rgba(0, 255, 65, 0.8)", 
+    HUD_COLOR_FADE: "rgba(0, 255, 65, 0.3)",
+    RETICLE_COLOR: "#ffffff",
+    NUM_STARS: 150
 };
 
-function initApp() {
-    
-    // --- UI Setup ---
-    const btnRecord = document.getElementById("btn-record");
-    const btnPause = document.getElementById("btn-pause");
-    const btnFs = document.getElementById("btn-fs");
-    const btnMode = document.getElementById("btn-mode");
-    
-    // --- HUD Setup ---
-    hudCanvas = document.getElementById("hud-display");
-    hudCtx = hudCanvas.getContext("2d");
-    resizeHud();
-    window.addEventListener('resize', resizeHud);
-
-    // Function to force update the UI status based on priority
-    const updateGlobalStatus = () => {
-        const statusEl = document.getElementById("status-text");
-        
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            statusEl.innerText = "DISCONNECTED";
-            statusEl.style.color = "#ffaa00";
-            return;
-        }
-        if (flags.pause) {
-            statusEl.innerText = "PAUSED";
-            statusEl.style.color = "#ffaa00";
-            return;
-        }
-        if (flags.record) {
-            statusEl.innerText = "REC ●";
-            statusEl.style.color = "#ff3333";
-            return;
-        }
-        if (controlsActive) {
-            statusEl.innerText = "ACTIVE";
-            statusEl.style.color = "#00ff41";
-            return;
-        }
-        statusEl.innerText = "READY";
-        statusEl.style.color = "#00f3ff";
-    };
-
-    // Helper: Handles BOTH Mouse (Laptop) and Touch (Mobile)
-    const addInputListener = (el, callback) => {
-        const handlePress = (e) => {
-            if(e.type === 'touchstart' && e.cancelable) e.preventDefault();
-            e.stopPropagation();
-            el.classList.add('btn-active');
-            callback();
-        };
-        const handleRelease = (e) => {
-            el.classList.remove('btn-active');
-        };
-        el.addEventListener("touchstart", handlePress, {passive: false});
-        el.addEventListener("touchend", handleRelease, {passive: false});
-        el.addEventListener("touchcancel", handleRelease, {passive: false});
-        el.addEventListener("mousedown", handlePress);
-        el.addEventListener("mouseup", handleRelease);
-        el.addEventListener("mouseleave", handleRelease);
-    };
-
-    addInputListener(btnRecord, () => {
-        flags.record = !flags.record;
-        if (flags.record) btnRecord.classList.add("recording");         
-        else btnRecord.classList.remove("recording");
-        updateGlobalStatus();
-    });
-
-    addInputListener(btnPause, () => {
-        flags.pause = !flags.pause;
-        if (flags.pause) {
-            btnPause.classList.add("paused");
-            document.getElementById("icon-pause").style.display = "none";
-            document.getElementById("icon-play").style.display = "block";
-        } else {
-            btnPause.classList.remove("paused");
-            document.getElementById("icon-pause").style.display = "block";
-            document.getElementById("icon-play").style.display = "none";
-        }
-        updateGlobalStatus();
-    });
-
-    addInputListener(btnMode, () => {
-        flags.control_state = !flags.control_state;
-        if (flags.control_state) btnMode.classList.add("active");
-        else btnMode.classList.remove("active");
-    });
-
-    btnFs.addEventListener("click", () => {
-        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>{});
-        else if (document.exitFullscreen) document.exitFullscreen();
-    });
-
-    // --- Keyboard Listeners ---
-    window.addEventListener('keydown', (e) => {
-        const k = e.key.toLowerCase();
-        // Check both original key and lower case to catch Shift+Key nuances or caps lock
-        const mappedKey = k === ' ' ? 'Space' : (e.key === 'Shift' ? 'Shift' : k);
-        
-        // Map arrow keys correctly (they don't have lowercase single letters)
-        let finalKey = mappedKey;
-        if (e.key.startsWith('Arrow')) finalKey = e.key;
-        
-        if (keys.hasOwnProperty(finalKey)) {
-            keys[finalKey] = true;
-            if (!controlsActive) {
-                controlsActive = true;
-                updateGlobalStatus();
-            }
-        }
-    });
-
-    window.addEventListener('keyup', (e) => {
-        const k = e.key.toLowerCase();
-        const mappedKey = k === ' ' ? 'Space' : (e.key === 'Shift' ? 'Shift' : k);
-        let finalKey = mappedKey;
-        if (e.key.startsWith('Arrow')) finalKey = e.key;
-
-        if (keys.hasOwnProperty(finalKey)) {
-            keys[finalKey] = false;
-        }
-    });
-
-    // --- WebSocket (Auto-Reconnect) ---
-    function connect() {
-        ws = new WebSocket(WS_URL);
-        ws.onopen = () => { updateGlobalStatus(); };
-        ws.onclose = () => { 
-            updateGlobalStatus();
-            setTimeout(connect, 1000);
-        };
-        ws.onerror = (e) => { ws.close(); };
-    }
-    connect();
-
-    // --- Joysticks ---
-    const onStickActivity = (isActive) => {
-        controlsActive = isActive;
-        updateGlobalStatus();
-    };
-
-    stickLeft = new Joystick("canvasLeft", "rgba(255, 160, 0, 0.8)", onStickActivity);
-    stickRight = new Joystick("canvasRight", "rgba(0, 240, 255, 0.8)", onStickActivity);
-
-    // --- Loop ---
-    setInterval(() => gameLoop(flags, ws), SEND_RATE_MS);
-    requestAnimationFrame(renderLoop); 
-}
-
 // ========================
-// LOGIC HELPERS
+// 2. STATE
 // ========================
+const State = {
+    flags: { record: false, pause: false, control_state: false },
+    controlsActive: false,
+    output: { x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0 },
+    keys: { w: false, a: false, s: false, d: false, q: false, e: false, 
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false, Shift: false },
+    gyroBase: { roll: 0, pitch: 0 },
+    gyroRaw: { beta: 0, gamma: 0, alpha: 0 },
+    wsConnected: false
+};
 
-const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
-const round = (val) => Math.round(val * 100) / 100;
-
-function getShortestDiff(current, base) {
-    let diff = current - base;
-    while (diff > 180) diff -= 360;
-    while (diff < -180) diff += 360;
-    return diff;
-}
-
-function applyRadialDeadzone(x, y, deadzoneThreshold) {
-    const mag = Math.sqrt(x*x + y*y);
-    if (mag < deadzoneThreshold) {
-        return { x: 0, y: 0 };
-    } else {
+const MathUtil = {
+    clamp: (val, min, max) => Math.max(min, Math.min(max, val)),
+    round: (val) => Math.round(val * 100) / 100,
+    getShortestDiff: (current, base) => {
+        let diff = current - base;
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        return diff;
+    },
+    applyRadialDeadzone: (x, y, deadzoneThreshold) => {
+        const mag = Math.sqrt(x*x + y*y);
+        if (mag < deadzoneThreshold) return { x: 0, y: 0 };
         const activeMag = mag - deadzoneThreshold;
         const normalizedMag = activeMag / (1 - deadzoneThreshold);
         const scale = normalizedMag / mag; 
         return { x: x * scale, y: y * scale };
     }
-}
-
-// --- GYRO HANDLING ---
-window.addEventListener("deviceorientation", e => {
-    gyroRaw.beta = e.beta || 0;
-    gyroRaw.gamma = e.gamma || 0;
-    gyroRaw.alpha = e.alpha || 0;
-});
-
-function activateGyro() {
-    if (!controlsActive) {
-        controlsActive = true;
-        gyroBase.roll = gyroRaw.beta;  
-        gyroBase.pitch = gyroRaw.gamma;
-    }
-}
-
-function resizeHud() {
-    if(!hudCanvas) return;
-    hudCanvas.width = window.innerWidth;
-    hudCanvas.height = window.innerHeight;
-}
+};
 
 // ========================
-// RENDER LOOP (HUD)
+// 3. INPUT CONTROLLER
 // ========================
-function renderLoop() {
-    if (!hudCtx) return;
-    const w = hudCanvas.width;
-    const h = hudCanvas.height;
-    const cx = w / 2;
-    const cy = h / 2;
-    
-    // --- DYNAMIC SCALE FACTOR ---
-    // All sizes are calculated relative to a reference height (e.g. 800px)
-    // This ensures consistency across window sizes.
-    const refH = 800; 
-    const scale = Math.min(w, h) / refH; 
-    
-    hudCtx.clearRect(0, 0, w, h);
-    hudCtx.lineWidth = 2 * scale;
-    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.6)";
-    hudCtx.fillStyle = "rgba(0, 255, 65, 0.8)";
-    hudCtx.font = `bold ${Math.max(12, 16 * scale)}px Consolas`;
-    hudCtx.textAlign = "center";
-
-    // --- 1. PITCH (Ladder) ---
-    // Scaled parameters
-    const maxPitchPx = h * 0.35; // Total travel distance
-    const pitchOffset = -output.pitch * maxPitchPx; 
-    const clipW = 240 * scale;
-    const clipH = h * 0.7; // Keep clip relative to screen height to avoid clipping issues on resize
-    
-    hudCtx.save();
-    hudCtx.beginPath();
-    // Centered clip box
-    hudCtx.rect(cx - clipW/2, cy - clipH/2, clipW, clipH);
-    hudCtx.clip();
-
-    const horizonY = cy + pitchOffset;
-    const stepPx = maxPitchPx / 4; 
-    
-    for (let i = -4; i <= 4; i++) {
-        const y = horizonY - (i * stepPx);
-        const width = (i === 0) ? (200 * scale) : (i % 2 === 0 ? (120 * scale) : (60 * scale));
-        
-        hudCtx.beginPath();
-        hudCtx.moveTo(cx - width/2, y);
-        hudCtx.lineTo(cx + width/2, y);
-        
-        if (i === 0) {
-            hudCtx.strokeStyle = "rgba(0, 255, 65, 0.9)";
-            hudCtx.lineWidth = 3 * scale;
-        } else {
-            hudCtx.strokeStyle = "rgba(0, 255, 65, 0.4)";
-            hudCtx.lineWidth = 1.5 * scale;
-        }
-        hudCtx.stroke();
-    }
-    
-    // Pitch Value
-    hudCtx.fillStyle = "#00f3ff";
-    hudCtx.textAlign = "center"; 
-    hudCtx.fillText(`Pitch: ${output.pitch.toFixed(2)}`, cx, cy + (40 * scale));
-    
-    // Center Ref (The "Plane")
-    hudCtx.strokeStyle = "#00f3ff";
-    hudCtx.lineWidth = 2 * scale;
-    hudCtx.beginPath();
-    hudCtx.moveTo(cx - (50 * scale), cy); 
-    hudCtx.lineTo(cx - (20 * scale), cy); 
-    hudCtx.lineTo(cx - (20 * scale), cy + (10 * scale));
-    
-    hudCtx.moveTo(cx + (50 * scale), cy); 
-    hudCtx.lineTo(cx + (20 * scale), cy); 
-    hudCtx.lineTo(cx + (20 * scale), cy + (10 * scale));
-    hudCtx.stroke();
-    hudCtx.beginPath(); 
-    hudCtx.arc(cx, cy, 3 * scale, 0, Math.PI*2); 
-    hudCtx.fill();
-    hudCtx.restore();
-
-    // --- 2. ROLL (Top Half Circle) ---
-    const rollRadius = 200 * scale; 
-    const rollCenterY = 300 * scale; // Moved down proportionally
-    
-    hudCtx.save();
-    hudCtx.translate(cx, rollCenterY);
-
-    // Roll Value
-    hudCtx.fillStyle = "#00f3ff";
-    hudCtx.textAlign = "center";
-    hudCtx.fillText(`Roll: ${output.roll.toFixed(2)}`, 0, -rollRadius + (80 * scale));
-
-    // Static Arc
-    hudCtx.beginPath();
-    hudCtx.arc(0, 0, rollRadius, Math.PI, 0); 
-    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.4)";
-    hudCtx.lineWidth = 3 * scale;
-    hudCtx.stroke();
-    
-    // Static Ticks
-    for (let ang = 180; ang >= 0; ang -= 15) {
-        const rad = ang * (Math.PI / 180);
-        const rInner = (ang % 45 === 0) ? rollRadius - (20 * scale) : rollRadius - (10 * scale);
-        const x1 = Math.cos(rad) * rollRadius;
-        const y1 = Math.sin(rad) * rollRadius;
-        const x2 = Math.cos(rad) * rInner;
-        const y2 = Math.sin(rad) * rInner;
-        hudCtx.beginPath();
-        hudCtx.moveTo(x1, -y1); 
-        hudCtx.lineTo(x2, -y2);
-        hudCtx.lineWidth = 2 * scale;
-        hudCtx.stroke();
-    }
-
-    // Moving Indicator
-    const rollAngle = output.roll * (Math.PI / 2); 
-    hudCtx.rotate(rollAngle); 
-    hudCtx.fillStyle = "#00f3ff";
-    hudCtx.beginPath();
-    hudCtx.moveTo(0, -rollRadius + (25 * scale));
-    hudCtx.lineTo(-(10 * scale), -rollRadius + (5 * scale));
-    hudCtx.lineTo((10 * scale), -rollRadius + (5 * scale));
-    hudCtx.fill();
-    hudCtx.restore();
-
-    // --- 3. YAW (Bottom Ruler) ---
-    const rulerY = h - (80 * scale);
-    const rulerWidth = w * 0.8;
-    const tickSpacing = 40 * scale; 
-    // Scale offset based on screen Width to maintain "speed" appearance
-    const yawPixelOffset = output.yaw * (w * 0.3); 
-
-    hudCtx.save();
-    hudCtx.beginPath();
-    hudCtx.rect(cx - rulerWidth/2, rulerY - (50 * scale), rulerWidth, 100 * scale);
-    hudCtx.clip();
-
-    // Background Line
-    hudCtx.beginPath();
-    hudCtx.moveTo(cx - rulerWidth/2, rulerY);
-    hudCtx.lineTo(cx + rulerWidth/2, rulerY);
-    hudCtx.strokeStyle = "rgba(0, 255, 65, 0.6)";
-    hudCtx.lineWidth = 2 * scale;
-    hudCtx.stroke();
-
-    // Moving Ticks
-    const numTicks = Math.ceil(rulerWidth / tickSpacing) + 4;
-    for (let i = -10; i <= 10; i++) {
-        let xPos = cx + (i * tickSpacing) - yawPixelOffset;
-        // Optimization: Don't draw if clearly out of bounds
-        if (xPos > 0 && xPos < w) {
-            hudCtx.beginPath();
-            hudCtx.moveTo(xPos, rulerY);
-            let hTick = (i === 0) ? (20 * scale) : (i % 5 === 0 ? (15 * scale) : (8 * scale));
-            hudCtx.lineTo(xPos, rulerY - hTick);
-            hudCtx.stroke();
-        }
-    }
-    hudCtx.restore();
-
-    // Yaw Value
-    hudCtx.fillStyle = "#00f3ff";
-    hudCtx.textAlign = "center";
-    hudCtx.fillText(`Yaw: ${output.yaw.toFixed(2)}`, cx, rulerY - (40 * scale));
-
-    // Static Center Marker
-    hudCtx.fillStyle = "#00f3ff";
-    hudCtx.beginPath();
-    hudCtx.moveTo(cx, rulerY + (5 * scale));
-    hudCtx.lineTo(cx - (8 * scale), rulerY + (18 * scale));
-    hudCtx.lineTo(cx + (8 * scale), rulerY + (18 * scale));
-    hudCtx.fill();
-
-    requestAnimationFrame(renderLoop);
-}
-
 class Joystick {
-    constructor(canvasId, color, statusCallback) {
+    constructor(canvasId, color) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext("2d");
         this.color = color;
-        this.statusCallback = statusCallback;
         this.touchId = null;
-        this.maxDist = 0;
-        this.deadzoneRatio = 0; 
-        
-        // Internal state for external override (Keyboard)
-        this.externalX = 0;
-        this.externalY = 0;
-
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-        this.pos = { x: this.center, y: this.center };
         this.val = { x: 0, y: 0 }; 
+        this.external = { x: 0, y: 0 };
+        this.resize();
         this.initEvents();
-        this.draw();
     }
     
-    setExternalInput(x, y) {
-        // x, y are -1 to 1 normalized
-        this.externalX = x;
-        this.externalY = y;
-        
-        // If not touched, use external
-        if (this.touchId === null) {
-            this.val.x = x;
-            this.val.y = y;
-            
-            // Map val back to visual pos
-            this.pos.x = this.center + (x * this.maxDist);
-            this.pos.y = this.center + (y * this.maxDist);
-            this.draw(x !== 0 || y !== 0);
-        }
-    }
-
     resize() {
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0) return;
@@ -655,19 +251,29 @@ class Joystick {
         this.center = this.size / 2;
         this.radius = this.size / 2;
         this.maxDist = this.radius - 35; 
-        this.deadzoneRatio = JOY_DEADZONE_RADIUS / this.maxDist; 
+        this.deadzoneRatio = CONFIG.JOY_DEADZONE_RADIUS / this.maxDist; 
         this.pos = { x: this.center, y: this.center };
         this.draw();
+    }
+
+    setExternalInput(x, y) {
+        this.external = { x, y };
+        if (this.touchId === null) {
+            this.val = { x, y };
+            this.pos.x = this.center + (x * this.maxDist);
+            this.pos.y = this.center + (y * this.maxDist);
+            this.draw(x !== 0 || y !== 0);
+        }
     }
 
     initEvents() {
         const start = (e) => {
             e.preventDefault();
-            activateGyro();
+            InputController.activateGyro();
             if (this.touchId === null) {
                 this.touchId = e.changedTouches[0].identifier;
                 this.update(e.changedTouches[0]);
-                this.statusCallback(true);
+                InputController.checkActivity();
             }
         };
         const move = (e) => {
@@ -679,9 +285,7 @@ class Joystick {
             for (let t of e.changedTouches) if (t.identifier === this.touchId) {
                 this.touchId = null;
                 this.reset();
-                if (stickLeft.touchId === null && stickRight.touchId === null) {
-                    this.statusCallback(false);
-                }
+                InputController.checkActivity();
             }
         };
         this.canvas.addEventListener("touchstart", start, {passive: false});
@@ -710,14 +314,11 @@ class Joystick {
     }
 
     reset() {
-        // If external input exists, revert to it
-        if (this.externalX !== 0 || this.externalY !== 0) {
-             this.setExternalInput(this.externalX, this.externalY);
+        if (this.external.x !== 0 || this.external.y !== 0) {
+             this.setExternalInput(this.external.x, this.external.y);
         } else {
-            this.pos.x = this.center;
-            this.pos.y = this.center;
-            this.val.x = 0;
-            this.val.y = 0;
+            this.pos = { x: this.center, y: this.center };
+            this.val = { x: 0, y: 0 };
             this.draw(false);
         }
     }
@@ -728,116 +329,449 @@ class Joystick {
         
         ctx.beginPath();
         ctx.arc(this.center, this.center, this.radius - 2, 0, Math.PI*2);
-        ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = "rgba(0, 0, 65, 0.4)"; ctx.lineWidth = 2; ctx.stroke();
         
         ctx.beginPath();
-        ctx.arc(this.center, this.center, JOY_DEADZONE_RADIUS, 0, Math.PI*2);
-        ctx.strokeStyle = "rgba(0, 255, 65, 0.2)"; 
+        ctx.arc(this.center, this.center, CONFIG.JOY_DEADZONE_RADIUS, 0, Math.PI*2);
+        ctx.strokeStyle = "rgba(255, 255, 65, 0.5)"; 
         ctx.lineWidth = 1; 
         ctx.setLineDash([5, 5]); 
         ctx.stroke();
         ctx.setLineDash([]); 
 
         ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, JOY_THUMB_RADIUS, 0, Math.PI*2);
-        ctx.fillStyle = active ? this.color : "#444"; ctx.fill();
-        ctx.strokeStyle = active ? "#fff" : "#666"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.arc(this.pos.x, this.pos.y, CONFIG.JOY_THUMB_RADIUS, 0, Math.PI*2);
+        ctx.fillStyle = active ? this.color : "rgba(0, 255, 65, 0.1)"; ctx.fill();
+        ctx.strokeStyle = active ? "#fff" : "rgba(0, 255, 65, 0.6)"; ctx.lineWidth = 2; ctx.stroke();
     }
 }
 
-// ========================
-// GAME LOOP
-// ========================
-function gameLoop(flags, ws) {
-    
-    // 0. Update Virtual Joysticks from Keyboard
-    // Clamped to 0.75 as requested
-    let joyLeftX = 0;
-    let joyLeftY = 0;
-    if (keys.w) joyLeftY -= KEY_INPUT_MAGNITUDE; 
-    if (keys.s) joyLeftY += KEY_INPUT_MAGNITUDE; 
-    if (keys.q) joyLeftX -= KEY_INPUT_MAGNITUDE; 
-    if (keys.e) joyLeftX += KEY_INPUT_MAGNITUDE; 
-    
-    stickLeft.setExternalInput(joyLeftX, joyLeftY);
+const InputController = {
+    init: () => {
+        InputController.bindButton("btn-record", () => {
+            State.flags.record = !State.flags.record;
+            document.getElementById("btn-record").classList.toggle("recording", State.flags.record);
+            App.updateUIStatus();
+        });
 
-    let joyRightX = 0;
-    let joyRightY = 0;
-    if (keys.Space) joyRightY -= KEY_INPUT_MAGNITUDE; 
-    if (keys.Shift) joyRightY += KEY_INPUT_MAGNITUDE; 
-    if (keys.a) joyRightX -= KEY_INPUT_MAGNITUDE; 
-    if (keys.d) joyRightX += KEY_INPUT_MAGNITUDE; 
-    
-    stickRight.setExternalInput(joyRightX, joyRightY);
+        InputController.bindButton("btn-pause", () => InputController.togglePause());
+        InputController.bindButton("btn-mode", () => InputController.toggleArm());
 
-    // 1. Process Joystick Outputs
-    const leftOut = applyRadialDeadzone(stickLeft.val.x, stickLeft.val.y, stickLeft.deadzoneRatio);
-    const rightOut = applyRadialDeadzone(stickRight.val.x, stickRight.val.y, stickRight.deadzoneRatio);
+        document.getElementById("btn-fs").addEventListener("click", () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>{});
+            else if (document.exitFullscreen) document.exitFullscreen();
+        });
 
-    output.x = -leftOut.y;
-    output.y = -leftOut.x;
-    output.z = -rightOut.y; // Space maps to stickRight Up (-1) -> output.z = 1
-    output.yaw = -rightOut.x;
-
-    // 2. Gyro & Display Logic
-    if (controlsActive) {
+        window.addEventListener('keydown', (e) => {
+            // Handle specific shortcut keys
+            if (e.key === "Alt") {
+                e.preventDefault();
+                if (!e.repeat) InputController.togglePause();
+                return;
+            } else if (e.key === "Control") {
+                e.preventDefault();
+                if (!e.repeat) InputController.toggleArm();
+                return;
+            }
+            InputController.handleKey(e, true);
+        });
         
-        // --- KEYBOARD OVERRIDE FOR PITCH/ROLL ---
-        let usingKeysForAttitude = false;
-        let keyRoll = 0; 
-        let keyPitch = 0;
+        window.addEventListener('keyup', (e) => {
+            if (e.key === "Alt" || e.key === "Control") return;
+            InputController.handleKey(e, false);
+        });
+
+        window.addEventListener("deviceorientation", e => {
+            State.gyroRaw.beta = e.beta || 0;
+            State.gyroRaw.gamma = e.gamma || 0;
+            State.gyroRaw.alpha = e.alpha || 0;
+        });
+
+        InputController.stickLeft = new Joystick("canvasLeft", "rgba(0, 255, 65, 0.8)");
+        InputController.stickRight = new Joystick("canvasRight", "rgba(0, 255, 65, 0.8)");
+        window.addEventListener('resize', () => {
+            InputController.stickLeft.resize();
+            InputController.stickRight.resize();
+        });
+    },
+
+    togglePause: () => {
+        State.flags.pause = !State.flags.pause;
+        const btn = document.getElementById("btn-pause");
+        btn.classList.toggle("paused", State.flags.pause);
+        document.getElementById("icon-pause").style.display = State.flags.pause ? "none" : "block";
+        document.getElementById("icon-play").style.display = State.flags.pause ? "block" : "none";
+        App.updateUIStatus();
+    },
+
+    toggleArm: () => {
+        State.flags.control_state = !State.flags.control_state;
+        document.getElementById("btn-mode").classList.toggle("active", State.flags.control_state);
+        App.updateUIStatus();
+    },
+
+    bindButton: (id, callback) => {
+        const el = document.getElementById(id);
+        const handlePress = (e) => {
+            if(e.type === 'touchstart' && e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            el.classList.add('btn-active');
+            callback();
+        };
+        const handleRelease = () => el.classList.remove('btn-active');
+        el.addEventListener("touchstart", handlePress, {passive: false});
+        el.addEventListener("touchend", handleRelease, {passive: false});
+        el.addEventListener("mousedown", handlePress);
+        el.addEventListener("mouseup", handleRelease);
+        el.addEventListener("mouseleave", handleRelease);
+    },
+
+    handleKey: (e, isDown) => {
+        const k = e.key.toLowerCase();
+        const mappedKey = k === ' ' ? 'Space' : (e.key === 'Shift' ? 'Shift' : k);
+        let finalKey = e.key.startsWith('Arrow') ? e.key : mappedKey;
         
-        if (keys.ArrowUp) { keyPitch = -1; usingKeysForAttitude = true; } 
-        if (keys.ArrowDown) { keyPitch = 1; usingKeysForAttitude = true; } 
-        if (keys.ArrowLeft) { keyRoll = -1; usingKeysForAttitude = true; } 
-        if (keys.ArrowRight) { keyRoll = 1; usingKeysForAttitude = true; } 
-        
-        if (usingKeysForAttitude) {
-            output.roll = keyRoll;
-            output.pitch = keyPitch;
-        } else {
-            // Use Gyro
-            let rollDiff = getShortestDiff(gyroRaw.beta, gyroBase.roll);
-            let pitchDiff = getShortestDiff(gyroRaw.gamma, gyroBase.pitch);
+        if (State.keys.hasOwnProperty(finalKey)) {
+            State.keys[finalKey] = isDown;
+            if (isDown && !State.controlsActive) {
+                State.controlsActive = true;
+                App.updateUIStatus();
+            }
+        }
+    },
+
+    activateGyro: () => {
+        if (!State.controlsActive) {
+            State.controlsActive = true;
+            State.gyroBase.roll = State.gyroRaw.beta;  
+            State.gyroBase.pitch = State.gyroRaw.gamma;
+        }
+    },
+
+    checkActivity: () => {
+        const active = InputController.stickLeft.touchId !== null || InputController.stickRight.touchId !== null;
+        if (State.controlsActive !== active && !Object.values(State.keys).some(v=>v)) {
+            State.controlsActive = active;
+            App.updateUIStatus();
+        }
+    },
+
+    processLogicLoop: () => {
+        let joyLeftX = 0, joyLeftY = 0;
+        if (State.keys.w) joyLeftY -= CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.s) joyLeftY += CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.q) joyLeftX -= CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.e) joyLeftX += CONFIG.KEY_INPUT_MAGNITUDE; 
+        InputController.stickLeft.setExternalInput(joyLeftX, joyLeftY);
+
+        let joyRightX = 0, joyRightY = 0;
+        if (State.keys.Space) joyRightY -= CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.Shift) joyRightY += CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.a) joyRightX -= CONFIG.KEY_INPUT_MAGNITUDE; 
+        if (State.keys.d) joyRightX += CONFIG.KEY_INPUT_MAGNITUDE; 
+        InputController.stickRight.setExternalInput(joyRightX, joyRightY);
+
+        const leftOut = MathUtil.applyRadialDeadzone(InputController.stickLeft.val.x, InputController.stickLeft.val.y, InputController.stickLeft.deadzoneRatio);
+        const rightOut = MathUtil.applyRadialDeadzone(InputController.stickRight.val.x, InputController.stickRight.val.y, InputController.stickRight.deadzoneRatio);
+
+        // MAP TO ROS2 FLU
+        State.output.x = -leftOut.y;
+        State.output.y = -leftOut.x;
+        State.output.z = -rightOut.y; 
+        State.output.yaw = -rightOut.x;
+
+        if (State.controlsActive) {
+            let usingKeys = false, keyRoll = 0, keyPitch = 0;
+            // FLU: Nose down = +Pitch, Right wing down = +Roll
+            if (State.keys.ArrowUp) { keyPitch = 1; usingKeys = true; } 
+            if (State.keys.ArrowDown) { keyPitch = -1; usingKeys = true; } 
+            if (State.keys.ArrowLeft) { keyRoll = -1; usingKeys = true; } 
+            if (State.keys.ArrowRight) { keyRoll = 1; usingKeys = true; } 
             
-            // Calculate Control Output (Normalized)
-            if (Math.abs(rollDiff) < GYRO_DEADZONE) {
-                output.roll = 0; 
+            if (usingKeys) {
+                State.output.roll = keyRoll;
+                State.output.pitch = keyPitch;
             } else {
-                let activeDiff = Math.abs(rollDiff) - GYRO_DEADZONE;
-                output.roll = Math.sign(rollDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+                let rDiff = MathUtil.getShortestDiff(State.gyroRaw.beta, State.gyroBase.roll);
+                let pDiff = MathUtil.getShortestDiff(State.gyroRaw.gamma, State.gyroBase.pitch);
+                
+                State.output.roll = Math.abs(rDiff) < CONFIG.GYRO_DEADZONE ? 0 : 
+                    Math.sign(rDiff) * ((Math.abs(rDiff) - CONFIG.GYRO_DEADZONE) / CONFIG.GYRO_ACTIVE_RANGE);
+                
+                State.output.pitch = Math.abs(pDiff) < CONFIG.GYRO_DEADZONE ? 0 : 
+                    Math.sign(pDiff) * ((Math.abs(pDiff) - CONFIG.GYRO_DEADZONE) / CONFIG.GYRO_ACTIVE_RANGE);
+            }
+            State.output.roll = MathUtil.clamp(State.output.roll, -1, 1);
+            State.output.pitch = MathUtil.clamp(State.output.pitch, -1, 1);
+        } else {
+            State.output.roll = 0;
+            State.output.pitch = 0;
+        }
+    }
+};
+
+// ========================
+// 4. COMMS CONTROLLER
+// ========================
+const CommsController = {
+    ws: null,
+    init: () => {
+        CommsController.connect();
+        setInterval(CommsController.sendData, CONFIG.SEND_RATE_MS);
+    },
+    connect: () => {
+        CommsController.ws = new WebSocket(CONFIG.WS_URL);
+        CommsController.ws.onopen = () => { State.wsConnected = true; App.updateUIStatus(); };
+        CommsController.ws.onclose = () => { 
+            State.wsConnected = false; 
+            App.updateUIStatus();
+            setTimeout(CommsController.connect, 1000);
+        };
+        CommsController.ws.onerror = () => { CommsController.ws.close(); };
+    },
+    sendData: () => {
+        if (State.wsConnected && CommsController.ws.readyState === WebSocket.OPEN) {
+            CommsController.ws.send(JSON.stringify({
+                x: MathUtil.round(State.output.x),
+                y: MathUtil.round(State.output.y),
+                z: MathUtil.round(State.output.z),
+                yaw: MathUtil.round(State.output.yaw),
+                roll: MathUtil.round(State.output.roll),
+                pitch: MathUtil.round(State.output.pitch),
+                record: State.flags.record,
+                pause: State.flags.pause,
+                control_state: State.flags.control_state
+            }));
+        }
+    }
+};
+
+// ========================
+// 5. HUD RENDERER
+// ========================
+const HUDRenderer = {
+    canvas: null, ctx: null, w: 0, h: 0, cx: 0, cy: 0, scale: 1,
+    stars: [],
+
+    init: () => {
+        HUDRenderer.canvas = document.getElementById("hud-display");
+        HUDRenderer.ctx = HUDRenderer.canvas.getContext("2d");
+        
+        for(let i=0; i<CONFIG.NUM_STARS; i++) {
+            HUDRenderer.stars.push(HUDRenderer.spawnStar(true));
+        }
+
+        HUDRenderer.resize();
+        window.addEventListener('resize', HUDRenderer.resize);
+        requestAnimationFrame(HUDRenderer.renderLoop);
+    },
+
+    spawnStar: (randomZ = false) => {
+        return {
+            x: (Math.random() - 0.5) * 4000,
+            y: (Math.random() - 0.5) * 4000,
+            z: randomZ ? Math.random() * 3000 : 3000
+        };
+    },
+
+    resize: () => {
+        if(!HUDRenderer.canvas) return;
+        HUDRenderer.w = HUDRenderer.canvas.width = window.innerWidth;
+        HUDRenderer.h = HUDRenderer.canvas.height = window.innerHeight;
+        HUDRenderer.cx = HUDRenderer.w / 2;
+        HUDRenderer.cy = HUDRenderer.h / 2;
+        HUDRenderer.scale = Math.min(HUDRenderer.w, HUDRenderer.h) / 800; 
+    },
+
+    renderLoop: () => {
+        const { ctx, w, h, cx, cy, scale, stars } = HUDRenderer;
+        ctx.clearRect(0, 0, w, h);
+        
+        // --- A. 3D STARFIELD DYNAMICS ---
+        const vX = State.output.x * 60; 
+        const vY = State.output.y * 30; 
+        const vZ = State.output.z * 30; 
+        
+        const rYaw = -State.output.yaw * 0.01; 
+        const rPitch = State.output.pitch * 0.05;
+
+        ctx.fillStyle = "rgba(0, 255, 255, 0.8)"; // Teal Stars
+        
+        for (let i = 0; i < stars.length; i++) {
+            let star = stars[i];
+
+            star.z -= vX; 
+            star.x += vY; 
+            star.y += vZ; 
+
+            if (rYaw !== 0) {
+                let cosY = Math.cos(rYaw), sinY = Math.sin(rYaw);
+                let nx = star.x * cosY - star.z * sinY;
+                let nz = star.x * sinY + star.z * cosY;
+                star.x = nx; star.z = nz;
+            }
+            if (rPitch !== 0) {
+                let cosP = Math.cos(rPitch), sinP = Math.sin(rPitch);
+                let ny = star.y * cosP - star.z * sinP;
+                let nz = star.y * sinP + star.z * cosP;
+                star.y = ny; star.z = nz;
             }
 
-            if (Math.abs(pitchDiff) < GYRO_DEADZONE) {
-                output.pitch = 0; 
-            } else {
-                let activeDiff = Math.abs(pitchDiff) - GYRO_DEADZONE;
-                output.pitch = Math.sign(pitchDiff) * (activeDiff / GYRO_ACTIVE_RANGE);
+            // Infinite Panning Wrap
+            if (star.x > 2000) star.x -= 4000;
+            else if (star.x < -2000) star.x += 4000;
+            
+            if (star.y > 2000) star.y -= 4000;
+            else if (star.y < -2000) star.y += 4000;
+
+            if (star.z <= 10) stars[i] = HUDRenderer.spawnStar(); 
+            else if (star.z > 4000) star.z = 10; 
+            
+            const fov = 600;
+            const pX = cx + (star.x / star.z) * fov;
+            const pY = cy + (star.y / star.z) * fov;
+            
+            // Scaled teal dots, max 20px
+            const size = Math.max(1, (1 - star.z/4000) * 10 * scale);
+            
+            if (pX > 0 && pX < w && pY > 0 && pY < h) {
+                ctx.beginPath();
+                if (Math.abs(vX) > 5) {
+                    const tailZ = star.z + vX;
+                    if (tailZ > 10) {
+                        const tailX = cx + (star.x / tailZ) * fov;
+                        const tailY = cy + (star.y / tailZ) * fov;
+                        ctx.moveTo(pX, pY);
+                        ctx.lineTo(tailX, tailY);
+                        ctx.strokeStyle = "rgba(0, 255, 255, 0.7)"; 
+                        ctx.lineWidth = size;
+                        ctx.stroke();
+                        continue;
+                    }
+                } 
+                ctx.arc(pX, pY, size, 0, Math.PI*2);
+                ctx.fill();
             }
         }
 
-        output.roll = clamp(output.roll, -1, 1);
-        output.pitch = clamp(output.pitch, -1, 1);
-    } else {
-        output.roll = 0;
-        output.pitch = 0;
-    }
+        // --- B. STATIC HUD ELEMENTS ---
+        ctx.strokeStyle = CONFIG.HUD_COLOR;
+        ctx.lineWidth = 2 * scale;
+        
+        ctx.beginPath();
+        ctx.moveTo(cx - 15*scale, cy); ctx.lineTo(cx + 15*scale, cy);
+        ctx.moveTo(cx, cy - 15*scale); ctx.lineTo(cx, cy + 15*scale);
+        ctx.stroke();
 
-    // 3. Send Data
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            x: round(output.x),
-            y: round(output.y),
-            z: round(output.z),
-            yaw: round(output.yaw),
-            roll: round(output.roll),
-            pitch: round(output.pitch),
-            record: flags.record,
-            pause: flags.pause,
-            control_state: flags.control_state
-        }));
+        const innerRadius = 250 * scale;
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerRadius, Math.PI*1.15, Math.PI*1.85);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerRadius, Math.PI*0.15, Math.PI*0.85);
+        ctx.stroke();
+
+        // --- C. DYNAMIC RETICLE ---
+        ctx.save();
+        
+        let tX = -State.output.yaw * innerRadius; 
+        let tY = State.output.pitch * innerRadius; 
+        
+        let mag = Math.sqrt(tX*tX + tY*tY);
+        let maxAllowedRadius = innerRadius * 0.85;
+        if (mag > maxAllowedRadius) {
+            tX = (tX / mag) * maxAllowedRadius;
+            tY = (tY / mag) * maxAllowedRadius;
+        }
+
+        ctx.translate(cx + tX, cy + tY);
+        
+        const rot = State.output.roll * (Math.PI / 2);
+        ctx.rotate(rot);
+
+        ctx.strokeStyle = CONFIG.RETICLE_COLOR; 
+        ctx.lineWidth = 3 * scale;
+        ctx.shadowColor = CONFIG.HUD_COLOR;
+        ctx.shadowBlur = 15;
+        
+        ctx.beginPath();
+        ctx.moveTo(-30*scale, -15*scale);
+        ctx.lineTo(-50*scale, -15*scale);
+        ctx.lineTo(-50*scale, 15*scale);
+        ctx.lineTo(-30*scale, 15*scale);
+        
+        ctx.moveTo(30*scale, -15*scale);
+        ctx.lineTo(50*scale, -15*scale);
+        ctx.lineTo(50*scale, 15*scale);
+        ctx.lineTo(30*scale, 15*scale);
+        
+        ctx.moveTo(-12*scale, -5*scale);
+        ctx.lineTo(0, -15*scale);
+        ctx.lineTo(12*scale, -5*scale);
+        
+        ctx.stroke();
+        ctx.restore();
+
+        // --- D. TELEMETRY READOUT ---
+        ctx.fillStyle = CONFIG.HUD_COLOR;
+        ctx.font = `bold ${14 * Math.max(1, scale)}px Consolas`;
+        ctx.textAlign = "center";
+        
+        const fmt = (val) => (val >= 0 ? "+" : "") + val.toFixed(2);
+        const hudText = `[ FLU | X:${fmt(State.output.x)} Y:${fmt(State.output.y)} Z:${fmt(State.output.z)} | P:${fmt(State.output.pitch)} R:${fmt(State.output.roll)} Yw:${fmt(State.output.yaw)} ]`;
+        
+        ctx.fillText(hudText, cx, h - (30 * scale));
+
+        requestAnimationFrame(HUDRenderer.renderLoop);
     }
-}
+};
+
+// ========================
+// 6. APP BOOTSTRAP
+// ========================
+const App = {
+    init: () => {
+        try {
+            InputController.init();
+            HUDRenderer.init();
+            CommsController.init();
+            
+            setInterval(InputController.processLogicLoop, CONFIG.SEND_RATE_MS);
+
+            const loader = document.getElementById('loader');
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 500);
+        } catch (e) {
+            console.error("Boot failed", e);
+            document.getElementById('loader').innerText = "BOOT ERROR. RELOADING...";
+            setTimeout(() => location.reload(), 1000);
+        }
+    },
+
+    updateUIStatus: () => {
+        const statusEl = document.getElementById("status-text");
+        if (!State.wsConnected) {
+            statusEl.innerText = "NO SIGNAL";
+            statusEl.style.color = "#ffaa00";
+        } else if (State.flags.pause) {
+            statusEl.innerText = "STANDBY";
+            statusEl.style.color = "#ffaa00";
+        } else if (State.flags.record) {
+            statusEl.innerText = "RECORDING";
+            statusEl.style.color = "#ff3333";
+        } else if (State.controlsActive) {
+            statusEl.innerText = "LINK ACTIVE";
+            statusEl.style.color = "#00f3ff";
+        } else {
+            statusEl.innerText = "SYS READY";
+            statusEl.style.color = "#00ff41";
+        }
+    }
+};
+
+window.addEventListener('load', App.init);
+setTimeout(() => { if (document.getElementById('loader')) location.reload(); }, 3000);
+
 </script>
 </body>
 </html>

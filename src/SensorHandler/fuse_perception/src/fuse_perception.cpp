@@ -38,9 +38,9 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
 
     // Init variable
     lost_lidar_down = true;
-    missed_lidar_down = Threshold::MISSED_FAST_TOPIC;
+    missed_lidar_down = Threshold::ALLOW_MISSED_FAST_TOPIC;
     lost_odometry = true;
-    missed_odometry = Threshold::MISSED_FAST_TOPIC;
+    missed_odometry = Threshold::ALLOW_MISSED_FAST_TOPIC;
     lidar_down_range_min = 0.1f;
     lidar_down_range_max = 30.0f;
     last_hazard_distance = Drone::HAZARD_DISTANCE;
@@ -78,8 +78,8 @@ void FusePerceptionNode::PublishCallback() {
     auto msg = alpha_msgs::msg::FusePerception();
     
     // Odometry - stream
-    if(missed_odometry < Threshold::MISSED_FAST_TOPIC) missed_odometry++;
-    if(missed_odometry >= Threshold::MISSED_FAST_TOPIC) {
+    if(missed_odometry < Threshold::ALLOW_MISSED_FAST_TOPIC) missed_odometry++;
+    if(missed_odometry >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
         if(lost_odometry == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost Odometry" RESET);
         lost_odometry = true;
         last_odo = nullptr;
@@ -132,8 +132,8 @@ void FusePerceptionNode::PublishCallback() {
     }
 
     // Scan down - stream
-    if(missed_lidar_down < Threshold::MISSED_FAST_TOPIC) missed_lidar_down++;
-    if(missed_lidar_down >= Threshold::MISSED_FAST_TOPIC) {
+    if(missed_lidar_down < Threshold::ALLOW_MISSED_FAST_TOPIC) missed_lidar_down++;
+    if(missed_lidar_down >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
         if(lost_lidar_down == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost lidar scan down" RESET);
         last_scan_down = nullptr;
         lost_lidar_down = true;
@@ -162,7 +162,7 @@ void FusePerceptionNode::ContactCallback(const alpha_msgs::msg::ContactSensor::S
 
 void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_scan_down = msg;
-    if(missed_lidar_down >= Threshold::MISSED_FAST_TOPIC) {
+    if(missed_lidar_down >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
         lidar_down_range_min = msg->range_min;
         lidar_down_range_max = msg->range_max;
     }

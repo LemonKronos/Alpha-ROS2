@@ -20,7 +20,7 @@
 
 namespace alpha_brain {
 
-// class DepthCamNode; // Forward declaration
+class DepthCamNode; // Forward declaration
 
 constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
 constexpr int WORLD_BATCH_SIZE = 512;
@@ -96,7 +96,7 @@ private:
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>> hazard_point_queue;
 
     void ConsumerLoop();
-    void PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& closest_point);
+    void PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive);
 
 };
 

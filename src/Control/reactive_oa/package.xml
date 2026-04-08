@@ -11,6 +11,8 @@
 
   <depend>rclcpp</depend>
   <depend>alpha_msgs</depend>
+  <depend>depth_cam</depend>
+  <depend>fuse_perception</depend>
   <depend>global_utils</depend>
   <depend>visualization_msgs</depend>
   <depend>osqp_eigen</depend>

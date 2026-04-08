@@ -133,6 +133,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             if(x_cliped && y_cliped && z_cliped) continue;
 
             // For hazard point
+            // hazard_distance_sq = 400.0f; // #Test
             if(body_point.squaredNorm() <= hazard_distance_sq) {
                 // Convert to spherical coordinate
                 Eigen::Vector3f spherical_body_point = math_utils::toSpherical(body_point);
@@ -225,7 +226,9 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
     int worker_finished = 0;
     std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
     VFH.reset();
-    Eigen::Vector3f closest_point = {0.0f, 0.0f, FLT_MAX};
+    Eigen::Vector3f repulsive_direction;
+    repulsive_direction.setZero();
+    float repulsive_value = FLT_MAX;
 
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
@@ -237,15 +240,35 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         if(batch_cloud == nullptr) {
             worker_finished++;
             if(worker_finished >= this->num_worker) {
-                PublishHazardPoint(VFH, closest_point);
+                // Compute repulsive vector
+                // Could do sum of S_vector if VFH[index] != 1 to get roughly this
+                for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
+                    if(VFH[index] == 0) continue;
+
+                    int row = index / Sensor::VFH_AZIMUTH_BINS;
+                    int col = index % Sensor::VFH_AZIMUTH_BINS;
+
+                    float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
+                    float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
+                    Eigen::Vector3f bin_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
+
+                    repulsive_direction += bin_direction;
+                }
+
+                repulsive_direction.normalize();
+                repulsive_direction *= repulsive_value;
+
+                // Send to publish
+                PublishHazardPoint(VFH, repulsive_direction);
                 VFH.reset();
-                closest_point = {0.0f, 0.0f, FLT_MAX};
+                repulsive_direction.setZero();
+                repulsive_value = FLT_MAX;
                 worker_finished = 0;
             }
             continue;
         }
 
-        // Put the batch cloud to VFH
+        // Put the batch cloud to VFH #CanBeOptimize maybe try do the repulsive update in here
         for(const auto &point : *batch_cloud) {
             // Get scaling
             float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
@@ -273,12 +296,12 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
             }
 
             // Update closest point
-            if(point.z() < closest_point.z()) closest_point = point;
+            repulsive_value = std::min(repulsive_value, point.z());
         }
     }
 }
 
-void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& closest_point) {
+void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive) {
     alpha_msgs::msg::VectorFieldHistogram msg;
 
     // Check if clear
@@ -294,9 +317,9 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
     }
 
     // Generate closest point
-    msg.closest_obstacle.set__x(closest_point.x());
-    msg.closest_obstacle.set__y(closest_point.y());
-    msg.closest_obstacle.set__z(closest_point.z());
+    msg.closest_obstacle.set__x(sum_repulsive.x());
+    msg.closest_obstacle.set__y(sum_repulsive.y());
+    msg.closest_obstacle.set__z(sum_repulsive.z());
 
     // The rest of msg
     msg.header.frame_id = this->base_link.get();

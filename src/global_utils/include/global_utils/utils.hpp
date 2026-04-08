@@ -141,7 +141,7 @@ namespace frame_utils {
     }
 
     inline float quaternionToYaw(const float w, const float x, const float y, const float z) {
-        float yaw = std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z));
+        float yaw = static_cast<float>(std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z)));
         return angleInWrapped(yaw);
     }
     inline float quaternionToYaw(const std::array<float, 4> q) {
