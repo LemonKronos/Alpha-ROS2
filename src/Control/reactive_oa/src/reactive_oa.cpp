@@ -72,7 +72,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_l
     last_perception = nullptr;
 
     hazard_distance = Drone::HAZARD_DISTANCE;
-    has_seeing_voxel_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
+    has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
 }
 ReactiveOANode::~ReactiveOANode(){
 #if DEBUG && TIME_ANALYSE
@@ -309,7 +309,8 @@ void ReactiveOANode::resetVectors() {
         control_vec.setZero();
     }
 
-    if(!has_seeing_voxel_counter && VFH.any()) {
+    // ?! Cannot use VFH.any() here if change VFH anything but bitset
+    if(!has_seeing_vfh_counter && VFH.any()) {
         VFH.reset();
         repulsive_vec.setZero();
 
@@ -424,7 +425,7 @@ void ReactiveOANode::nodeLoopCallback() {
     }
 
     // Check seeing hazard voxel callback
-    if(has_seeing_voxel_counter > 0) has_seeing_voxel_counter--;
+    if(has_seeing_vfh_counter > 0) has_seeing_vfh_counter--;
 
     // Publish msg
     msg.header.stamp = this->get_clock()->now();
@@ -451,7 +452,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 }
 
 void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    has_seeing_voxel_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
+    has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     computeVectorFieldHistogram(msg);
     // computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }

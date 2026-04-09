@@ -66,7 +66,7 @@ private:
     uint8_t lost_control_signal_counter = 0;
     bool lost_perception = true;
     uint8_t lost_perception_counter = 0;
-    uint8_t has_seeing_voxel_counter = 0;
+    uint8_t has_seeing_vfh_counter = 0;
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
