@@ -9,9 +9,16 @@
 
 #include <bitset>
 
-#define VISUALIZE true // uncomment to disable visualize in this node
+#define DEBUG 1
+#define VISUALIZE 1
+#define TIME_ANALYSE 1
+
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 #ifndef VISUALIZE
-    #define VISUALIZE false
+    #define VISUALIZE 0
 #endif
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker.hpp>
@@ -21,9 +28,8 @@
     #define DO_REACTIVE_OA 1
 #endif
 
-#define DEBUG 1
-#ifndef DEBUG
-    #define DEBUG 0
+#ifndef TIME_ANALYSE
+    #define TIME_ANALYSE 0
 #endif
 
 using std::placeholders::_1;
@@ -46,6 +52,9 @@ private:
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
     rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_SUB;
+
+    // Objects
+    time_utils::TimeAnalyzer analyzer;
 
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;

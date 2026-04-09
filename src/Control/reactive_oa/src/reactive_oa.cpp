@@ -1,6 +1,6 @@
 #include "reactive_oa/reactive_oa.hpp"
 
-ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
+ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_logger()) {
     
     Global::setup_for_simulation(this);
     
@@ -74,7 +74,11 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"){
     hazard_distance = Drone::HAZARD_DISTANCE;
     has_seeing_voxel_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
 }
-ReactiveOANode::~ReactiveOANode(){}
+ReactiveOANode::~ReactiveOANode(){
+#if DEBUG && TIME_ANALYSE
+    analyzer.printSummary();
+#endif
+}
 
 #pragma region Compute vectors
 
@@ -130,9 +134,57 @@ void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
     repulsive_vec = point.normalized() * -strenght * Drone::SPEED_MAX_FORWARD;
 }
 
+float getSpeed(const float angle_deg, const float smooth_margin_deg = 15.0f * DEGREE) {
+    constexpr float A_90_DEG = 90.0f * DEGREE;
+    constexpr float A_180_DEG = 180.0f * DEGREE;
+
+    // Safety fallback: if margin is basically 0, just do the raw linear calculation with hard jumps
+    if (smooth_margin_deg < DEGREE) {
+        if (angle_deg <= A_90_DEG) return 1.0f - (angle_deg / A_90_DEG);
+        else return 1.0f - ((angle_deg - A_90_DEG) / A_90_DEG);
+    }
+
+    // Helper lambda: cubic smoothstep for organic, non-linear blending
+    auto smoothstep = [](float edge0, float edge1, float x) {
+        float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    };
+
+    float speed = 0.0f;
+
+    // 3. Curve logic
+    if (angle_deg <= A_90_DEG) {
+        float threshold = A_90_DEG - smooth_margin_deg;
+        
+        if (angle_deg <= threshold) {
+            // Zone 1: Pure linear drop from 1.0 down towards 0.0
+            speed = 1.0f - (angle_deg / A_90_DEG);
+        } else {
+            // Zone 2: The smoothing zone (ramping back up to 1.0 at exactly 90)
+            float speed_at_threshold = 1.0f - (threshold / A_90_DEG);
+            float blend = smoothstep(threshold, A_90_DEG, angle_deg);
+            speed = speed_at_threshold + blend * (1.0f - speed_at_threshold);
+        }
+    } else {
+        float threshold = A_180_DEG - smooth_margin_deg;
+        
+        if (angle_deg <= threshold) {
+            // Zone 3: Drops linearly starting from 1.0 right after 90
+            speed = 1.0f - ((angle_deg - A_90_DEG) / A_90_DEG);
+        } else {
+            // Zone 4: The smoothing zone (ramping back up to 1.0 at exactly 180)
+            float speed_at_threshold = 1.0f - ((threshold - A_90_DEG) / A_90_DEG);
+            float blend = smoothstep(threshold, A_180_DEG, angle_deg);
+            speed = speed_at_threshold + blend * (1.0f - speed_at_threshold);
+        }
+    }
+    
+    // Final safety clamp just in case
+    return std::clamp(speed, 0.0f, 1.0f);
+}
 void ReactiveOANode::computeCorrectionVector() {
-#if DEBUG && 1
-    auto start = std::chrono::high_resolution_clock::now();
+#if DEBUG && TIME_ANALYSE
+    analyzer.start_segment("Compute Correction");
 #endif
 
     // Scale repulsion base on moving direction
@@ -140,7 +192,7 @@ void ReactiveOANode::computeCorrectionVector() {
         float movement_weight = movement_vec.norm() / Drone::SPEED_MAX_FORWARD;
         repulsive_vec = (1 - movement_weight) * repulsive_vec + movement_weight * repulsive_vec * repulsive_vec.dot(movement_vec);
     }
-    
+
     // Compute target vector
     Eigen::Vector3f target_vec = control_vec + repulsive_vec;
     float target_speed = target_vec.norm();
@@ -157,16 +209,10 @@ void ReactiveOANode::computeCorrectionVector() {
     constexpr float MOVEMENT_WEIGHT = 1.0f;
     constexpr float CONTROL_X_WEIGHT = 5.0f;
     constexpr float CONTROL_Y_WEIGHT = 1.0f;
-    constexpr float CONTROL_Z_WEIGHT = 9595959590.0f;
+    constexpr float CONTROL_Z_WEIGHT = 20.0f;
     float ACCEPTABLE_COST = 0.0f; // Set to 0 or negative for exact best direction.
     
     // Init search intermediates
-    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
-
-    int row_target = static_cast<int>((spherical_target_vec.y() + M_PI_2) / Sensor::VFH_RESOLUTION);
-    int col_target = static_cast<int>((spherical_target_vec.x() + M_PI) / Sensor::VFH_RESOLUTION);
-    int row_best = -1, col_best = -1;
-
     float min_cost = std::numeric_limits<float>::max();
     Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
     bool found_safe_path = false;
@@ -198,8 +244,6 @@ void ReactiveOANode::computeCorrectionVector() {
         if(total_cost < min_cost) {
             min_cost = total_cost;
             best_direction = candinate_direction;
-            row_best = row;
-            col_best = col;
             found_safe_path = true;
             if(min_cost <= ACCEPTABLE_COST) break;
         }
@@ -208,17 +252,23 @@ void ReactiveOANode::computeCorrectionVector() {
     if(!found_safe_path) {
         correction_vec.setZero();
     }
-    else if(row_best == row_target && col_best == col_target) {
-        correction_vec = target_vec;
-    }
     else {
-        correction_vec = best_direction * target_speed;
+        // Get deviation
+        float dot_prod = std::clamp(target_direction.dot(best_direction), -1.0f, 1.0f);
+        float angle_deg = std::acos(dot_prod);
+        
+        constexpr float HALF_CELL = 2.5f * DEGREE;
+        if(angle_deg < HALF_CELL) {
+            correction_vec = best_direction * target_speed;
+        }
+        else {   
+            float speed_scaler = getSpeed(angle_deg);
+            correction_vec = best_direction * speed_scaler * target_speed;
+        }
     }
 
-#if DEBUG && 1
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    RCLCPP_INFO(this->get_logger(), "Execution time: %ld microseconds", duration.count());
+#if DEBUG && TIME_ANALYSE
+    analyzer.stop_segment("Compute Correction");
 #endif
 
 #if DEBUG && 1
@@ -232,6 +282,7 @@ void ReactiveOANode::computeCorrectionVector() {
 #endif
 
 #if DEBUG && 1
+    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
     RCLCPP_INFO(
         this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f, min cost = %.2f" RESET, 
         spherical_target_vec.z(), 

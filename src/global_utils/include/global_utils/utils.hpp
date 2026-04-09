@@ -1,10 +1,21 @@
 #pragma once
 
+#include <rclcpp/rclcpp.hpp>
 #include <limits>
 #include <array>
 #include <cmath>
+#include <algorithm>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <chrono>
+#include <numeric>
+#include <iomanip>
+#include <mutex>
+#include <sstream>
 
 /* ######################################## Color */
 #define RED     "\033[31m"
@@ -221,3 +232,125 @@ namespace math_utils {
         return out_min + expo_ratio * (out_max - out_min);
     }
 } // namespace math_utils
+
+namespace time_utils {
+    class TimeAnalyzer {
+    private:
+        struct TagData {
+            std::vector<double> history;
+            size_t head = 0;           // Circular buffer index
+            size_t count = 0;          // How many samples we currently have
+            double min_time = 1e9;     // Init ridiculously high
+            double max_time = 0.0;
+            double last_time = 0.0;    // Store the most recent compute time
+            std::chrono::high_resolution_clock::time_point start_time;
+            
+            // Constructor pre-allocates the vector so we never dynamically allocate during flight
+            TagData(size_t window_size) : history(window_size, 0.0) {}
+        };
+
+        rclcpp::Logger logger;
+        std::unordered_map<std::string, TagData> data_;
+        size_t window_size_;
+        std::mutex mtx_; // Thread safety for ROS2 callbacks
+
+    public:
+        // Default window size of 100 loops. Adjust as needed.
+        TimeAnalyzer(rclcpp::Logger logger, size_t window_size = 500) : logger(logger), window_size_(window_size) {}
+
+        // 1. Call this right before the code you want to measure
+        void start_segment(const std::string& tag) {
+            std::lock_guard<std::mutex> lock(mtx_);
+            auto it = data_.find(tag);
+
+            // If this tag doesn't exist yet, emplace it (only allocates memory on the very first call)
+            if (it == data_.end()) it = data_.emplace(tag, TagData(window_size_)).first;
+            it->second.start_time = std::chrono::high_resolution_clock::now();
+        }
+
+        // 2. Call this right after. Returns the microseconds it took just in case you need it logically.
+        double stop_segment(const std::string& tag) {
+            auto end_time = std::chrono::high_resolution_clock::now();
+            std::lock_guard<std::mutex> lock(mtx_);
+            
+            auto it = data_.find(tag);
+            if (it == data_.end()) return 0.0; // Failsafe if stop() is called before start()
+
+            auto& d = it->second;
+            double duration_us = std::chrono::duration<double, std::micro>(end_time - d.start_time).count();
+            
+            // Update circular buffer
+            d.history[d.head] = duration_us;
+            d.head = (d.head + 1) % window_size_;
+            if (d.count < window_size_) d.count++;
+            
+            // Update global bounds
+            d.min_time = std::min(d.min_time, duration_us);
+            d.max_time = std::max(d.max_time, duration_us);
+            d.last_time = duration_us;
+
+            return duration_us;
+        }
+
+        // 3. Print the absolute latest time for a specific loop
+        void printCurrent(const std::string& tag) {
+            std::lock_guard<std::mutex> lock(mtx_);
+            auto it = data_.find(tag);
+            if (it != data_.end()) {
+                RCLCPP_INFO_STREAM(
+                    logger, 
+                    "[Profiler] " << tag << " took: " << std::fixed << std::setprecision(2) << it->second.last_time << " us\n"
+                );
+            }
+        }
+
+        // Convenience function to stop and print instantly
+        void stopAndPrint(const std::string& tag) {
+            stop_segment(tag);
+            printCurrent(tag);
+        }
+
+        // 4. The grand finale. Call this in your Node Destructor.
+        void printSummary() {
+            std::lock_guard<std::mutex> lock(mtx_);
+            std::stringstream ss;
+            ss  << "\n====================== COMPUTE PROFILER SUMMARY ======================\n"
+                << std::left << std::setw(20) << "Tag" 
+                << std::right << std::setw(12) << "Avg (us)" 
+                << std::setw(12) << "Med (us)" 
+                << std::setw(12) << "Min (us)" 
+                << std::setw(12) << "Max (us)" 
+                << std::setw(10) << "Samples" << "\n"
+                << "----------------------------------------------------------------------\n";
+
+            for (auto& [tag, d] : data_) {
+                if (d.count == 0) continue;
+
+                // Calculate Average
+                double sum = std::accumulate(d.history.begin(), d.history.begin() + d.count, 0.0);
+                double avg = sum / d.count;
+
+                // Calculate Median (O(N) time, incredibly fast)
+                std::vector<double> valid_history(d.history.begin(), d.history.begin() + d.count);
+                size_t n = valid_history.size();
+                std::nth_element(valid_history.begin(), valid_history.begin() + n / 2, valid_history.end());
+                
+                double median = valid_history[n / 2];
+                // If even number of elements, technically median is the average of the two middle ones
+                if (n % 2 == 0) {
+                    auto max_it = std::max_element(valid_history.begin(), valid_history.begin() + n / 2);
+                    median = (median + *max_it) / 2.0;
+                }
+                ss  << std::left << std::setw(25) << tag 
+                    << std::right << std::fixed << std::setprecision(2)
+                    << std::setw(12) << avg 
+                    << std::setw(12) << median 
+                    << std::setw(12) << d.min_time 
+                    << std::setw(12) << d.max_time 
+                    << std::setw(10) << d.count << "\n";
+            }
+            ss << "======================================================================\n";
+            RCLCPP_INFO_STREAM(logger, ss.str());
+        }
+    };
+} // namespace time_utils
