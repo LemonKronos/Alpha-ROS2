@@ -10,7 +10,7 @@
 #include <bitset>
 
 #define DEBUG 1
-#define VISUALIZE 1
+// #define VISUALIZE 1
 #define TIME_ANALYSE 1
 
 #ifndef DEBUG
@@ -83,7 +83,7 @@ private:
     void computeControlVector();
     void computeMovementVector();
     void computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
-    void computeRepulsiveVector(const Eigen::Vector3f point);
+    void computeRepulsiveVector(const Eigen::Vector3f& point);
     void computeCorrectionVector();
     void resetVectors();
     

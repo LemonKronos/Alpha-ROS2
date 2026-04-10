@@ -82,6 +82,15 @@ start_gz_ros_bridge() {
   printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 }
 
+start_rviz2() {
+  env DISPLAY="$DISPLAY" QT_QPA_PLATFORM=xcb zsh -c '
+    source "$SETUP_ROS2"
+    rNvidia rviz2
+    exec zsh
+  ' & echo $! >> /tmp/sim_pids.txt &&
+  printf "\033[92m[Rviz2] running...\033[0m\n"
+}
+
 # ==========================================
 # Main Execution
 # ==========================================
@@ -97,6 +106,7 @@ main() {
   start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
+  start_rviz2
 
   sleep 5
   echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat

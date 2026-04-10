@@ -1,6 +1,6 @@
 #include "reactive_oa/reactive_oa.hpp"
 
-ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_logger()) {
+ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_logger(), 800) {
     
     Global::setup_for_simulation(this);
     
@@ -80,61 +80,9 @@ ReactiveOANode::~ReactiveOANode(){
 #endif
 }
 
-#pragma region Compute vectors
+#pragma region Helpers
 
-void ReactiveOANode::computeControlVector() {
-    control_vec = Eigen::Vector3f(
-        last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
-        last_control_signal->left * Drone::SPEED_MAX_FORWARD,
-        last_control_signal->up * Drone::SPEED_MAX_UP
-    ); // body frame
-
-    // RCLCPP_INFO(this->get_logger(), BLUE "Control vec = %0.2f" RESET, control_vec.norm());
-
-    // control_angular_vec = Eigen::Vector3f(
-    //     last_control_signal->roll,
-    //     last_control_signal->pitch,
-    //     last_control_signal->yaw
-    // ); // body frame
-}
-
-void ReactiveOANode::computeMovementVector() {
-    movement_vec = Eigen::Vector3f(
-        last_perception->velocity[0],
-        last_perception->velocity[1],
-        last_perception->velocity[2]
-    ); // world frame
-    if(movement_vec.hasNaN()) {
-        movement_vec.setZero();
-        // RCLCPP_WARN(this->get_logger(), RED "Movement has NaN" RESET);
-    }
-    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
-    movement_vec = q.inverse() * movement_vec; // body frame
-
-    // movement_angular_vec = Eigen::Vector3f(
-    //     last_perception->angular_velocity[0],
-    //     last_perception->angular_velocity[1],
-    //     last_perception->angular_velocity[2]
-    // ); // world frame
-    // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
-}
-
-void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    VFH.reset();
-
-    // Extract the VFH
-    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
-        VFH[i] = (msg->vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] >> (i % Sensor::VFH_MSG_BIT_SIZE)) & 1;
-    }
-}
-
-void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f point) {
-    float strenght = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    strenght = math_utils::linearMap<float>(strenght, 0, 1, 0, 1);
-    repulsive_vec = point.normalized() * -strenght * Drone::SPEED_MAX_FORWARD;
-}
-
-float getSpeed(const float angle_deg, const float smooth_margin_deg = 15.0f * DEGREE) {
+float getSpeedScale(const float angle_deg, const float smooth_margin_deg = 30.0f * DEGREE) {
     constexpr float A_90_DEG = 90.0f * DEGREE;
     constexpr float A_180_DEG = 180.0f * DEGREE;
 
@@ -182,6 +130,63 @@ float getSpeed(const float angle_deg, const float smooth_margin_deg = 15.0f * DE
     // Final safety clamp just in case
     return std::clamp(speed, 0.0f, 1.0f);
 }
+
+#pragma endregion
+
+#pragma region Compute vectors
+
+void ReactiveOANode::computeControlVector() {
+    control_vec = Eigen::Vector3f(
+        last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
+        last_control_signal->left * Drone::SPEED_MAX_STRAFE,
+        last_control_signal->up * Drone::SPEED_MAX_UP
+    ); // body frame
+
+    // RCLCPP_INFO(this->get_logger(), BLUE "Control vec = %0.2f" RESET, control_vec.norm());
+
+    // control_angular_vec = Eigen::Vector3f(
+    //     last_control_signal->roll,
+    //     last_control_signal->pitch,
+    //     last_control_signal->yaw
+    // ); // body frame
+}
+
+void ReactiveOANode::computeMovementVector() {
+    movement_vec = Eigen::Vector3f(
+        last_perception->velocity[0],
+        last_perception->velocity[1],
+        last_perception->velocity[2]
+    ); // world frame
+    if(movement_vec.hasNaN()) {
+        movement_vec.setZero();
+        // RCLCPP_WARN(this->get_logger(), RED "Movement has NaN" RESET);
+    }
+    Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
+    movement_vec = q.inverse() * movement_vec; // body frame
+
+    // movement_angular_vec = Eigen::Vector3f(
+    //     last_perception->angular_velocity[0],
+    //     last_perception->angular_velocity[1],
+    //     last_perception->angular_velocity[2]
+    // ); // world frame
+    // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
+}
+
+void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
+    VFH.reset();
+
+    // Extract the VFH
+    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
+        VFH[i] = (msg->vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] >> (i % Sensor::VFH_MSG_BIT_SIZE)) & 1;
+    }
+}
+
+void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f& point) {
+    float strenght = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
+    strenght = math_utils::linearMap<float>(strenght, 0, 1, 0, 1);
+    repulsive_vec = point.normalized() * -strenght * Drone::SPEED_MAX_FORWARD;
+}
+
 void ReactiveOANode::computeCorrectionVector() {
 #if DEBUG && TIME_ANALYSE
     analyzer.start_segment("Compute Correction");
@@ -196,76 +201,85 @@ void ReactiveOANode::computeCorrectionVector() {
     // Compute target vector
     Eigen::Vector3f target_vec = control_vec + repulsive_vec;
     float target_speed = target_vec.norm();
-    if(target_speed < 1e-3f) {
-        correction_vec.setZero();
-        return;
-    }
 
-    // Get directions
-    Eigen::Vector3f target_direction = target_vec.normalized();
-    Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
-    
-    // Setup weights
-    constexpr float MOVEMENT_WEIGHT = 1.0f;
-    constexpr float CONTROL_X_WEIGHT = 5.0f;
-    constexpr float CONTROL_Y_WEIGHT = 1.0f;
-    constexpr float CONTROL_Z_WEIGHT = 20.0f;
-    float ACCEPTABLE_COST = 0.0f; // Set to 0 or negative for exact best direction.
-    
-    // Init search intermediates
-    float min_cost = std::numeric_limits<float>::max();
-    Eigen::Vector3f best_direction = Eigen::Vector3f::Zero();
-    bool found_safe_path = false;
-    
-    // Start search
-    for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
-        // Skip occupied space
-        if(VFH[index] == 1) continue;
+    // Init correction
+    Eigen::Vector3f new_correction_vec = target_vec;
 
-        // Get row and column
-        int row = index / Sensor::VFH_AZIMUTH_BINS;
-        int col = index % Sensor::VFH_AZIMUTH_BINS;
-
-        // Get candinate vector
-        float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
-        float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
-        Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
-
-        // Compute cost
-        Eigen::Vector3f diff = candinate_direction - target_direction;
-        float target_cost = 
-              CONTROL_X_WEIGHT * diff.x() * diff.x()
-            + CONTROL_Y_WEIGHT * diff.y() * diff.y()
-            + CONTROL_Z_WEIGHT * diff.z() * diff.z();
-        float movement_cost = 1.0f - candinate_direction.dot(movement_direction);
-        float total_cost = target_cost + MOVEMENT_WEIGHT * movement_cost;
-
-        // Evaluate cost
-        if(total_cost < min_cost) {
-            min_cost = total_cost;
-            best_direction = candinate_direction;
-            found_safe_path = true;
-            if(min_cost <= ACCEPTABLE_COST) break;
-        }
-    }
-
-    if(!found_safe_path) {
-        correction_vec.setZero();
-    }
-    else {
-        // Get deviation
-        float dot_prod = std::clamp(target_direction.dot(best_direction), -1.0f, 1.0f);
-        float angle_deg = std::acos(dot_prod);
+    // Compute correction
+    if(target_speed < 1e-3f) new_correction_vec.setZero();
+    else if(VFH.any()) {
+        // Get directions
+        Eigen::Vector3f target_direction = target_vec.normalized();
+        Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
         
-        constexpr float HALF_CELL = 2.5f * DEGREE;
-        if(angle_deg < HALF_CELL) {
-            correction_vec = best_direction * target_speed;
+        // Setup weights
+        constexpr float MOVEMENT_WEIGHT = 1.0f;
+        constexpr float CONTROL_X_WEIGHT = 5.0f;
+        constexpr float CONTROL_Y_WEIGHT = 1.0f;
+        constexpr float CONTROL_UP_WEIGHT = 80.0f;
+        constexpr float CONTROL_DOWN_WEIGHT = 20.0f; 
+        float ACCEPTABLE_COST = -0.0f; // Set to 0 or negative for exact best direction.
+        
+        // Init search intermediates
+        float min_cost = std::numeric_limits<float>::max();
+        Eigen::Vector3f best_direction = target_direction;
+        bool found_safe_path = false;
+        
+        // Start search
+        for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
+            // Skip occupied space
+            if(VFH[index] == 1) continue;
+
+            // Get row and column
+            int row = index / Sensor::VFH_AZIMUTH_BINS;
+            int col = index % Sensor::VFH_AZIMUTH_BINS;
+
+            // Get candinate vector
+            float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
+            float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
+            Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
+
+            // Compute cost
+            Eigen::Vector3f diff = candinate_direction - target_direction;
+            float target_cost = 
+                CONTROL_X_WEIGHT * diff.x() * diff.x()
+                + CONTROL_Y_WEIGHT * diff.y() * diff.y()
+                + (diff.z() > 0 ? CONTROL_UP_WEIGHT : CONTROL_DOWN_WEIGHT) * diff.z() * diff.z();
+            float movement_cost = 1.0f - candinate_direction.dot(movement_direction);
+            float total_cost = target_cost + MOVEMENT_WEIGHT * movement_cost;
+
+            // Evaluate cost
+            if(total_cost < min_cost) {
+                min_cost = total_cost;
+                best_direction = candinate_direction;
+                found_safe_path = true;
+                if(min_cost <= ACCEPTABLE_COST) break;
+            }
         }
-        else {   
-            float speed_scaler = getSpeed(angle_deg);
-            correction_vec = best_direction * speed_scaler * target_speed;
+
+        if(!found_safe_path) {
+            new_correction_vec.setZero();
+        }
+        else {
+            // Get deviation
+            float dot = std::clamp(target_direction.dot(best_direction), -1.0f, 1.0f);
+            float angle = std::acos(dot);
+
+            constexpr float HALF_CELL = 2.5f * DEGREE;
+
+            if(angle > HALF_CELL) {
+                float speed_scaler = getSpeedScale(angle);
+                new_correction_vec =  best_direction * speed_scaler * target_speed;
+            }
         }
     }
+    
+    //! Bad smooth trajectory code
+    Eigen::Vector3f change_dir = new_correction_vec.normalized() - correction_vec.normalized();
+    constexpr float change_limit = 0.1f;
+    if(change_dir.norm() > change_limit) change_dir = change_dir.normalized() * change_limit;
+
+    correction_vec = (correction_vec.normalized() + change_dir).normalized() * new_correction_vec.norm();
 
 #if DEBUG && TIME_ANALYSE
     analyzer.stop_segment("Compute Correction");
@@ -284,11 +298,10 @@ void ReactiveOANode::computeCorrectionVector() {
 #if DEBUG && 1
     Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
     RCLCPP_INFO(
-        this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f, min cost = %.2f" RESET, 
+        this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
         spherical_target_vec.z(), 
         spherical_target_vec.x() / DEGREE, 
-        spherical_target_vec.y() / DEGREE,
-        min_cost
+        spherical_target_vec.y() / DEGREE
     );
 #endif
 
@@ -319,8 +332,8 @@ void ReactiveOANode::resetVectors() {
 #endif
     }
 
-    // Reset correction vector
-    correction_vec.setZero();
+    // // Keep correction vector
+    // correction_vec.setZero();
 
     // Reset movement
     if(lost_perception) {
