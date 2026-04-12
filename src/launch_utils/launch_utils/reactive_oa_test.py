@@ -25,6 +25,13 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
+        # Node(
+        #     package='simulation_overview',
+        #     executable='simulation_overview',
+        #     name='simulation_overview',
+        #     output='screen',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='finalize_control',
             executable='finalize_control',
@@ -51,7 +58,7 @@ def generate_launch_description():
             executable='depth_cam',
             name='depth_cam',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            # arguments=['--ros-args', '--log-level', 'warn']
         ),
         # Node(
         #     package='lidar_2d_handler',

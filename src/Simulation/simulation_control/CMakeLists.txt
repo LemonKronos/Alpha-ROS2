@@ -12,8 +12,6 @@ find_package(alpha_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ros_gz_interfaces REQUIRED)
 find_package(global_utils REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(OpenCV REQUIRED)
 
 include_directories(
   include
@@ -28,8 +26,6 @@ ament_target_dependencies(simulation_control
   alpha_msgs
   ros_gz_interfaces
   global_utils
-  cv_bridge
-  OpenCV
 )
 
 install(TARGETS

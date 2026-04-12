@@ -48,6 +48,7 @@ class Topic:
     DEPTH_CAM_LEFT_PL = "/sensor/depth_cam/left/points"
     DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points"
     RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
+    OVERVIEW_CAM = "/sensor/overview_cam/camera/image"
     LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan"
     LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan"
     BODY_CONTACT = "/sensor/contact_body/contact"

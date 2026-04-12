@@ -18,6 +18,19 @@
 #include "global_utils/blockingconcurrentqueue.h"
 #include "alpha_msgs/msg/vector_field_histogram.hpp"
 
+
+#define DEBUG 1
+#define TIME_ANALYSE 1
+
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
+#ifndef TIME_ANALYSE
+    #define TIME_ANALYSE 0
+#endif
+
+
 namespace alpha_brain {
 
 class DepthCamNode; // Forward declaration
@@ -26,6 +39,8 @@ constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
 constexpr int WORLD_BATCH_SIZE = 512;
 
 using std::placeholders::_1;
+
+// TODO refactor this, these class be friend class to use all resources of the Node
 
 class ProcessingThread {
 public:
@@ -88,6 +103,11 @@ private:
 
     Name::Dynamic::BASE_LINK base_link;
     rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr hazard_voxel_PUB;
+
+    // TODO bring this analyzer to theNode
+#if DEBUG && TIME_ANALYSE
+    std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
+#endif
 
     const int num_worker;
     const octomap::point3d origin; 

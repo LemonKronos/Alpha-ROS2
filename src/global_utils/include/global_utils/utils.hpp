@@ -255,7 +255,7 @@ namespace time_utils {
         std::mutex mtx_; // Thread safety for ROS2 callbacks
 
     public:
-        // Default window size of 100 loops. Adjust as needed.
+        // Default window size of 500 loops. Adjust as needed.
         TimeAnalyzer(rclcpp::Logger logger, size_t window_size = 500) : logger(logger), window_size_(window_size) {}
 
         // 1. Call this right before the code you want to measure
@@ -314,12 +314,12 @@ namespace time_utils {
         void printSummary() {
             std::lock_guard<std::mutex> lock(mtx_);
             std::stringstream ss;
-            ss  << "\n====================== COMPUTE PROFILER SUMMARY ======================\n"
+            ss  << "\n====================== COMPUTE PROFILER SUMMARY (us) ======================\n"
                 << std::left << std::setw(20) << "Tag" 
-                << std::right << std::setw(12) << "Avg (us)" 
-                << std::setw(12) << "Med (us)" 
-                << std::setw(12) << "Min (us)" 
-                << std::setw(12) << "Max (us)" 
+                << std::right << std::setw(12) << "Avg" 
+                << std::setw(12) << "Med" 
+                << std::setw(12) << "Min" 
+                << std::setw(12) << "Max" 
                 << std::setw(10) << "Samples" << "\n"
                 << "----------------------------------------------------------------------\n";
 
@@ -341,7 +341,7 @@ namespace time_utils {
                     auto max_it = std::max_element(valid_history.begin(), valid_history.begin() + n / 2);
                     median = (median + *max_it) / 2.0;
                 }
-                ss  << std::left << std::setw(25) << tag 
+                ss  << std::left << std::setw(20) << tag 
                     << std::right << std::fixed << std::setprecision(2)
                     << std::setw(12) << avg 
                     << std::setw(12) << median 

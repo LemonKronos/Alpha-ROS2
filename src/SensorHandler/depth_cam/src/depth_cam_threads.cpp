@@ -194,6 +194,8 @@ alpha_brain::HazardPointThread::HazardPointThread(
     // Init variables
     this->running.store(true);
 
+    analyzer = std::make_unique<time_utils::TimeAnalyzer>(theNode->get_logger(), 300);
+
     // Check sycn
     alpha_msgs::msg::VectorFieldHistogram test_msg;
     if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
@@ -216,6 +218,10 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
     this->hazard_point_queue.enqueue(nullptr);
     if(this->hazard_point_thread.joinable()) this->hazard_point_thread.join();
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
+
+#if DEBUG && TIME_ANALYSE
+        analyzer->printSummary();
+#endif
 }
 
 moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& alpha_brain::HazardPointThread::getQueue() {
@@ -234,6 +240,10 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         // Dequeue the batch of point cloud
         std::unique_ptr<std::vector<Eigen::Vector3f>> batch_cloud;
         this->hazard_point_queue.wait_dequeue(batch_cloud);
+
+#if DEBUG && TIME_ANALYSE
+        analyzer->start_segment("Collect Batch Cloud");
+#endif
 
         if(!this->running.load(std::memory_order_relaxed)) break;
 
@@ -272,7 +282,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         for(const auto &point : *batch_cloud) {
             // Get scaling
             float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
-            float scale_angle = std::asin(scale_distance);
+            float scale_angle = std::min(std::asin(scale_distance), 45*DEGREE);
             float scale_bin = static_cast<int>(std::ceil(scale_angle / Sensor::VFH_RESOLUTION));
 
             // Get VFH center bin
@@ -298,6 +308,11 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
             // Update closest point
             repulsive_value = std::min(repulsive_value, point.z());
         }
+
+#if DEBUG && TIME_ANALYSE
+        analyzer->stop_segment("Collect Batch Cloud");
+#endif  
+
     }
 }
 
@@ -305,10 +320,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
     alpha_msgs::msg::VectorFieldHistogram msg;
 
     // Check if clear
-    if(VFH.none()) {
-        RCLCPP_INFO(this->theNode->get_logger(), YELLOW "Obstacle clear" RESET);
-        return;
-    }
+    if(VFH.none()) return;
 
     // Generate payload
     memset(&msg.vfh_part, 0, sizeof(msg.vfh_part)); // Init all the bits to 0s
