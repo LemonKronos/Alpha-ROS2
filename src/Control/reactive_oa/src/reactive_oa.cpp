@@ -55,7 +55,6 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_l
     control_vec.setZero();
     movement_vec.setZero();
     repulsive_vec.setZero();
-    effect_vec.setZero();
     correction_vec.setZero();
     // control_angular_vec.setZero();
     // movement_angular_vec.setZero();
@@ -182,33 +181,46 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
     }
 }
 
-void ReactiveOANode::computeRepulsiveVector(const Eigen::Vector3f& point) {
-    float strenght = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    strenght = math_utils::linearMap<float>(strenght, 0, 1, 0, 1.5);
-    repulsive_vec = point.normalized() * -strenght * Drone::SPEED_MAX_FORWARD;
-}
+void ReactiveOANode::computeRepulsiveAndEffectVector(const Eigen::Vector3f& point) {
+    // Compute new repulsive vector
+    float urgency = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
+    urgency = math_utils::linearMap<float>(urgency, 0.0f, 1.0f, 0.0f, 1.0f);
+    Eigen::Vector3f new_repulsive_vec = -(point.normalized() * urgency * Drone::SPEED_MAX_FORWARD);
 
-void ReactiveOANode::computeCorrectionVector() {
-#if DEBUG && 0
-    Eigen::Vector3f  b_spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
+    // Cast old repulsive to the new one
+    repulsive_vec = (repulsive_vec.dot(new_repulsive_vec) / movement_vec.squaredNorm() ) * movement_vec;
+
+    // Compute Effect vector
+    if(new_repulsive_vec.squaredNorm() > repulsive_vec.squaredNorm()) {
+        effect_vec = (new_repulsive_vec - repulsive_vec) * 2.0f;
+    }
+
+#if DEBUG && 1
+    Eigen::Vector3f  spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
     RCLCPP_INFO(
         this->get_logger(), RED "Repulsive  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        b_spherical_repulsive_vec.z(),
-        b_spherical_repulsive_vec.x() / DEGREE, 
-        b_spherical_repulsive_vec.y() / DEGREE
+        spherical_repulsive_vec.z(),
+        spherical_repulsive_vec.x() / DEGREE, 
+        spherical_repulsive_vec.y() / DEGREE
+    );
+
+    Eigen::Vector3f spherical_effect_vec = math_utils::toSpherical(effect_vec);
+    RCLCPP_INFO(
+        this->get_logger(), PINK "Effect     = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
+        spherical_effect_vec.z(),
+        spherical_effect_vec.x() / DEGREE, 
+        spherical_effect_vec.y() / DEGREE
     );
 #endif
 
+    // Assign new value
+    repulsive_vec = new_repulsive_vec;
+}
+
+void ReactiveOANode::computeCorrectionVector() {
 #if DEBUG && TIME_ANALYSE
     analyzer.start_segment("Compute Correction");
 #endif
-
-    // Scale repulsion base on moving direction
-    if(!movement_vec.isZero(1e-3f)) {
-        float movement_weight = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
-        effect_vec = (1 - movement_weight) * repulsive_vec;
-        // repulsive_vec *= abs(repulsive_vec.normalized().dot(movement_vec.normalized()));
-    }
 
     // Compute target vector
     Eigen::Vector3f target_vec = control_vec + effect_vec;
@@ -225,7 +237,7 @@ void ReactiveOANode::computeCorrectionVector() {
         Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
         
         // Setup weights
-        constexpr float MOVEMENT_WEIGHT = 1.0f;
+        constexpr float MOVEMENT_WEIGHT = 10.0f;
         constexpr float CONTROL_X_WEIGHT = 5.0f;
         constexpr float CONTROL_Y_WEIGHT = 1.0f;
         constexpr float CONTROL_UP_WEIGHT = 80.0f;
@@ -292,17 +304,7 @@ void ReactiveOANode::computeCorrectionVector() {
     analyzer.stop_segment("Compute Correction");
 #endif
 
-#if DEBUG && 1
-    Eigen::Vector3f spherical_effect_vec = math_utils::toSpherical(effect_vec);
-    RCLCPP_INFO(
-        this->get_logger(), RED "Repulsive  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_effect_vec.z(),
-        spherical_effect_vec.x() / DEGREE, 
-        spherical_effect_vec.y() / DEGREE
-    );
-#endif
-
-#if DEBUG && 1
+#if DEBUG && 0
     Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
     RCLCPP_INFO(
         this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
@@ -312,7 +314,7 @@ void ReactiveOANode::computeCorrectionVector() {
     );
 #endif
 
-#if DEBUG & 1
+#if DEBUG & 0
     Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
     RCLCPP_INFO(
         this->get_logger(), YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
@@ -333,6 +335,7 @@ void ReactiveOANode::resetVectors() {
     if(!has_seeing_vfh_counter && VFH.any()) {
         VFH.reset();
         repulsive_vec.setZero();
+        effect_vec.setZero();
 
 #if DEBUG && 1
         RCLCPP_INFO(this->get_logger(), PINK "Reset obstacles" RESET);
@@ -474,7 +477,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     computeVectorFieldHistogram(msg);
-    computeRepulsiveVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+    // computeRepulsiveAndEffectVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){

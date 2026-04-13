@@ -106,6 +106,7 @@ void FusePerceptionNode::PublishCallback() {
             hazard_distance = last_hazard_distance - DECREASE_CONSTANT;
         }
 
+        // hazard_distance = 20.0f; //#TEST
         msg.hazard_distance = hazard_distance;
         last_hazard_distance = msg.hazard_distance;
 

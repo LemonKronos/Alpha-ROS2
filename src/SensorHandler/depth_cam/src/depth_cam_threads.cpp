@@ -133,7 +133,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             if(x_cliped && y_cliped && z_cliped) continue;
 
             // For hazard point
-            // hazard_distance_sq = 400.0f; // #Test
+            // hazard_distance_sq = 400.0f; //#TEST
             if(body_point.squaredNorm() <= hazard_distance_sq) {
                 // Convert to spherical coordinate
                 Eigen::Vector3f spherical_body_point = math_utils::toSpherical(body_point);
@@ -250,26 +250,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         if(batch_cloud == nullptr) {
             worker_finished++;
             if(worker_finished >= this->num_worker) {
-                // Compute repulsive vector
-                // Could do sum of S_vector if VFH[index] != 1 to get roughly this
-                for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
-                    if(VFH[index] == 0) continue;
-
-                    int row = index / Sensor::VFH_AZIMUTH_BINS;
-                    int col = index % Sensor::VFH_AZIMUTH_BINS;
-
-                    float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
-                    float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
-                    Eigen::Vector3f bin_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
-
-                    repulsive_direction += bin_direction;
-                }
-
-                repulsive_direction.normalize();
-                repulsive_direction *= repulsive_value;
-
-                // Send to publish
-                PublishHazardPoint(VFH, repulsive_direction);
+                PublishHazardPoint(VFH, math_utils::toCartesian(repulsive_direction));
                 VFH.reset();
                 repulsive_direction.setZero();
                 repulsive_value = FLT_MAX;
@@ -306,7 +287,10 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
             }
 
             // Update closest point
-            repulsive_value = std::min(repulsive_value, point.z());
+            if(repulsive_value > point.z()) {
+                repulsive_value = point.z();
+                repulsive_direction = point;
+            }
         }
 
 #if DEBUG && TIME_ANALYSE
