@@ -187,15 +187,12 @@ void ReactiveOANode::computeRepulsiveAndEffectVector(const Eigen::Vector3f& poin
     urgency = math_utils::linearMap<float>(urgency, 0.0f, 1.0f, 0.0f, 1.0f);
     Eigen::Vector3f new_repulsive_vec = -(point.normalized() * urgency * Drone::SPEED_MAX_FORWARD);
 
-    // Cast old repulsive to the new one
-    repulsive_vec = (repulsive_vec.dot(new_repulsive_vec) / movement_vec.squaredNorm() ) * movement_vec;
+    float movement_speed_weight = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 0.8f); // slower mean more repulsive
+    float movement_angular_weight = std::fabs(movement_vec.normalized().dot(new_repulsive_vec.normalized())); // more perpendicular mean more relax
 
-    // Compute Effect vector
-    if(new_repulsive_vec.squaredNorm() > repulsive_vec.squaredNorm()) {
-        effect_vec = (new_repulsive_vec - repulsive_vec) * 2.0f;
-    }
+    effect_vec = new_repulsive_vec * (1.0f - movement_speed_weight) * movement_angular_weight;
 
-#if DEBUG && 1
+#if DEBUG && 0
     Eigen::Vector3f  spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
     RCLCPP_INFO(
         this->get_logger(), RED "Repulsive  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
@@ -203,7 +200,9 @@ void ReactiveOANode::computeRepulsiveAndEffectVector(const Eigen::Vector3f& poin
         spherical_repulsive_vec.x() / DEGREE, 
         spherical_repulsive_vec.y() / DEGREE
     );
+#endif
 
+#if DEBUG && 1
     Eigen::Vector3f spherical_effect_vec = math_utils::toSpherical(effect_vec);
     RCLCPP_INFO(
         this->get_logger(), PINK "Effect     = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
@@ -223,7 +222,11 @@ void ReactiveOANode::computeCorrectionVector() {
 #endif
 
     // Compute target vector
-    Eigen::Vector3f target_vec = control_vec + effect_vec;
+    Eigen::Vector3f target_vec = (
+        control_vec.squaredNorm() > effect_vec.squaredNorm() ?
+        control_vec :
+        effect_vec
+    );
     float target_speed = target_vec.norm();
 
     // Init correction
@@ -302,6 +305,10 @@ void ReactiveOANode::computeCorrectionVector() {
 
 #if DEBUG && TIME_ANALYSE
     analyzer.stop_segment("Compute Correction");
+#endif
+
+#if DEBUG && 1
+    if(control_vec.squaredNorm() < effect_vec.squaredNorm()) RCLCPP_INFO(this->get_logger(), YELLOW "Use Effect vector" RESET);
 #endif
 
 #if DEBUG && 0
@@ -477,7 +484,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     computeVectorFieldHistogram(msg);
-    // computeRepulsiveAndEffectVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+    computeRepulsiveAndEffectVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){

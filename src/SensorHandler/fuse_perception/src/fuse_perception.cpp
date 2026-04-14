@@ -100,8 +100,8 @@ void FusePerceptionNode::PublishCallback() {
         float speed = std::sqrt(speed_sq);
 
         float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
+        
         constexpr float DECREASE_CONSTANT = Drone::HAZARD_DISTANCE / 20.0f;
-
         if(hazard_distance + DECREASE_CONSTANT < last_hazard_distance) {
             hazard_distance = last_hazard_distance - DECREASE_CONSTANT;
         }
