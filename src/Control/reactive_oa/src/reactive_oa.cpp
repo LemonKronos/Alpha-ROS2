@@ -45,7 +45,7 @@ ReactiveOANode::ReactiveOANode(): Node("reactive_oa_node"), analyzer(this->get_l
         std::string error_msg = 
               "Wrong VFH msg size: expected "
             + std::to_string(Sensor::VFH_MSG_CHUNK_SIZE)
-            + ", but got"
+            + ", but got "
             + std::to_string(test_msg.vfh_part.size());
         RCLCPP_FATAL(this->get_logger(), RED "%s" RESET, error_msg.c_str());
         throw std::runtime_error(error_msg);
@@ -181,16 +181,16 @@ void ReactiveOANode::computeVectorFieldHistogram(const alpha_msgs::msg::VectorFi
     }
 }
 
-void ReactiveOANode::computeRepulsiveAndEffectVector(const Eigen::Vector3f& point) {
+void ReactiveOANode::computeRepulsive(const Eigen::Vector3f& point) {
     // Compute new repulsive vector
     float urgency = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
     urgency = math_utils::linearMap<float>(urgency, 0.0f, 1.0f, 0.0f, 1.0f);
     Eigen::Vector3f new_repulsive_vec = -(point.normalized() * urgency * Drone::SPEED_MAX_FORWARD);
 
     float movement_speed_weight = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 0.8f); // slower mean more repulsive
-    float movement_angular_weight = std::fabs(movement_vec.normalized().dot(new_repulsive_vec.normalized())); // more perpendicular mean more relax
+    float movement_angular_weight = std::clamp(std::fabs(movement_vec.normalized().dot(new_repulsive_vec.normalized())), 0.1f, 1.0f); // more perpendicular mean more relax
 
-    effect_vec = new_repulsive_vec * (1.0f - movement_speed_weight) * movement_angular_weight;
+    repulsive_vec = new_repulsive_vec * (1.0f - movement_speed_weight) * movement_angular_weight;
 
 #if DEBUG && 0
     Eigen::Vector3f  spherical_repulsive_vec = math_utils::toSpherical(repulsive_vec);
@@ -201,19 +201,6 @@ void ReactiveOANode::computeRepulsiveAndEffectVector(const Eigen::Vector3f& poin
         spherical_repulsive_vec.y() / DEGREE
     );
 #endif
-
-#if DEBUG && 1
-    Eigen::Vector3f spherical_effect_vec = math_utils::toSpherical(effect_vec);
-    RCLCPP_INFO(
-        this->get_logger(), PINK "Effect     = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_effect_vec.z(),
-        spherical_effect_vec.x() / DEGREE, 
-        spherical_effect_vec.y() / DEGREE
-    );
-#endif
-
-    // Assign new value
-    repulsive_vec = new_repulsive_vec;
 }
 
 void ReactiveOANode::computeCorrectionVector() {
@@ -221,12 +208,7 @@ void ReactiveOANode::computeCorrectionVector() {
     analyzer.start_segment("Compute Correction");
 #endif
 
-    // Compute target vector
-    Eigen::Vector3f target_vec = (
-        control_vec.squaredNorm() > effect_vec.squaredNorm() ?
-        control_vec :
-        effect_vec
-    );
+    Eigen::Vector3f target_vec = control_vec + repulsive_vec;
     float target_speed = target_vec.norm();
 
     // Init correction
@@ -240,7 +222,7 @@ void ReactiveOANode::computeCorrectionVector() {
         Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
         
         // Setup weights
-        constexpr float MOVEMENT_WEIGHT = 10.0f;
+        constexpr float MOVEMENT_WEIGHT = 2.0f;
         constexpr float CONTROL_X_WEIGHT = 5.0f;
         constexpr float CONTROL_Y_WEIGHT = 1.0f;
         constexpr float CONTROL_UP_WEIGHT = 80.0f;
@@ -307,7 +289,7 @@ void ReactiveOANode::computeCorrectionVector() {
     analyzer.stop_segment("Compute Correction");
 #endif
 
-#if DEBUG && 1
+#if DEBUG && 0
     if(control_vec.squaredNorm() < effect_vec.squaredNorm()) RCLCPP_INFO(this->get_logger(), YELLOW "Use Effect vector" RESET);
 #endif
 
@@ -342,7 +324,6 @@ void ReactiveOANode::resetVectors() {
     if(!has_seeing_vfh_counter && VFH.any()) {
         VFH.reset();
         repulsive_vec.setZero();
-        effect_vec.setZero();
 
 #if DEBUG && 1
         RCLCPP_INFO(this->get_logger(), PINK "Reset obstacles" RESET);
@@ -400,6 +381,10 @@ void ReactiveOANode::publishVectorArrow(
 #endif
 
 void ReactiveOANode::nodeLoopCallback() {
+#if DEBUG && TIME_ANALYSE
+    analyzer.start_segment("Main Loop");
+#endif
+
     computeCorrectionVector();
 
     auto msg = alpha_msgs::msg::ControlInterface();
@@ -469,6 +454,11 @@ void ReactiveOANode::nodeLoopCallback() {
     #endif
 
     resetVectors();
+
+#if DEBUG && TIME_ANALYSE
+    analyzer.stop_segment("Main Loop");
+#endif
+
 }
 
 #pragma region Callbacks 
@@ -484,7 +474,7 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
 void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     computeVectorFieldHistogram(msg);
-    computeRepulsiveAndEffectVector({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
+    computeRepulsive({msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
 void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){

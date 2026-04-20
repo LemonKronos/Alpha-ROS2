@@ -71,7 +71,6 @@ private:
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
     Eigen::Vector3f repulsive_vec;
-    Eigen::Vector3f effect_vec;
     Eigen::Vector3f correction_vec;
     // Eigen::Vector3f control_angular_vec;
     // Eigen::Vector3f movement_angular_vec;
@@ -84,7 +83,7 @@ private:
     void computeControlVector();
     void computeMovementVector();
     void computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
-    void computeRepulsiveAndEffectVector(const Eigen::Vector3f& point);
+    void computeRepulsive(const Eigen::Vector3f& point);
     void computeCorrectionVector();
     void resetVectors();
     

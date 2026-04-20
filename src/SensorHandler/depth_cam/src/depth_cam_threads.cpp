@@ -202,7 +202,7 @@ alpha_brain::HazardPointThread::HazardPointThread(
         std::string error_msg = 
               "Wrong VFH msg size: expected "
             + std::to_string(Sensor::VFH_MSG_CHUNK_SIZE)
-            + ", but got"
+            + ", but got "
             + std::to_string(test_msg.vfh_part.size());
         RCLCPP_FATAL(this->theNode->get_logger(), RED "%s" RESET, error_msg.c_str());
         throw std::runtime_error(error_msg);
