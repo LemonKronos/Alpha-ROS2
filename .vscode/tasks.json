@@ -3,7 +3,7 @@
     "tasks": [
         {"label": "Build ROS2 single Node and it Upstream",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-up-to ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-up-to ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -27,7 +27,7 @@
         },
         {"label": "Build ROS2 single Node and it Downstream",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-above ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-above ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -51,7 +51,7 @@
         },
         {"label": "Build ROS2 single Node, it Up and Downstream",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-above-and-dependencies ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-above-and-dependencies ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -75,7 +75,7 @@
         },
         {"label": "Build ROS2 single Node Only",
             "type": "shell",
-            "command": "source /opt/ros/jazzy/setup.bash && clear ; colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 --allow-overriding ${input:packageName} --packages-select ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-select ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -99,7 +99,7 @@
         },
         {"label": "Build Full ROS2 Workspace",
             "type": "shell",
-            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source /opt/ros/jazzy/setup.bash && ionice -c2 -n7 nice -n 10 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8 ; else echo \"Cancelled\"; fi",
+            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && ionice -c2 -n7 nice -n 10 colcon build ; else echo \"Cancelled\"; fi",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -120,6 +120,30 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {"label": "Build ROS2 Outsource",
+            "type": "shell",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --base-paths src/Out_source/${input:outsourceSub}",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "/bin/bash",
+                    "args": ["-l", "-c"]
+                }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": ["$colcon-gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
         }
     ],
     "inputs": [
@@ -135,6 +159,12 @@
             "description": "Dude U sure want to re-build full ROS2 workspace?",
             "options": ["Yes", "No"],
             "default": "Yes"
-        }
+        },
+        {
+            "id": "outsourceSub",
+            "type": "promptString",
+            "description": "Enter Outsource sub directory to build",
+            "default": "px4_msgs"
+        },
     ]
 }

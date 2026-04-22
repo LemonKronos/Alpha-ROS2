@@ -16,6 +16,8 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(octomap REQUIRED)
+find_package(voxblox REQUIRED)
+find_package(voxblox_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 include_directories(include)
@@ -50,6 +52,8 @@ ament_target_dependencies(depth_cam_component
   tf2_eigen
   Eigen3
   octomap
+  voxblox
+  voxblox_ros
 )
 
 rclcpp_components_register_nodes(depth_cam_component "alpha_brain::DepthCamNode")

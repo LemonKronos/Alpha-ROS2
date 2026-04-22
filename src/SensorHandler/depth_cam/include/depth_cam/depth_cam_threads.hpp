@@ -17,6 +17,10 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h"
 #include "alpha_msgs/msg/vector_field_histogram.hpp"
+#include "voxblox/core/common.h"
+#include "voxblox/core/voxel.h"
+#include "voxblox/core/layer.h"
+#include "voxblox/integrator/tsdf_integrator.h"
 
 
 #define DEBUG 1
@@ -39,8 +43,6 @@ constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
 constexpr int WORLD_BATCH_SIZE = 512;
 
 using std::placeholders::_1;
-
-// TODO refactor this, these class be friend class to use all resources of the Node
 
 class ProcessingThread {
 public:
