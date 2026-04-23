@@ -151,9 +151,11 @@ namespace Sensor {
     constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
     constexpr float DEPTH_CAM_RANGE = 30.0f;
-    // constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f; //! Use voxblox instead
+    // constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f; //! Decapreted, Use voxblox instead
     constexpr float VOXEL_RESOLUTION = 0.25f;
     constexpr size_t VOXEL_PER_SIDE = 8; // new voxel allocate to chunk of block 8x8x8 = 512 voxels, a 2 m^3 cube
+    constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
+    constexpr float VOXEL_MAX_WEIGHT = 10000.0f;
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
     constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
     constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);

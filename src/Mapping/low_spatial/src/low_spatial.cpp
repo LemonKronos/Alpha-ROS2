@@ -10,8 +10,8 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
 
         // Put map in shared memory space
         {
-            std::unique_lock lock(global_map_mutex);
-            global_tsdf_layer = tsdf_layer;
+            std::unique_lock lock(global_map.mutex);
+            global_map.tsdf_layer = tsdf_layer;
         }
         
         RCLCPP_INFO(this->get_logger(), GREEN "Low Spatial Map allocated" RESET);

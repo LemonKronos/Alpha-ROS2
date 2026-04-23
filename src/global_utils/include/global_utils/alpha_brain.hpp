@@ -5,17 +5,32 @@
 
 #include "voxblox/core/layer.h"
 #include "voxblox/core/voxel.h"
+#include "voxblox/integrator/tsdf_integrator.h"
+
+#include "global_utils/system_config.hpp"
 
 namespace alpha_brain {
-    // The Read-Write lock to prevent core dumps from thread collisions.
-    // - DepthCam must use: std::unique_lock<std::shared_mutex> lock(global_map_mutex);
-    // - AcrobaticOA must use: std::shared_lock<std::shared_mutex> lock(global_map_mutex);
-    inline std::shared_mutex global_map_mutex;
+    struct MapState {
+        // The Memory Lock
+        std::shared_mutex mutex;
 
-    // The zero-copy shared map pointer. 
-    // - Mapping component calls make_shared to create it.
-    // - DepthCam component writes to it.
-    // - AcrobaticOA component reads from it.
-    inline std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> global_tsdf_layer = nullptr;
+        // The 3D Voxel Memory
+        std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer = nullptr;
+
+        // The Configuration (Compile-Time Defaults)
+        voxblox::TsdfIntegratorBase::Config config;
+
+        // You can add a constructor here to force compile-time initialization
+        // of specific Voxblox settings!
+        MapState() {
+            // These compile directly into the binary
+            //! Dynamic these value
+            config.default_truncation_distance = Sensor::VOXEL_TRUNCATION_DISTANCE; 
+            config.max_weight = Sensor::VOXEL_MAX_WEIGHT;
+            config.voxel_carving_enabled = true;
+        }
+    };
+
+    inline MapState global_map;
 
 } // namespace alpha_brain

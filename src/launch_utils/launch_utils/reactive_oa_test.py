@@ -6,10 +6,14 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     static_tf_path = os.path.join(os.path.dirname(__file__), 'static_tf.py')
+    alpha_brain_path = os.path.join(os.path.dirname(__file__), 'alpha_brain.py')
 
     return LaunchDescription([
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(static_tf_path)
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(alpha_brain_path)
         ),
         Node(
             package='advance_control',
@@ -53,13 +57,13 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        Node(
-            package='depth_cam',
-            executable='depth_cam',
-            name='depth_cam',
-            output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='depth_cam',
+        #     executable='depth_cam',
+        #     name='depth_cam',
+        #     output='screen',
+        #     arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         # Node(
         #     package='lidar_2d_handler',
         #     executable='lidar_2d_handler',

@@ -123,7 +123,7 @@
         },
         {"label": "Build ROS2 Outsource",
             "type": "shell",
-            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --base-paths src/Out_source/${input:outsourceSub}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --cmake-args -DCMAKE_POSITION_INDEPENDENT_CODE=ON --base-paths src/Out_source/${input:outsourceSub}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {

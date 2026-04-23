@@ -16,6 +16,7 @@
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h"
+#include "global_utils/alpha_brain.hpp"
 #include "alpha_msgs/msg/vector_field_histogram.hpp"
 #include "voxblox/core/common.h"
 #include "voxblox/core/voxel.h"
@@ -161,6 +162,9 @@ private:
     std::thread world_update_thread;
 
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch> world_update_queue;
+
+    // The tool that actually shoots the rays into the map
+    std::unique_ptr<voxblox::FastTsdfIntegrator> tsdf_integrator = nullptr;
 
     // Methods
     void ConsumerLoop();

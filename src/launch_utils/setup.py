@@ -4,13 +4,14 @@ package_name = 'launch_utils'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.0.1',
     packages=find_packages(include=[package_name]),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
+            'launch_utils/alpha_brain.py',
             'launch_utils/static_tf.py',
             'launch_utils/lidar_2d_handler_launch.py',
             'launch_utils/pygame_control_launch.py',

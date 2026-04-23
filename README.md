@@ -1,6 +1,3 @@
 The ReactiveOA is WORKING
 ___
-1. Nuke the `compile_commands.json` thing
-2. Add colcon rule `"-DCMAKE_POLICY_DEFAULT_CMP0144=NEW"`
-3. Setup stack-like HEAP allocation for DepthCamNode to avoid chasing pointer
-4. Setup shared header for alpha_brain
+1. Voxblox build need to produce .so file, so build with `--cmake-args -DCMAKE_POSITION_INDEPENDENT_CODE=ON` only for Outsource in `.vscode/tasks.json`

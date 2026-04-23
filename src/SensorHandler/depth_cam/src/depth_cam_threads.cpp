@@ -407,7 +407,39 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
 
         has_data = true;
 
-        // TODO put it in voxblox map here
+        // Put new scan to voxblox map
+        {
+            // 1. Lock the global map (Wait for AcrobaticOA to finish reading)
+            std::unique_lock lock(alpha_brain::global_map.mutex);
+
+            // 2. Check if LowSpatial has allocated the memory yet
+            if(alpha_brain::global_map.tsdf_layer) {
+                
+                // 3. Lazy-Load: Boot the integrator the very first time we see the map
+                if(!this->tsdf_integrator) {
+                    this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
+                        alpha_brain::global_map.config, 
+                        alpha_brain::global_map.tsdf_layer.get()
+                    );
+                    RCLCPP_INFO(this->theNode->get_logger(), "DepthCam: Integrator locked onto shared map!");
+                }
+
+                // 4. Create a dummy gray color array to satisfy the Voxblox API
+                voxblox::Colors empty_colors(batch_cloud.points.size(), voxblox::Color(128, 128, 128));
+
+                // 5. Fire the points into the RAM!
+                this->tsdf_integrator->integratePointCloud(
+                    batch_cloud.transfrom, 
+                    batch_cloud.points, 
+                    empty_colors
+                );
+
+            }
+            else {
+                // If we get a frame before LowSpatial boots, just drop it and warn
+                RCLCPP_WARN(this->theNode->get_logger(), "DepthCam: Dropping scan, map memory not hot yet.");
+            }
+        } // Mutex naturally release here
     }
     this->running.store(false);
     if(has_data && worker_finished >= 3) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
