@@ -6,7 +6,6 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
 
     Global::setup_for_simulation(this);
 
-
     // Frame transform
     tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
@@ -19,11 +18,14 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     );
 
     // Init variables
+    analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger(), 300);
+
     hazard_point_thread = std::make_unique<HazardPointThread>(this, 3);
     world_update_thread = std::make_unique<WorldUpdateThread>(this, 3);
     front_processing_thread = std::make_unique<ProcessingThread>(
         "Front",
         this,
+        analyzer.get(),
         Topic::DEPTH_CAM_FRONT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
@@ -34,6 +36,7 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     left_processing_thread = std::make_unique<ProcessingThread>(
         "Left",
         this,
+        analyzer.get(),
         Topic::DEPTH_CAM_LEFT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
@@ -43,7 +46,8 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
 
     right_processing_thread = std::make_unique<ProcessingThread>(
         "Right", 
-        this, 
+        this,
+        analyzer.get(),
         Topic::DEPTH_CAM_RIGHT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
@@ -53,7 +57,9 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
 }
 
 alpha_brain::DepthCamNode::~DepthCamNode() {
-    // Nothing here
+#if DEBUG && TIME_ANALYSE
+        analyzer->printSummary();
+#endif
 }
 
 void alpha_brain::DepthCamNode::FusePerceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {

@@ -12,6 +12,17 @@
 
 namespace alpha_brain {
 
+#define DEBUG 1
+#define TIME_ANALYSE 1
+
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
+#ifndef TIME_ANALYSE
+    #define TIME_ANALYSE 0
+#endif
+
 using std::placeholders::_1;
 
 class DepthCamNode : public rclcpp::Node {
@@ -34,6 +45,12 @@ private:
     std::unique_ptr<ProcessingThread> front_processing_thread;
     std::unique_ptr<ProcessingThread> left_processing_thread;
     std::unique_ptr<ProcessingThread> right_processing_thread;
+
+    // TODO how to bring this compile time to the threads?
+    // Time analyzer
+#if DEBUG && TIME_ANALYSE
+    std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
+#endif
 
     // Callbacks
     void FusePerceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);

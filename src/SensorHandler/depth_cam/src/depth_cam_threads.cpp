@@ -5,12 +5,22 @@
 alpha_brain::ProcessingThread::ProcessingThread(
     const std::string& name,
     rclcpp::Node* theNode,
+    time_utils::TimeAnalyzer* analyzer,
     const std::string& topic,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer,
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue,
     const std::atomic<bool>& world_update,
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& world_update_queue
-) : name(name), theNode(theNode), topic(topic), tf_buffer(tf_buffer), world_update(world_update), hazard_point_queue(hazard_point_queue), world_update_queue(world_update_queue) {
+    moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>>& world_update_queue
+) : 
+    name(name), 
+    theNode(theNode), 
+    analyzer(analyzer),
+    topic(topic), 
+    tf_buffer(tf_buffer), 
+    world_update(world_update), 
+    hazard_point_queue(hazard_point_queue), 
+    world_update_queue(world_update_queue) 
+{
     // Create subscriber
     this->depth_cam_SUB = theNode->create_subscription<sensor_msgs::msg::PointCloud2>(
         this->topic,
@@ -84,8 +94,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         if(!world_update) this->done_world_update = false;
 
         // Lookup world frame
-        std::optional<Eigen::Isometry3f> iso_world;
-        bool has_tf_world = false;
+        std::optional<voxblox::Transformation> voxblox_tf_world;
         if(world_update && !this->done_world_update) {
             RCLCPP_INFO(this->theNode->get_logger(), YELLOW "%s thread called world update" RESET, this->name.c_str());
             try {
@@ -95,13 +104,19 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                     msg->header.stamp, // Time stamp of the scan
                     rclcpp::Duration::from_nanoseconds(Clock::LOOP_CYCLE_NANOSEC * 2)
                 );
-                iso_world = tf2::transformToEigen(tf_world).cast<float>();
-                has_tf_world = true;
+                
+                // Directly convert to voxblox Transformation
+                const auto& translate = tf_world.transform.translation;
+                const auto& rotate = tf_world.transform.rotation;
+                voxblox_tf_world = voxblox::Transformation(
+                    voxblox::Rotation(rotate.w, rotate.x, rotate.y, rotate.z),
+                    voxblox::Point(translate.x, translate.y, translate.z)
+                );
+
                 RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera DYNAMIC tf lookup complete" RESET, this->name.c_str());
             }
             catch(const tf2::TransformException& ex) {
                 RCLCPP_WARN(this->theNode->get_logger(), RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
-                has_tf_world = false;
             }
         }
 
@@ -109,10 +124,11 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         bool hazard_exist = false;
         std::unique_ptr<std::vector<Eigen::Vector3f>> hazard_cloud;
 
-        std::unique_ptr<octomap::Pointcloud> world_update_cloud;
-        if(world_update && !this->done_world_update) {
-            world_update_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
-            world_update_cloud->reserve(WORLD_BATCH_SIZE);
+        std::unique_ptr<VoxbloxBatch> world_update_cloud;
+        if(world_update && !this->done_world_update && voxblox_tf_world.has_value()) {
+            world_update_cloud = std::make_unique<VoxbloxBatch>(); // #CanBeOptimize
+            world_update_cloud->points.reserve(WORLD_BATCH_SIZE);
+            world_update_cloud->transfrom = voxblox_tf_world.value();
         }
 
         sensor_msgs::PointCloud2Iterator<float> itx(*msg, "x");
@@ -155,14 +171,20 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             }
 
             // For world update
-            if(world_update && !this->done_world_update && has_tf_world) {
-                Eigen::Vector3f world_point = (*iso_world) * raw_point;
-                if(world_update_cloud->size() >= WORLD_BATCH_SIZE) {
+            if(world_update && !this->done_world_update && voxblox_tf_world.has_value()) {
+                if(world_update_cloud->points.size() >= WORLD_BATCH_SIZE) {
+#if DEBUG && TIME_ANALYSE                    
+                    analyzer->start_segment("World update" + name);
+#endif
                     this->world_update_queue.enqueue(std::move(world_update_cloud));
-                    world_update_cloud = std::make_unique<octomap::Pointcloud>(); // #CanBeOptimize
-                    world_update_cloud->reserve(WORLD_BATCH_SIZE);
+                    world_update_cloud = std::make_unique<VoxbloxBatch>(); // #CanBeOptimize
+                    world_update_cloud->points.reserve(WORLD_BATCH_SIZE);
+                    world_update_cloud->transfrom = voxblox_tf_world.value();
+#if DEBUG && TIME_ANALYSE
+                    analyzer->stop_segment("World update" + name);
+#endif
                 }
-                world_update_cloud->push_back(world_point.x(), world_point.y(), world_point.z());
+                world_update_cloud->points.push_back(raw_point.cast<voxblox::FloatingPoint>());
             }
         }
 
@@ -170,7 +192,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         if(hazard_cloud != nullptr && hazard_cloud->size() > 0) this->hazard_point_queue.enqueue(std::move(hazard_cloud));
         this->hazard_point_queue.enqueue(nullptr);
         if(world_update && !this->done_world_update) {
-            if(world_update_cloud != nullptr && world_update_cloud->size() > 0) this->world_update_queue.enqueue(std::move(world_update_cloud));   
+            if(world_update_cloud != nullptr && world_update_cloud->points.size() > 0) this->world_update_queue.enqueue(std::move(world_update_cloud));   
             this->world_update_queue.enqueue(nullptr);
             this->done_world_update = true;
         }
@@ -184,7 +206,10 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 alpha_brain::HazardPointThread::HazardPointThread(
     rclcpp::Node* theNode,
     const int num_worker
-) : theNode(theNode), num_worker(num_worker), origin(0.0f, 0.0f, 0.0f) {
+) : 
+    theNode(theNode), 
+    num_worker(num_worker) 
+{
     // Create Publisher
     this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VectorFieldHistogram>(
         Topic::VFH_HAZARD_SEEING,
@@ -193,8 +218,6 @@ alpha_brain::HazardPointThread::HazardPointThread(
 
     // Init variables
     this->running.store(true);
-
-    analyzer = std::make_unique<time_utils::TimeAnalyzer>(theNode->get_logger(), 300);
 
     // Check sycn
     alpha_msgs::msg::VectorFieldHistogram test_msg;
@@ -220,7 +243,7 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 
 #if DEBUG && TIME_ANALYSE
-        analyzer->printSummary();
+        // theNode->analyzer->printSummary();
 #endif
 }
 
@@ -242,7 +265,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         this->hazard_point_queue.wait_dequeue(batch_cloud);
 
 #if DEBUG && TIME_ANALYSE
-        analyzer->start_segment("Collect Batch Cloud");
+        // theNode->analyzer->start_segment("Collect Batch Cloud");
 #endif
 
         if(!this->running.load(std::memory_order_relaxed)) break;
@@ -294,7 +317,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         }
 
 #if DEBUG && TIME_ANALYSE
-        analyzer->stop_segment("Collect Batch Cloud");
+        // theNode->analyzer->stop_segment("Collect Batch Cloud");
 #endif  
 
     }
@@ -353,7 +376,7 @@ const std::atomic<bool>& alpha_brain::WorldUpdateThread::getStatus() {
     return this->running;
 }
 
-moodycamel::BlockingConcurrentQueue<std::unique_ptr<octomap::Pointcloud>>& alpha_brain::WorldUpdateThread::getQueue() {
+moodycamel::BlockingConcurrentQueue<std::unique_ptr<alpha_brain::VoxbloxBatch>>& alpha_brain::WorldUpdateThread::getQueue() {
     return this->world_update_queue;
 }
 
@@ -361,7 +384,7 @@ void alpha_brain::WorldUpdateThread::doWorldUpdate() {
     this->running.store(false);
     this->world_update_queue.enqueue(nullptr);
     if (this->world_update_thread.joinable()) this->world_update_thread.join();
-    std::unique_ptr<octomap::Pointcloud> flush_batch;
+    std::unique_ptr<VoxbloxBatch> flush_batch;
     while(this->world_update_queue.try_dequeue(flush_batch)){};
 
     this->running.store(true);
@@ -374,7 +397,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
     bool has_data = false;
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
-        std::unique_ptr<octomap::Pointcloud> batch_cloud;
+        std::unique_ptr<VoxbloxBatch> batch_cloud;
         this->world_update_queue.wait_dequeue(batch_cloud);
         if(!this->running.load(std::memory_order_relaxed)) break;
         if(!batch_cloud) {
@@ -385,6 +408,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
 
         has_data = true;
 
+        // TODO put it in voxblox map here
         // I had no idea whether this batch cloud will get push to the existing octomap or make new octomap, so for now the batch cloud just sit here and die
     }
     this->running.store(false);

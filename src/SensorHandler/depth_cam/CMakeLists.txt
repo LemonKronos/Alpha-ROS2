@@ -18,6 +18,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(octomap REQUIRED)
 find_package(voxblox REQUIRED)
 find_package(voxblox_ros REQUIRED)
+find_package(glog REQUIRED) #! Voxblox leaky dependency
 find_package(Eigen3 REQUIRED)
 
 include_directories(include)
@@ -37,7 +38,7 @@ target_include_directories(depth_cam_component PUBLIC
 )
 
 target_link_libraries(depth_cam_component
-  ${OCTOMAP_LIBRARIES}
+  glog::glog #! Voxblox leaky dependency
 )
 
 ament_target_dependencies(depth_cam_component

@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/zsh
 
 ALL_GOOD=1
-ROS_SETUP="/opt/ros/jazzy/setup.bash"
-ROS_LOCAL_SETUP="$HOME/MyCode/Project/Drone/ROS2/install/local_setup.bash"
+ROS_SETUP="/opt/ros/jazzy/setup.zsh"
+ROS_LOCAL_SETUP="$HOME/MyCode/Project/Drone/ROS2/install/local_setup.zsh"
 ROS_PYVENV="$HOME/MyCode/Project/Drone/ROS2/pyvenv/bin/activate"
 
 if [ -f "$ROS_SETUP" ]; then
@@ -30,7 +30,7 @@ fi
 cd $HOME/MyCode/Project/Drone/ROS2
 
 if [ "$ALL_GOOD" -eq 1 ]; then
-    echo $'\033[32m  Setup complete! \033[0m'
+    echo $'\033[32m  Sourcing complete! \033[0m'
 else
-    echo $'\033[31m  Setup incomplete! \033[0m'
+    echo $'\033[31m  Sourcing incomplete! \033[0m'
 fi

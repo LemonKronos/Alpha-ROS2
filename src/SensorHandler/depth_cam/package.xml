@@ -21,7 +21,8 @@
   <depend>octomap</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
-
+  <depend>glog</depend> <!-- Voxblox leaky dependency -->
+  
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
