@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>low_spacial</name>
+  <name>low_spatial</name>
   <version>0.0.1</version>
-  <description>Store Octo map, no color</description>
+  <description>Store a non-environment awared map, no color</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
 
@@ -13,6 +13,9 @@
   <depend>rclcpp_components</depend>
   <depend>alpha_msgs</depend>
   <depend>global_utils</depend>
+  <depend>voxblox</depend>
+  <depend>voxblox_ros</depend>
+  <depend>glog</depend> <!-- Voxblox leaky dependency -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

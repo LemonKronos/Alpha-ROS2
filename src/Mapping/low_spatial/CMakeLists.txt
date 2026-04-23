@@ -1,68 +1,68 @@
 cmake_minimum_required(VERSION 3.8)
-project(low_spacial)
+project(low_spatial)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(alpha_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(global_utils REQUIRED)
-find_package(octomap REQUIRED)
+find_package(alpha_msgs REQUIRED)
+find_package(voxblox REQUIRED)
+find_package(voxblox_ros REQUIRED)
+find_package(glog REQUIRED) #! Voxblox leaky dependency
 find_package(Eigen3 REQUIRED)
 
-include_directories(
-  include
-)
+include_directories(include)
 
 # ####################################### COMPONENT |>
 
-add_library(low_spacial_component SHARED
-  src/low_spacial.cpp
+add_library(low_spatial_component SHARED
+  src/low_spatial.cpp
   src/component.cpp
 )
 
-target_include_directories(low_spacial_component PUBLIC
+target_include_directories(low_spatial_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${OCTOMAP_INCLUDE_DIRS}
 )
 
-target_link_libraries(low_spacial_component
-  ${OCTOMAP_LIBRARIES}
+target_link_libraries(low_spatial_component
+  glog::glog #! Voxblox leaky dependency
 )
 
-ament_target_dependencies(low_spacial_component
+ament_target_dependencies(low_spatial_component
   rclcpp
   rclcpp_components
   global_utils
   alpha_msgs
   Eigen3
-  octomap
+  voxblox
+  voxblox_ros
 )
 
-rclcpp_components_register_nodes(low_spacial_component "alpha_brain::LowSpacialNode")
+rclcpp_components_register_nodes(low_spatial_component "alpha_brain::LowSpatialNode")
 
 # ####################################### EXECUTABLE |>
 
-add_executable(low_spacial
+add_executable(low_spatial
   src/main.cpp
 )
 
-target_link_libraries(low_spacial
-  low_spacial_component
+target_link_libraries(low_spatial
+  low_spatial_component
 )
 
-ament_target_dependencies(low_spacial
+ament_target_dependencies(low_spatial
   rclcpp
   rclcpp_components
 )
 
 install(TARGETS
-  low_spacial_component
-  low_spacial
+  low_spatial_component
+  low_spatial
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

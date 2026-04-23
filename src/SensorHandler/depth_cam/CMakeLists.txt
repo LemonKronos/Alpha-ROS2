@@ -15,7 +15,6 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
-find_package(octomap REQUIRED)
 find_package(voxblox REQUIRED)
 find_package(voxblox_ros REQUIRED)
 find_package(glog REQUIRED) #! Voxblox leaky dependency
@@ -34,7 +33,6 @@ add_library(depth_cam_component SHARED
 target_include_directories(depth_cam_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${OCTOMAP_INCLUDE_DIRS}
 )
 
 target_link_libraries(depth_cam_component
@@ -52,7 +50,6 @@ ament_target_dependencies(depth_cam_component
   tf2_sensor_msgs
   tf2_eigen
   Eigen3
-  octomap
   voxblox
   voxblox_ros
 )
