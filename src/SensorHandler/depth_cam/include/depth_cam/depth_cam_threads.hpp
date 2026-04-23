@@ -22,7 +22,6 @@
 #include "voxblox/core/layer.h"
 #include "voxblox/integrator/tsdf_integrator.h"
 
-
 #define DEBUG 1
 #define TIME_ANALYSE 1
 
@@ -52,12 +51,12 @@ public:
     ProcessingThread(
         const std::string& name,
         rclcpp::Node* theNode,
-        time_utils::TimeAnalyzer* analyzer,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
-        moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue,
+        moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& hazard_point_queue,
         const std::atomic<bool>& world_update,
-        moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>>& world_update_queue
+        moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue,
+        time_utils::TimeAnalyzer* analyzer
     );
     ~ProcessingThread();
     void processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg);
@@ -87,8 +86,8 @@ private:
     std::thread processing_thread;
 
     moodycamel::BlockingConcurrentQueue<sensor_msgs::msg::PointCloud2::SharedPtr> msg_queue;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue; // Send in batch of smaller point cloud
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>>& world_update_queue; // Send in batch of smaler point cloud
+    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& hazard_point_queue; // Send in batch of smaller point cloud
+    moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue; // Send in batch of smaler point cloud
     
     // Methods
     void ConsumerLoop();
@@ -110,7 +109,7 @@ public:
     );
     ~HazardPointThread();
 
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& getQueue();
+    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& getQueue();
 
 private:
     // Publishers
@@ -126,7 +125,7 @@ private:
     std::atomic<bool> running;
     std::thread hazard_point_thread;
 
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>> hazard_point_queue;
+    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>> hazard_point_queue;
 
     // Methods
     void ConsumerLoop();
@@ -144,7 +143,7 @@ public:
     ~WorldUpdateThread();
 
     const std::atomic<bool>& getStatus();
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>>& getQueue();
+    moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& getQueue();
     void doWorldUpdate();
     
 private:
@@ -161,7 +160,7 @@ private:
     std::atomic<bool> running;
     std::thread world_update_thread;
 
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>> world_update_queue;
+    moodycamel::BlockingConcurrentQueue<VoxbloxBatch> world_update_queue;
 
     // Methods
     void ConsumerLoop();

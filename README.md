@@ -1,5 +1,6 @@
 The ReactiveOA is WORKING
 ___
-1. I change the colcon build instead of having `--symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --parallel-workers 8` in each task, I do a `colcon_defaults.yaml` file
-2. Update C_cpp to use `compile_commands.json` instead of include path
-3. Make `scripts/setupROS2Build.sh` for source ROS2 in build bash terminal
+1. Nuke the `compile_commands.json` thing
+2. Add colcon rule `"-DCMAKE_POLICY_DEFAULT_CMP0144=NEW"`
+3. Setup stack-like HEAP allocation for DepthCamNode to avoid chasing pointer
+4. Setup shared header for alpha_brain

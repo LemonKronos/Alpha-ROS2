@@ -25,34 +25,34 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     front_processing_thread = std::make_unique<ProcessingThread>(
         "Front",
         this,
-        analyzer.get(),
         Topic::DEPTH_CAM_FRONT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
         world_update_thread->getStatus(),
-        world_update_thread->getQueue()
+        world_update_thread->getQueue(),
+        analyzer.get()
     );
 
     left_processing_thread = std::make_unique<ProcessingThread>(
         "Left",
         this,
-        analyzer.get(),
         Topic::DEPTH_CAM_LEFT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
         world_update_thread->getStatus(),
-        world_update_thread->getQueue()
+        world_update_thread->getQueue(),
+        analyzer.get()
     );
 
     right_processing_thread = std::make_unique<ProcessingThread>(
         "Right", 
         this,
-        analyzer.get(),
         Topic::DEPTH_CAM_RIGHT_PL,
         tf_buffer,
         hazard_point_thread->getQueue(),
         world_update_thread->getStatus(),
-        world_update_thread->getQueue()
+        world_update_thread->getQueue(),
+        analyzer.get()
     );
 }
 

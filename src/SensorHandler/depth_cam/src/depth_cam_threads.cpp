@@ -5,21 +5,21 @@
 alpha_brain::ProcessingThread::ProcessingThread(
     const std::string& name,
     rclcpp::Node* theNode,
-    time_utils::TimeAnalyzer* analyzer,
     const std::string& topic,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer,
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& hazard_point_queue,
+    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& hazard_point_queue,
     const std::atomic<bool>& world_update,
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<VoxbloxBatch>>& world_update_queue
+    moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue,
+    time_utils::TimeAnalyzer* analyzer
 ) : 
     name(name), 
     theNode(theNode), 
-    analyzer(analyzer),
     topic(topic), 
     tf_buffer(tf_buffer), 
     world_update(world_update), 
     hazard_point_queue(hazard_point_queue), 
-    world_update_queue(world_update_queue) 
+    world_update_queue(world_update_queue),
+    analyzer(analyzer)
 {
     // Create subscriber
     this->depth_cam_SUB = theNode->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -122,13 +122,12 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
         // Prepare intermediate variables>
         bool hazard_exist = false;
-        std::unique_ptr<std::vector<Eigen::Vector3f>> hazard_cloud;
+        std::vector<Eigen::Vector3f> hazard_cloud;
 
-        std::unique_ptr<VoxbloxBatch> world_update_cloud;
+        VoxbloxBatch world_update_cloud;
         if(world_update && !this->done_world_update && voxblox_tf_world.has_value()) {
-            world_update_cloud = std::make_unique<VoxbloxBatch>(); // #CanBeOptimize
-            world_update_cloud->points.reserve(WORLD_BATCH_SIZE);
-            world_update_cloud->transfrom = voxblox_tf_world.value();
+            world_update_cloud.points.reserve(WORLD_BATCH_SIZE);
+            world_update_cloud.transfrom = voxblox_tf_world.value();
         }
 
         sensor_msgs::PointCloud2Iterator<float> itx(*msg, "x");
@@ -156,44 +155,44 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
 
                 // Push into batch
                 if(hazard_exist) {
-                    if(hazard_cloud->size() >= HAZARD_BATCH_SIZE) {
+                    if(hazard_cloud.size() >= HAZARD_BATCH_SIZE) {
                         this->hazard_point_queue.enqueue(std::move(hazard_cloud));
-                        hazard_cloud = std::make_unique<std::vector<Eigen::Vector3f>>(); // #CanBeOptimize
-                        hazard_cloud->reserve(HAZARD_BATCH_SIZE);
+                        hazard_cloud = std::vector<Eigen::Vector3f>(); // #CanBeOptimize
+                        hazard_cloud.reserve(HAZARD_BATCH_SIZE);
                     }
                 }
                 else {
-                    hazard_cloud = std::make_unique<std::vector<Eigen::Vector3f>>(); // #CanBeOptimize
-                    hazard_cloud->reserve(HAZARD_BATCH_SIZE);
+                    hazard_cloud = std::vector<Eigen::Vector3f>(); // #CanBeOptimize
+                    hazard_cloud.reserve(HAZARD_BATCH_SIZE);
                     hazard_exist = true;
                 }
-                hazard_cloud->push_back(spherical_body_point);
+                hazard_cloud.push_back(spherical_body_point);
             }
 
             // For world update
             if(world_update && !this->done_world_update && voxblox_tf_world.has_value()) {
-                if(world_update_cloud->points.size() >= WORLD_BATCH_SIZE) {
+                if(world_update_cloud.points.size() >= WORLD_BATCH_SIZE) {
 #if DEBUG && TIME_ANALYSE                    
-                    analyzer->start_segment("World update" + name);
+                    analyzer->start_segment("World update " + name);
 #endif
                     this->world_update_queue.enqueue(std::move(world_update_cloud));
-                    world_update_cloud = std::make_unique<VoxbloxBatch>(); // #CanBeOptimize
-                    world_update_cloud->points.reserve(WORLD_BATCH_SIZE);
-                    world_update_cloud->transfrom = voxblox_tf_world.value();
+                    world_update_cloud = VoxbloxBatch(); // #CanBeOptimize
+                    world_update_cloud.points.reserve(WORLD_BATCH_SIZE);
+                    world_update_cloud.transfrom = voxblox_tf_world.value();
 #if DEBUG && TIME_ANALYSE
-                    analyzer->stop_segment("World update" + name);
+                    analyzer->stop_segment("World update " + name);
 #endif
                 }
-                world_update_cloud->points.push_back(raw_point.cast<voxblox::FloatingPoint>());
+                world_update_cloud.points.push_back(raw_point.cast<voxblox::FloatingPoint>());
             }
         }
 
         // Flush the left over batch and Send empty batch to indicate end of msg
-        if(hazard_cloud != nullptr && hazard_cloud->size() > 0) this->hazard_point_queue.enqueue(std::move(hazard_cloud));
-        this->hazard_point_queue.enqueue(nullptr);
+        if(hazard_cloud.size() > 0) this->hazard_point_queue.enqueue(std::move(hazard_cloud));
+        this->hazard_point_queue.enqueue(std::vector<Eigen::Vector3f>());
         if(world_update && !this->done_world_update) {
-            if(world_update_cloud != nullptr && world_update_cloud->points.size() > 0) this->world_update_queue.enqueue(std::move(world_update_cloud));   
-            this->world_update_queue.enqueue(nullptr);
+            if(world_update_cloud.points.size() > 0) this->world_update_queue.enqueue(std::move(world_update_cloud));
+            this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
             this->done_world_update = true;
         }
     }
@@ -238,7 +237,7 @@ alpha_brain::HazardPointThread::HazardPointThread(
 
 alpha_brain::HazardPointThread::~HazardPointThread() {
     this->running.store(false);
-    this->hazard_point_queue.enqueue(nullptr);
+    this->hazard_point_queue.enqueue(std::vector<Eigen::Vector3f>());
     if(this->hazard_point_thread.joinable()) this->hazard_point_thread.join();
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 
@@ -247,7 +246,7 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
 #endif
 }
 
-moodycamel::BlockingConcurrentQueue<std::unique_ptr<std::vector<Eigen::Vector3f>>>& alpha_brain::HazardPointThread::getQueue() {
+moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& alpha_brain::HazardPointThread::getQueue() {
     return this->hazard_point_queue;
 }
 
@@ -261,7 +260,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
 
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
-        std::unique_ptr<std::vector<Eigen::Vector3f>> batch_cloud;
+        std::vector<Eigen::Vector3f> batch_cloud;
         this->hazard_point_queue.wait_dequeue(batch_cloud);
 
 #if DEBUG && TIME_ANALYSE
@@ -270,7 +269,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
 
         if(!this->running.load(std::memory_order_relaxed)) break;
 
-        if(batch_cloud == nullptr) {
+        if(batch_cloud.empty()) {
             worker_finished++;
             if(worker_finished >= this->num_worker) {
                 PublishHazardPoint(VFH, math_utils::toCartesian(repulsive_direction));
@@ -283,7 +282,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         }
 
         // Put the batch cloud to VFH #CanBeOptimize maybe try do the repulsive update in here
-        for(const auto &point : *batch_cloud) {
+        for(const auto &point : batch_cloud) {
             // Get scaling
             float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
             float scale_angle = std::min(std::asin(scale_distance), 45*DEGREE);
@@ -367,7 +366,7 @@ alpha_brain::WorldUpdateThread::WorldUpdateThread(
 
 alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
     this->running.store(false);
-    this->world_update_queue.enqueue(nullptr);
+    this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
     if(this->world_update_thread.joinable()) this->world_update_thread.join();
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "World update thread destructor called" RESET);
 }
@@ -376,15 +375,15 @@ const std::atomic<bool>& alpha_brain::WorldUpdateThread::getStatus() {
     return this->running;
 }
 
-moodycamel::BlockingConcurrentQueue<std::unique_ptr<alpha_brain::VoxbloxBatch>>& alpha_brain::WorldUpdateThread::getQueue() {
+moodycamel::BlockingConcurrentQueue<alpha_brain::VoxbloxBatch>& alpha_brain::WorldUpdateThread::getQueue() {
     return this->world_update_queue;
 }
 
 void alpha_brain::WorldUpdateThread::doWorldUpdate() {
     this->running.store(false);
-    this->world_update_queue.enqueue(nullptr);
+    this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
     if (this->world_update_thread.joinable()) this->world_update_thread.join();
-    std::unique_ptr<VoxbloxBatch> flush_batch;
+    VoxbloxBatch flush_batch;
     while(this->world_update_queue.try_dequeue(flush_batch)){};
 
     this->running.store(true);
@@ -397,10 +396,10 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
     bool has_data = false;
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
-        std::unique_ptr<VoxbloxBatch> batch_cloud;
+        VoxbloxBatch batch_cloud;
         this->world_update_queue.wait_dequeue(batch_cloud);
         if(!this->running.load(std::memory_order_relaxed)) break;
-        if(!batch_cloud) {
+        if(batch_cloud.points.empty()) {
             worker_finished++;
             if(worker_finished >= this->num_worker) break;
             else continue;
@@ -409,13 +408,13 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
         has_data = true;
 
         // TODO put it in voxblox map here
-        // I had no idea whether this batch cloud will get push to the existing octomap or make new octomap, so for now the batch cloud just sit here and die
     }
     this->running.store(false);
     if(has_data && worker_finished >= 3) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
     else if(has_data && worker_finished < 3) RCLCPP_WARN(this->theNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
     else RCLCPP_INFO(this->theNode->get_logger(), PINK "Wolrd update empty" RESET);
-    // Thread naturally die here
+
+    // World Update Thread naturally die here
 }
 
 #pragma endregion

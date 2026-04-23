@@ -11,12 +11,15 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(alpha_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(voxblox REQUIRED)
+find_package(voxblox_ros REQUIRED)
 
 # build the library (no main function needed)
 add_library(${PROJECT_NAME}
   src/surrounding.cpp
   src/utils.cpp
   src/system_config.cpp
+  src/alpha_brain.cpp
 )
 
 set_target_properties(global_utils PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -33,6 +36,8 @@ ament_target_dependencies(${PROJECT_NAME}
   std_msgs
   alpha_msgs
   Eigen3
+  voxblox
+  voxblox_ros
 )
 
 # export + install the library
@@ -52,7 +57,7 @@ install(
 
 # export info for other packages
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp std_msgs Eigen3)
+ament_export_dependencies(rclcpp std_msgs Eigen3 voxblox voxblox_ros)
 
 # testing (optional)
 if(BUILD_TESTING)

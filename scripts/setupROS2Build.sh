@@ -30,7 +30,7 @@ fi
 cd $HOME/MyCode/Project/Drone/ROS2
 
 if [ "$ALL_GOOD" -eq 1 ]; then
-    echo $'\033[32m  Sourcing complete! \033[0m'
+    echo $'\033[32m Sourcing complete! \033[0m'
 else
-    echo $'\033[31m  Sourcing incomplete! \033[0m'
+    echo $'\033[31m Sourcing incomplete! \033[0m'
 fi

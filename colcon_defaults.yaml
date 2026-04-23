@@ -1,4 +1,8 @@
 build:
   symlink-install: true
   parallel-workers: 8
-  cmake-args: ["-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", "-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
+  cmake-args: [
+    # "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    "-DCMAKE_POLICY_DEFAULT_CMP0144=NEW",
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  ]
