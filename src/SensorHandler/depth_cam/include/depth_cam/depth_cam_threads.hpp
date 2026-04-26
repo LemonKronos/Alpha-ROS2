@@ -6,7 +6,6 @@
 #include <tf2_ros/buffer.hpp>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
-// #include <octomap/octomap.h>
 
 #include <thread>
 #include <atomic>
@@ -23,9 +22,6 @@
 #include "voxblox/core/layer.h"
 #include "voxblox/integrator/tsdf_integrator.h"
 
-#define DEBUG 1
-#define TIME_ANALYSE 1
-
 #ifndef DEBUG
     #define DEBUG 0
 #endif
@@ -37,8 +33,8 @@
 
 namespace alpha_brain {
 
-constexpr int HAZARD_BATCH_SIZE = 128; // #CanBeOptimize
-constexpr int WORLD_BATCH_SIZE = 512;
+constexpr int HAZARD_BATCH_SIZE = 512; // #NeedTuning
+constexpr int WORLD_BATCH_SIZE = 4096;
 
 using std::placeholders::_1;
 
@@ -47,6 +43,7 @@ struct VoxbloxBatch {
     voxblox::Transformation transfrom;
 };
 
+// Handle the depth camera sensors
 class ProcessingThread {
 public:
     ProcessingThread(
@@ -139,7 +136,8 @@ class WorldUpdateThread {
 public:
     WorldUpdateThread(
         rclcpp::Node* theNode,
-        const int num_worker
+        const int num_worker,
+        time_utils::TimeAnalyzer* analyzer
     );
     ~WorldUpdateThread();
 
@@ -159,6 +157,7 @@ private:
     const int num_worker;
 
     std::atomic<bool> running;
+    std::atomic<bool> world_update;
     std::thread world_update_thread;
 
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch> world_update_queue;
@@ -168,6 +167,9 @@ private:
 
     // Methods
     void ConsumerLoop();
+
+    // debugs
+    time_utils::TimeAnalyzer* analyzer;
 };
 
 } // namespace alpha_brain

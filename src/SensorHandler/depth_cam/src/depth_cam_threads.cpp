@@ -1,5 +1,7 @@
 #include "depth_cam/depth_cam_threads.hpp"
 
+#define FLOW (DEBUG & 0)
+
 #pragma region ProcessingThread class
 
 alpha_brain::ProcessingThread::ProcessingThread(
@@ -36,14 +38,20 @@ alpha_brain::ProcessingThread::ProcessingThread(
 
     // Spawn thread
     this->processing_thread = std::thread(&ProcessingThread::ConsumerLoop, this);
+
+#if FLOW
     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn worker %s processing thread" RESET, this->name.c_str());
+#endif
 }
 
 alpha_brain::ProcessingThread::~ProcessingThread() {
     this->running.store(false);
     this->msg_queue.enqueue(nullptr);
     if(this->processing_thread.joinable()) this->processing_thread.join();
+
+#if FLOW
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "%s processing thread destructor called" RESET, this->name.c_str());
+#endif
 }
 
 void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg) {
@@ -96,7 +104,9 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         // Lookup world frame
         std::optional<voxblox::Transformation> voxblox_tf_world;
         if(world_update && !this->done_world_update) {
-            RCLCPP_INFO(this->theNode->get_logger(), YELLOW "%s thread called world update" RESET, this->name.c_str());
+#if FLOW
+            RCLCPP_INFO(this->theNode->get_logger(), YELLOW "%s thread send world update" RESET, this->name.c_str());
+#endif            
             try {
                 geometry_msgs::msg::TransformStamped tf_world = this->tf_buffer->lookupTransform(
                     "world",
@@ -112,8 +122,6 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                     voxblox::Rotation(rotate.w, rotate.x, rotate.y, rotate.z),
                     voxblox::Point(translate.x, translate.y, translate.z)
                 );
-
-                RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera DYNAMIC tf lookup complete" RESET, this->name.c_str());
             }
             catch(const tf2::TransformException& ex) {
                 RCLCPP_WARN(this->theNode->get_logger(), RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
@@ -147,7 +155,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             bool z_cliped = (Drone::MIN_Z < body_point.z() && body_point.z() < Drone::MAX_Z);
             if(x_cliped && y_cliped && z_cliped) continue;
 
-            // For hazard point
+            //_ For hazard point
             // hazard_distance_sq = 400.0f; //#TEST
             if(body_point.squaredNorm() <= hazard_distance_sq) {
                 // Convert to spherical coordinate
@@ -169,19 +177,13 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                 hazard_cloud.push_back(spherical_body_point);
             }
 
-            // For world update
+            //_ For world update
             if(world_update && !this->done_world_update && voxblox_tf_world.has_value()) {
                 if(world_update_cloud.points.size() >= WORLD_BATCH_SIZE) {
-#if DEBUG && TIME_ANALYSE                    
-                    analyzer->start_segment("World update " + name);
-#endif
                     this->world_update_queue.enqueue(std::move(world_update_cloud));
                     world_update_cloud = VoxbloxBatch(); // #CanBeOptimize
                     world_update_cloud.points.reserve(WORLD_BATCH_SIZE);
                     world_update_cloud.transfrom = voxblox_tf_world.value();
-#if DEBUG && TIME_ANALYSE
-                    analyzer->stop_segment("World update " + name);
-#endif
                 }
                 world_update_cloud.points.push_back(raw_point.cast<voxblox::FloatingPoint>());
             }
@@ -232,14 +234,20 @@ alpha_brain::HazardPointThread::HazardPointThread(
 
     // Spawn persistent thread
     this->hazard_point_thread = std::thread(&HazardPointThread::ConsumerLoop, this);
+
+#if FLOW    
     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn Consumer thread Hazard Point" RESET);
+#endif    
 }
 
 alpha_brain::HazardPointThread::~HazardPointThread() {
     this->running.store(false);
     this->hazard_point_queue.enqueue(std::vector<Eigen::Vector3f>());
     if(this->hazard_point_thread.joinable()) this->hazard_point_thread.join();
+
+#if FLOW    
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
+#endif    
 
 #if DEBUG && TIME_ANALYSE
         // theNode->analyzer->printSummary();
@@ -343,7 +351,6 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
     msg.header.frame_id = this->base_link.get();
     msg.header.stamp = this->theNode->get_clock()->now();
     this->hazard_voxel_PUB->publish(msg);
-    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Hazard VFH show occupied %d cells" RESET, VFH.count());
 }
 
 #pragma endregion
@@ -352,27 +359,43 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
 
 alpha_brain::WorldUpdateThread::WorldUpdateThread(
     rclcpp::Node* theNode,
-    const int num_worker
-) : theNode(theNode), num_worker(num_worker) {
+    const int num_worker,
+    time_utils::TimeAnalyzer* analyzer
+) : 
+    theNode(theNode), 
+    num_worker(num_worker),
+    analyzer(analyzer)
+{
     // Init variables
-    this->running.store(false);
-
+    this->running.store(true);
+    this->world_update.store(false);
+    
     // Create wall timer
     world_update_TIME = this->theNode->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_SLOW_NANOSEC),
         std::bind(&alpha_brain::WorldUpdateThread::doWorldUpdate, this)
     );
+
+    // Spawn persistent thread
+    this->world_update_thread = std::thread(&WorldUpdateThread::ConsumerLoop, this);
+
+    #if FLOW
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn Consumer thread World Update" RESET);
+    #endif
 }
 
 alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
     this->running.store(false);
     this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
     if(this->world_update_thread.joinable()) this->world_update_thread.join();
+
+    #if FLOW    
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "World update thread destructor called" RESET);
+    #endif    
 }
 
 const std::atomic<bool>& alpha_brain::WorldUpdateThread::getStatus() {
-    return this->running;
+    return this->world_update;
 }
 
 moodycamel::BlockingConcurrentQueue<alpha_brain::VoxbloxBatch>& alpha_brain::WorldUpdateThread::getQueue() {
@@ -380,73 +403,115 @@ moodycamel::BlockingConcurrentQueue<alpha_brain::VoxbloxBatch>& alpha_brain::Wor
 }
 
 void alpha_brain::WorldUpdateThread::doWorldUpdate() {
-    this->running.store(false);
-    this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
-    if (this->world_update_thread.joinable()) this->world_update_thread.join();
-    VoxbloxBatch flush_batch;
-    while(this->world_update_queue.try_dequeue(flush_batch)){};
+    this->world_update.store(true);
 
-    this->running.store(true);
-    this->world_update_thread = std::thread(&WorldUpdateThread::ConsumerLoop, this);
-    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn Consumer thread World Update" RESET);
+    #if TIME_ANALYSE
+    this->analyzer->start_segment("World update");
+    #endif
+
+    #if FLOW    
+    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Start world update" RESET);
+    #endif    
 }
 
 void alpha_brain::WorldUpdateThread::ConsumerLoop() {
     uint8_t worker_finished = 0;
+    #if FLOW
     bool has_data = false;
+    int count = 0;
+    #endif
+
+    // Thread loop
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
         VoxbloxBatch batch_cloud;
         this->world_update_queue.wait_dequeue(batch_cloud);
+
+        // Check stop thread condition
         if(!this->running.load(std::memory_order_relaxed)) break;
+
+        // Flush batch if not currently in world_update
+        if(!this->world_update.load(std::memory_order_relaxed)) {
+            #if FLOW            
+            RCLCPP_INFO(this->theNode->get_logger(), GRAY "Flush %d points" RESET, batch_cloud.points.size());
+            #endif            
+            continue;
+        }
+
+        // Receive valid batch
+        #if FLOW
+        RCLCPP_INFO(this->theNode->get_logger(), GRAY "Receive batch with %d points" RESET, batch_cloud.points.size());
+        count += batch_cloud.points.size();
+        #endif        
+
         if(batch_cloud.points.empty()) {
             worker_finished++;
-            if(worker_finished >= this->num_worker) break;
+            #if FLOW            
+            RCLCPP_INFO(this->theNode->get_logger(), GRAY "%d worker_finished, got %d points" RESET, worker_finished, count);
+            #endif
+
+            // Received all batch
+            if(worker_finished >= this->num_worker) {
+                this->world_update.store(false);
+
+                #if TIME_ANALYSE
+                this->analyzer->stop_segment("World update");
+                #endif
+
+                #if FLOW    
+                RCLCPP_INFO(this->theNode->get_logger(), GRAY "Added %d points" RESET, count);
+                if(has_data && worker_finished == this->num_worker) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
+                else if(has_data && worker_finished > this->num_worker) RCLCPP_WARN(this->theNode->get_logger(), YELLOW "Wolrd update overloaded" RESET);
+                else RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update empty" RESET);
+                count = 0;
+                has_data = false;
+                #endif
+
+                worker_finished = 0;
+            }
             else continue;
         }
 
+        #if FLOW
         has_data = true;
+        #endif        
 
         // Put new scan to voxblox map
         {
-            // 1. Lock the global map (Wait for AcrobaticOA to finish reading)
+            // Mutex lock
             std::unique_lock lock(alpha_brain::global_map.mutex);
 
-            // 2. Check if LowSpatial has allocated the memory yet
+            // Check if map exist
             if(alpha_brain::global_map.tsdf_layer) {
                 
-                // 3. Lazy-Load: Boot the integrator the very first time we see the map
+                // Lazy init intergrator (once)
                 if(!this->tsdf_integrator) {
                     this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
                         alpha_brain::global_map.config, 
                         alpha_brain::global_map.tsdf_layer.get()
                     );
-                    RCLCPP_INFO(this->theNode->get_logger(), "DepthCam: Integrator locked onto shared map!");
+                    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map!" RESET);
                 }
 
-                // 4. Create a dummy gray color array to satisfy the Voxblox API
+                // Dummy gray color for voxblox API
                 voxblox::Colors empty_colors(batch_cloud.points.size(), voxblox::Color(128, 128, 128));
 
-                // 5. Fire the points into the RAM!
+                // Intergrate batch pointcloud to the map
                 this->tsdf_integrator->integratePointCloud(
                     batch_cloud.transfrom, 
                     batch_cloud.points, 
                     empty_colors
                 );
-
             }
             else {
-                // If we get a frame before LowSpatial boots, just drop it and warn
-                RCLCPP_WARN(this->theNode->get_logger(), "DepthCam: Dropping scan, map memory not hot yet.");
+                RCLCPP_WARN(this->theNode->get_logger(), RED "Dropping scan, map memory not ready yet." RESET);
             }
-        } // Mutex naturally release here
-    }
-    this->running.store(false);
-    if(has_data && worker_finished >= 3) RCLCPP_INFO(this->theNode->get_logger(), GREEN "Wolrd update complete" RESET);
-    else if(has_data && worker_finished < 3) RCLCPP_WARN(this->theNode->get_logger(), YELLOW "Wolrd update incomplete" RESET);
-    else RCLCPP_INFO(this->theNode->get_logger(), PINK "Wolrd update empty" RESET);
+        }
+    } // Thread loop back
 
-    // World Update Thread naturally die here
+    #if FLOW
+    if(this->running.load(std::memory_order_relaxed)) RCLCPP_ERROR(this->theNode->get_logger(), RED "World Update Thread die unaturally!" RESET);
+    #endif    
 }
 
 #pragma endregion

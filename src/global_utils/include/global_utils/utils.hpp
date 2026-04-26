@@ -24,6 +24,7 @@
 #define BLUE    "\033[34m"
 #define PINK    "\033[35m"
 #define TEAL    "\033[36m"
+#define GRAY    "\033[90m"
 #define RESET   "\033[0m"
 
 /* ######################################## Constances */
@@ -314,14 +315,14 @@ namespace time_utils {
         void printSummary() {
             std::lock_guard<std::mutex> lock(mtx_);
             std::stringstream ss;
-            ss  << "\n====================== COMPUTE PROFILER SUMMARY (us) ======================\n"
+            ss  << "\n======================= COMPUTE PROFILER SUMMARY (us) ========================\n"
                 << std::left << std::setw(20) << "Tag" 
                 << std::right << std::setw(12) << "Avg" 
                 << std::setw(12) << "Med" 
                 << std::setw(12) << "Min" 
                 << std::setw(12) << "Max" 
                 << std::setw(10) << "Samples" << "\n"
-                << "----------------------------------------------------------------------\n";
+                <<   "------------------------------------------------------------------------------\n";
 
             for (auto& [tag, d] : data_) {
                 if (d.count == 0) continue;
@@ -349,7 +350,7 @@ namespace time_utils {
                     << std::setw(12) << d.max_time 
                     << std::setw(10) << d.count << "\n";
             }
-            ss << "======================================================================\n";
+            ss << "==============================================================================\n";
             RCLCPP_INFO_STREAM(logger, ss.str());
         }
     };

@@ -16,6 +16,19 @@
             "MIMode": "gdb",
             "stopAtEntry": false,
             "preLaunchTask": "Build ROS2 single Node Only"
+        },
+        {
+            "name": "Debug ROS2 Container",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/opt/ros/jazzy/lib/rclcpp_components/component_container_mt",
+            "args": [
+                "--ros-args", 
+                "-r", "__node:=${input:containerName}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "stopAtEntry": false
         }
     ],
     "inputs": [
@@ -30,6 +43,12 @@
             "type": "promptString",
             "description": "Enter ROS2 executable name",
             "default": "finalize_control"
+        },
+        {
+            "id": "containerName",
+            "type": "promptString",
+            "description": "Enter the name for the ROS 2 container:",
+            "default": "alpha_brain"
         }
     ]
 }

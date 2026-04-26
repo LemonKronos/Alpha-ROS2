@@ -1,0 +1,5 @@
+low_spatial:
+  ros__parameters:
+    voxel_resolution: 0.25
+    truncation_distance: 1.0
+    max_weight: 10000.0

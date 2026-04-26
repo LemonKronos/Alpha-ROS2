@@ -8,7 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include "global_utils/utils.hpp"
 
-// ################################# SYSTEM CONFIG
+//_                                   SYSTEM CONFIG
 
 #define VISUALIZE true
 #define DO_REACTIVE_OA true
@@ -23,7 +23,7 @@ namespace Clock {
     constexpr float LOOP_RATE_FAST = 1.0f / LOOP_CYCLE_FAST;
     constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_FAST * 1e9);
 
-    constexpr float LOOP_CYCLE_SLOW = 1.997f;
+    constexpr float LOOP_CYCLE_SLOW = 0.1997f;
     constexpr float LOOP_RATE_SLOW = 1.0f / LOOP_CYCLE_SLOW;
     constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_SLOW * 1e9);
 
@@ -33,7 +33,7 @@ namespace Clock {
 
 }
 
-// ################################# SYSTEM PARAMETER
+//_                                   SYSTEM PARAMETER
 
 // Dynamic info: data taken from env, json, yaml, etc ...
 class DynamicInfo {
@@ -151,7 +151,6 @@ namespace Sensor {
     constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
     constexpr float DEPTH_CAM_RANGE = 30.0f;
-    // constexpr float OCTREE_VOXEL_RESOLUTION = 0.5f; //! Decapreted, Use voxblox instead
     constexpr float VOXEL_RESOLUTION = 0.25f;
     constexpr size_t VOXEL_PER_SIDE = 8; // new voxel allocate to chunk of block 8x8x8 = 512 voxels, a 2 m^3 cube
     constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
@@ -169,7 +168,7 @@ namespace Window {
     constexpr const char* OVERVIEW_FPV = "Alpha FPV";
 }
 
-// ################################# FUNCTION
+//_                                   FUNCTION
 namespace Global {
     void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
     

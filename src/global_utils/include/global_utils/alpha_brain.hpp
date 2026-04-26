@@ -10,27 +10,19 @@
 #include "global_utils/system_config.hpp"
 
 namespace alpha_brain {
+
+    // Low Spatial Node shall init and config this
     struct MapState {
-        // The Memory Lock
         std::shared_mutex mutex;
+
+        voxblox::TsdfIntegratorBase::Config config;
 
         // The 3D Voxel Memory
         std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer = nullptr;
 
-        // The Configuration (Compile-Time Defaults)
-        voxblox::TsdfIntegratorBase::Config config;
-
-        // You can add a constructor here to force compile-time initialization
-        // of specific Voxblox settings!
-        MapState() {
-            // These compile directly into the binary
-            //! Dynamic these value
-            config.default_truncation_distance = Sensor::VOXEL_TRUNCATION_DISTANCE; 
-            config.max_weight = Sensor::VOXEL_MAX_WEIGHT;
-            config.voxel_carving_enabled = true;
-        }
     };
 
+    // Inline in alpha_brain container shared memory
     inline MapState global_map;
 
 } // namespace alpha_brain

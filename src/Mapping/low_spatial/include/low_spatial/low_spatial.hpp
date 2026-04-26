@@ -2,6 +2,7 @@
 
 #include <voxblox/core/layer.h>
 #include <voxblox/core/voxel.h>
+#include "voxblox/integrator/tsdf_integrator.h"
 
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"

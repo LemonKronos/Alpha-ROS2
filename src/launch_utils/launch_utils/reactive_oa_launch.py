@@ -5,16 +5,12 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    static_tf_path = os.path.join(os.path.dirname(__file__), 'static_tf.py')
-    alpha_brain_path = os.path.join(os.path.dirname(__file__), 'alpha_brain.py')
+    static_tf_path = os.path.join(os.path.dirname(__file__), 'static_tf_launch.py')
+    alpha_brain_path = os.path.join(os.path.dirname(__file__), 'alpha_brain_launch.py')
 
     return LaunchDescription([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(static_tf_path)
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(alpha_brain_path)
-        ),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(static_tf_path)),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(alpha_brain_path)),
         Node(
             package='advance_control',
             executable='advance_control',

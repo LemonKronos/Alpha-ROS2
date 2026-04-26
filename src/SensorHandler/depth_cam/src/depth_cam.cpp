@@ -21,7 +21,7 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger(), 300);
 
     hazard_point_thread = std::make_unique<HazardPointThread>(this, 3);
-    world_update_thread = std::make_unique<WorldUpdateThread>(this, 3);
+    world_update_thread = std::make_unique<WorldUpdateThread>(this, 3, analyzer.get());
     front_processing_thread = std::make_unique<ProcessingThread>(
         "Front",
         this,

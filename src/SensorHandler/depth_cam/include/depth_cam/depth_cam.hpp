@@ -12,7 +12,7 @@
 
 namespace alpha_brain {
 
-#define DEBUG 1
+#define DEBUG 0
 #define TIME_ANALYSE 1
 
 #ifndef DEBUG
@@ -48,7 +48,7 @@ private:
 
     // TODO how to bring this compile time to the threads?
     // Time analyzer
-#if DEBUG && TIME_ANALYSE
+#if TIME_ANALYSE
     std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
 #endif
 
