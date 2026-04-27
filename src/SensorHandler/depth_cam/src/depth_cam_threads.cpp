@@ -212,7 +212,7 @@ alpha_brain::HazardPointThread::HazardPointThread(
     num_worker(num_worker) 
 {
     // Create Publisher
-    this->hazard_voxel_PUB = this->theNode->create_publisher<alpha_msgs::msg::VectorFieldHistogram>(
+    this->seeing_VFH_PUB = this->theNode->create_publisher<alpha_msgs::msg::VectorFieldHistogram>(
         Topic::VFH_HAZARD_SEEING,
         rclcpp::SensorDataQoS()
     );
@@ -293,7 +293,7 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
         for(const auto &point : batch_cloud) {
             // Get scaling
             float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
-            float scale_angle = std::min(std::asin(scale_distance), 45*DEGREE);
+            float scale_angle = std::min(std::asin(scale_distance), 45*DEGREE); // #NeedTuning
             float scale_bin = static_cast<int>(std::ceil(scale_angle / Sensor::VFH_RESOLUTION));
 
             // Get VFH center bin
@@ -350,7 +350,7 @@ void alpha_brain::HazardPointThread::PublishHazardPoint(const std::bitset<Sensor
     // The rest of msg
     msg.header.frame_id = this->base_link.get();
     msg.header.stamp = this->theNode->get_clock()->now();
-    this->hazard_voxel_PUB->publish(msg);
+    this->seeing_VFH_PUB->publish(msg);
 }
 
 #pragma endregion

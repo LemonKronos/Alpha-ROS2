@@ -111,7 +111,7 @@ public:
 
 private:
     // Publishers
-    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr hazard_voxel_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_PUB;
 
     // Data
     rclcpp::Node* theNode;
