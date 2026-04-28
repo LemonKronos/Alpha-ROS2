@@ -46,6 +46,13 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
             rclcpp::SensorDataQoS()
         );
 
+        #if VISUALIZE
+        hazard_voxels_PUB = this->create_publisher<alpha_msgs::msg::VoxelBlock>(
+            "/visualizer/hazard_voxel",
+            rclcpp::SensorDataQoS()
+        );
+        #endif
+
         //_ Subscribers
         perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
             Topic::FUSE_PERCEPTION,
@@ -73,7 +80,7 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
     if(perception_alive_counter > 0) perception_alive_counter--;
     else {
         RCLCPP_WARN(this->get_logger(), RED "Lost perception" RESET);
-        //?! We maybe able to do a fill-execpt seeing here
+        //?! We maybe able to do a fill-execpt seeing here: not allow drone to move backward blindly
         return;
     }
 
@@ -85,6 +92,7 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
 
         if(!tsdf_layer) return;
 
+        hazard_distance = 10.0f; // #TEST
         voxblox::Point min_coord = current_position - voxblox::Point(hazard_distance, hazard_distance, hazard_distance);
         voxblox::Point max_coord = current_position + voxblox::Point(hazard_distance, hazard_distance, hazard_distance);
 
@@ -103,7 +111,7 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
 
                     for(size_t linear_index = 0; linear_index < block_ptr->num_voxels(); ++linear_index) {
                         const voxblox::TsdfVoxel& voxel = block_ptr->getVoxelByLinearIndex(linear_index);
-                        if(voxel.weight < Sensor::VOXEL_MIN_WEIGHT) continue;
+                        if(voxel.weight < Sensor::VOXEL_MIN_WEIGHT || std::abs(voxel.distance) > Sensor::VOXEL_RESOLUTION) continue;
 
                         voxblox::Point voxel_coord = block_ptr->computeCoordinatesFromLinearIndex(linear_index);
                         float dist_to_drone = (voxel_coord - current_position).norm();
@@ -113,6 +121,10 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
             }
         }
     }
+
+    #if VISUALIZE
+    PublishHazardVoxels(hazard_voxels);
+    #endif
 
     std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
     VFH.reset();
@@ -164,3 +176,23 @@ void alpha_brain::LowSpatialNode::PublishMemoryVFH(const std::bitset<Sensor::VFH
     msg.header.stamp = this->get_clock()->now();
     this->memory_VFH_PUB->publish(msg);
 }
+
+#if VISUALIZE
+void alpha_brain::LowSpatialNode::PublishHazardVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels) {
+    alpha_msgs::msg::VoxelBlock msg;
+
+    msg.header.frame_id = "world";
+    msg.header.stamp = this->get_clock()->now();
+    msg.size = hazard_voxels.size();
+    
+    for(auto& voxel : hazard_voxels) {
+        geometry_msgs::msg::Point32 v;
+        v.x = voxel.x();
+        v.y = voxel.y();
+        v.z = voxel.z();
+        msg.point_array.points.push_back(v);
+    }
+
+    hazard_voxels_PUB->publish(msg);
+}
+#endif

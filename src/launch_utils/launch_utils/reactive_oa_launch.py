@@ -88,13 +88,13 @@ def generate_launch_description():
         #     output='screen',
         #     arguments=['--ros-args', '--log-level', 'warn']
         # ),
-        # Node(
-        #     package='hazard_voxels',
-        #     executable='hazard_voxels',
-        #     name='hazard_voxels',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
+        Node(
+            package='hazard_voxels',
+            executable='hazard_voxels',
+            name='hazard_voxels',
+            output='screen',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
         Node(
             package='vfh_sphere',
             executable='vfh_sphere',

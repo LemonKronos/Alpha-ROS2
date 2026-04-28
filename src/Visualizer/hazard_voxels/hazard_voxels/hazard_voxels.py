@@ -22,7 +22,7 @@ class HazardVoxelVisualizer(Node):
         
         self.voxel_sub = self.create_subscription(
             VoxelBlock,
-            Topic.VFH_HAZARD_SEEING,
+            '/visualizer/hazard_voxel',
             self.voxel_callback,
             qos_profile_sensor_data
             
@@ -43,9 +43,9 @@ class HazardVoxelVisualizer(Node):
         marker.action = Marker.ADD
         
         # Hardcoded resolution/scale - adjust this to match your octomap resolution!
-        marker.scale.x = Sensor.OCTREE_VOXEL_RESOLUTION
-        marker.scale.y = Sensor.OCTREE_VOXEL_RESOLUTION
-        marker.scale.z = Sensor.OCTREE_VOXEL_RESOLUTION
+        marker.scale.x = Sensor.VOXEL_RESOLUTION
+        marker.scale.y = Sensor.VOXEL_RESOLUTION
+        marker.scale.z = Sensor.VOXEL_RESOLUTION
         
         # Color: Semi-transparent Orange for hazards
         marker.color.r = 1.0

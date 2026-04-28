@@ -10,6 +10,10 @@
 #include "alpha_msgs/msg/fuse_perception.hpp"
 #include "alpha_msgs/msg/vector_field_histogram.hpp"
 
+#define VISUALIZE 0
+#if VISUALIZE
+#include "alpha_msgs/msg/voxel_block.hpp"
+#endif
 
 namespace alpha_brain {
 
@@ -21,6 +25,10 @@ public:
 private:
     // Publishers
     rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr memory_VFH_PUB;
+
+    #if VISUALIZE
+    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr hazard_voxels_PUB;
+    #endif
 
     // Subscribers
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
@@ -39,6 +47,10 @@ private:
 
     // Methods
     void PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH);
+
+    #if VISUALIZE
+    void PublishHazardVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels);
+    #endif
 
     // Callbacks
     void FusePerceptionCallback(alpha_msgs::msg::FusePerception::SharedPtr msg);
