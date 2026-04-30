@@ -9,27 +9,23 @@
 
 #include <bitset>
 
-#define DEBUG 1
-// #define VISUALIZE 1
-#define TIME_ANALYSE 1
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef VISUALIZE
-    #define VISUALIZE 0
-#endif
-#ifdef VISUALIZE
-    #include <visualization_msgs/msg/marker.hpp>
+#ifndef ALLOW_DEBUG
+    #define ALLOW_DEBUG 0
 #endif
 
 #ifndef DO_REACTIVE_OA
     #define DO_REACTIVE_OA 1
 #endif
 
-#ifndef TIME_ANALYSE
-    #define TIME_ANALYSE 0
+//_ Local define
+#define DEBUG (ALLOW_DEBUG & 1)
+#define VISUALIZE (ALLOW_DEBUG & 1) // vectors
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
+#define FLOW (ALLOW_DEBUG & 0)
+#define VISUAL_VFH (ALLOW_DEBUG & 1) // Total VFH
+
+#ifdef VISUALIZE
+    #include <visualization_msgs/msg/marker.hpp>
 #endif
 
 using std::placeholders::_1;
@@ -41,53 +37,67 @@ public:
 private:
     // Publisher
     rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
-    #ifdef VISUALIZE
+    #if VISUALIZE
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr repulsive_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr correction_vec_PUB;
     #endif
 
+    #if VISUAL_VFH
+    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr total_VFH_PUB;
+    #endif
+
     // Subscriber
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
     rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr memory_VFH_SUB;
 
     // Objects
-    time_utils::TimeAnalyzer analyzer;
+    #if TIME_ANALYSE
+    std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
+    #endif
 
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
     float hazard_distance = Drone::HAZARD_DISTANCE;
 
-    // Variables
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
     bool lost_perception = true;
     uint8_t lost_perception_counter = 0;
     uint8_t has_seeing_vfh_counter = 0;
+    uint8_t has_memory_vfh_counter = 0;
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
-    Eigen::Vector3f repulsive_vec;
+    Eigen::Vector3f seeing_repulsive_vec;
+    Eigen::Vector3f memory_repulsive_vec;
+    Eigen::Vector3f total_repulsive_vec;
     Eigen::Vector3f correction_vec;
     // Eigen::Vector3f control_angular_vec;
     // Eigen::Vector3f movement_angular_vec;
     // Eigen::Vector3f repulsive_angular_vec;
     // Eigen::Vector3f correction_angular_vec;
-
-    std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
+    
+    std::bitset<Sensor::VFH_TOTAL_BINS> seeing_VFH;
+    std::bitset<Sensor::VFH_TOTAL_BINS> memory_VFH;
+    std::bitset<Sensor::VFH_TOTAL_BINS> total_VFH;
 
     // Methods
     void computeControlVector();
     void computeMovementVector();
-    void computeVectorFieldHistogram(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
-    void computeRepulsive(const Eigen::Vector3f& point);
+    void computeRepulsive(Eigen::Vector3f& output_repulsive_vec, const Eigen::Vector3f& point);
     void computeCorrectionVector();
     void resetVectors();
+
+    void parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BINS>& VFH , const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
+    void combineVectorFieldHistogram();
+    void combineRepulsiveVector();
     
-    #ifdef VISUALIZE
+    #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;
         void publishVectorArrow(
             const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
@@ -96,12 +106,17 @@ private:
         );
     #endif
 
+    #if VISUAL_VFH
+    void PublishTotalVFH();
+    #endif
+
     // Timer
     rclcpp::TimerBase::SharedPtr node_loop_TIME;
 
     // Callbacks
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
+    void memoryVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 

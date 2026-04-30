@@ -18,15 +18,13 @@ def generate_launch_description():
         package='low_spatial',
         plugin='alpha_brain::LowSpatialNode',
         name='low_spatial',
-        parameters=[low_spatial_params],
-        # arguments=['--ros-args', '--log-level', 'warn']
+        parameters=[low_spatial_params]
     )
 
     depth_cam_node = ComposableNode(
         package='depth_cam',
         plugin='alpha_brain::DepthCamNode',
-        name='depth_cam',
-        # arguments=['--ros-args', '--log-level', 'warn']
+        name='depth_cam'
     )
 
     alpha_brain_container = ComposableNodeContainer(
@@ -38,6 +36,11 @@ def generate_launch_description():
             low_spatial_node,
             depth_cam_node
         ],
+        # ros_arguments=[
+        #     '--log-level',
+        #     'low_spatial_node:=warn',
+        #     'depth_cam_node:=warn'
+        # ],
         output='screen'
     )
 

@@ -12,7 +12,7 @@ uint8 frame
 # Position
 float32[3] position
 
-# Quaternion x y z w
+# Quaternion wxyz, directly from PX4 standard, same with Eigen
 float32[4] q
 
 # Velocity

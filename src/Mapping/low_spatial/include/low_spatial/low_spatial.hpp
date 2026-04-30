@@ -10,7 +10,16 @@
 #include "alpha_msgs/msg/fuse_perception.hpp"
 #include "alpha_msgs/msg/vector_field_histogram.hpp"
 
-#define VISUALIZE 0
+#ifndef ALLOW_DEBUG
+    #define ALLOW_DEBUG 0
+#endif
+
+//_ Local define
+#define DEBUG (ALLOW_DEBUG & 1)
+#define FLOW (ALLOW_DEBUG & 0)
+#define VISUALIZE (ALLOW_DEBUG & 1) // voxblox local map
+#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+
 #if VISUALIZE
 #include "alpha_msgs/msg/voxel_block.hpp"
 #endif
@@ -41,12 +50,13 @@ private:
 
     uint8_t perception_alive_counter;
     voxblox::Point current_position;
+    voxblox::Transformation frame_transform; // World -> Body
     float hazard_distance;
 
     std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer;
 
     // Methods
-    void PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH);
+    void PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive);
 
     #if VISUALIZE
     void PublishHazardVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels);
@@ -55,6 +65,10 @@ private:
     // Callbacks
     void FusePerceptionCallback(alpha_msgs::msg::FusePerception::SharedPtr msg);
     void UpdateMemoryVFH();
+
+    #if TIME_ANALYSE
+    std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
+    #endif
 
 };
 

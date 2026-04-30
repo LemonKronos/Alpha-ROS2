@@ -103,6 +103,8 @@ class VFHHandler:
             return (1.0, 1.0, 0.0)
         elif name == "memory": # TEAL
             return (0.0, 1.0, 1.0)
+        elif name == "total": # SOFT RED
+            return (0.8, 0.3, 0.3)
 
 
     def timer_callback(self):
@@ -113,7 +115,7 @@ class VFHHandler:
 
             marker = Marker()
             marker.header.stamp = self.node.get_clock().now().to_msg()
-            marker.header.frame_id = getattr(self, 'last_frame_id', 'map') # Fallback to 'map' just in case
+            marker.header.frame_id = getattr(self, 'last_frame_id', 'world') # Fallback to 'world' just in case
             marker.ns = self.name
             marker.id = 0
             marker.type = Marker.CUBE_LIST
@@ -143,6 +145,13 @@ class VFHSphereVisualizer(Node):
             sub_topic=Topic.VFH_HAZARD_MEMORY,
             pub_topic='/visualizer/vfh_memory_markers',
             name='memory'
+        )
+
+        self.total_stream = VFHHandler(
+            node=self,
+            sub_topic="/visualizer/total_vfh",
+            pub_topic='visualize/vfh_total_markers',
+            name='total'
         )
 
         # 3. Setup shared subscribers

@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>reactive_oa</name>
-  <version>0.0.1</version>
+  <version>0.1.0</version>
   <description>AI reactive obstacle avoidance</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
@@ -11,11 +11,12 @@
 
   <depend>rclcpp</depend>
   <depend>alpha_msgs</depend>
-  <depend>depth_cam</depend>
-  <depend>fuse_perception</depend>
   <depend>global_utils</depend>
   <depend>visualization_msgs</depend>
   <depend>osqp_eigen</depend>
+  <depend>depth_cam</depend>
+  <depend>fuse_perception</depend>
+  <depend>low_spatial</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

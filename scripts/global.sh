@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #_ ROS2
-export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]: {message}"
-
+export RCUTILS_COLORIZED_OUTPUT=1
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]"$'\033[30;47m'"{name}"$'\033[0m'": {message}"
 #_ NAME
 export WORLD_NAME="grasslands"
 # export WORLD_NAME="obstacle_tunnel"

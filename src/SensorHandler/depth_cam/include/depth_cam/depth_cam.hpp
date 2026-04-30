@@ -10,18 +10,17 @@
 #include "alpha_msgs/msg/fuse_perception.hpp" 
 #include "depth_cam/depth_cam_threads.hpp"
 
+#ifndef ALLOW_DEBUG
+    #define ALLOW_DEBUG 0
+#endif
+
+//_ Local define
+#define DEBUG (ALLOW_DEBUG & 1)
+#define FLOW (ALLOW_DEBUG & 0)
+#define VISUALIZE (ALLOW_DEBUG & 0)
+#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+
 namespace alpha_brain {
-
-#define DEBUG 0
-#define TIME_ANALYSE 1
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef TIME_ANALYSE
-    #define TIME_ANALYSE 0
-#endif
 
 using std::placeholders::_1;
 

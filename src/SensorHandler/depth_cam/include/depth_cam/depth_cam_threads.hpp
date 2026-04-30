@@ -22,15 +22,6 @@
 #include "voxblox/core/layer.h"
 #include "voxblox/integrator/tsdf_integrator.h"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef TIME_ANALYSE
-    #define TIME_ANALYSE 0
-#endif
-
-
 namespace alpha_brain {
 
 constexpr int HAZARD_BATCH_SIZE = 512; // #NeedTuning

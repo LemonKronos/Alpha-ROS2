@@ -10,7 +10,7 @@
 
 //_                                   SYSTEM CONFIG
 
-#define VISUALIZE true
+#define ALLOW_DEBUG true
 #define DO_REACTIVE_OA true
 
 // Time related settings
@@ -154,8 +154,10 @@ namespace Sensor {
     constexpr float VOXEL_RESOLUTION = 0.5f;
     constexpr size_t VOXEL_PER_SIDE = 8; // new voxel allocate to chunk of block 8x8x8 = 512 voxels, a 2 m^3 cube
     constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
-    constexpr float VOXEL_MIN_WEIGHT = 10.0f;
-    constexpr float VOXEL_MAX_WEIGHT = 10000.0f;
+    constexpr float VOXEL_MIN_WEIGHT = 1.0f;
+    constexpr float VOXEL_MAX_WEIGHT = 100.0f;
+    constexpr bool VOXEL_USE_WEIGHT_DROPOFF = false;
+    // constexpr float VOXEL_DROPOFF_EPSILON_WEIGHT = 15.0f; // Not been put in Low Spatial config
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
     constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
     constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);
@@ -172,16 +174,5 @@ namespace Window {
 //_                                   FUNCTION
 namespace Global {
     void setup_for_simulation(rclcpp::Node *node); // Set up clock sync in simulation
-    
-    // class Info {
-    // private:
-    //     std::string drone_name;
-    //     std::string world_name;
-    // public:
-    //     Info();
-    //     ~Info();
-    //     std::string getDroneName() { return drone_name;};
-    //     std::string getWorldName() { return world_name;};
-    // };
 }
 

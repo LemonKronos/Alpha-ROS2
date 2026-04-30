@@ -1,7 +1,5 @@
 #include "depth_cam/depth_cam_threads.hpp"
 
-#define FLOW (DEBUG & 0)
-
 #pragma region ProcessingThread class
 
 alpha_brain::ProcessingThread::ProcessingThread(
@@ -262,9 +260,8 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
     int worker_finished = 0;
     std::bitset<Sensor::VFH_TOTAL_BINS> VFH;
     VFH.reset();
-    Eigen::Vector3f repulsive_direction;
-    repulsive_direction.setZero();
-    float repulsive_value = FLT_MAX;
+    Eigen::Vector3f repulsive_direction(Eigen::Vector3f::Zero());
+    float repulsive_value = std::numeric_limits<float>::max();
 
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
@@ -289,7 +286,8 @@ void alpha_brain::HazardPointThread::ConsumerLoop() {
             continue;
         }
 
-        // Put the batch cloud to VFH #CanBeOptimize maybe try do the repulsive update in here
+        // Put the batch cloud to VFH 
+        // #CanBeOptimize maybe try do the repulsive update in here
         for(const auto &point : batch_cloud) {
             // Get scaling
             float scale_distance = std::min(1.0f, Drone::HAZARD_DISTANCE / point.z());
