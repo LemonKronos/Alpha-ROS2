@@ -84,6 +84,8 @@ void alpha_brain::LowSpatialNode::FusePerceptionCallback(alpha_msgs::msg::FusePe
 
     hazard_distance = msg->hazard_distance;
 
+    if(std::isnan(msg->position[0]) || std::isnan(msg->position[1]) || std::isnan(msg->position[2])) return;
+    if(std::isnan(msg->q[0]) || std::isnan(msg->q[1]) || std::isnan(msg->q[2]) || std::isnan(msg->q[3])) return;
     current_position = voxblox::Point(msg->position[0], msg->position[1], msg->position[2]);
     voxblox::Rotation current_rotation = voxblox::Rotation(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
 

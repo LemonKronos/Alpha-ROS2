@@ -30,35 +30,35 @@ enum class TunnelState {
 class ObstacleTunnelNode : public rclcpp::Node {
 public:
     ObstacleTunnelNode();
-    ~ObstacleTunnelNode(); // Destructor for cleanup
+    ~ObstacleTunnelNode();
 
 private:
-    // --- Callbacks ---
+    //_ Callbacks
     void perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
     
-    // --- Actions ---
+    //_ Actions
     void manage_slices(float drone_x);
     void execute_soft_reset();
     
     void spawn_slice(int index);
     void delete_slice(int index);
-    void cleanup_all_slices(); // Helper for destructor
+    void cleanup_all_slices();
 
-    // --- Subscriptions ---
+    //_ Subscriptions
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_sub_;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub_;
     
-    // --- Publishers ---
+    //_ Publishers
     rclcpp::Publisher<alpha_msgs::msg::RecordControl>::SharedPtr record_pub_;
 
-    // --- Service Clients ---
+    //_ Service Clients
     rclcpp::Client<ros_gz_interfaces::srv::SpawnEntity>::SharedPtr spawn_client_;
     rclcpp::Client<ros_gz_interfaces::srv::DeleteEntity>::SharedPtr delete_client_;
     rclcpp::Client<ros_gz_interfaces::srv::ControlWorld>::SharedPtr control_world_client_;
     rclcpp::Client<ros_gz_interfaces::srv::SetEntityPose>::SharedPtr set_pose_client_;
 
-    // --- Managers & State ---
+    //_ Managers & State
     std::unique_ptr<ObstacleManager> manager_;
     
     TunnelState current_state_ = TunnelState::RUNNING;

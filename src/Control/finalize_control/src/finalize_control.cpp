@@ -2,9 +2,9 @@
 
 #define ALLOW_ATTITUDE true
 
-FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
-    using namespace std::chrono_literals;
-
+FinalizeControlNode::FinalizeControlNode():
+    rclcpp::Node("finalize_control")
+{
     Global::setup_for_simulation(this);
     
     // Create Subscriber
@@ -51,6 +51,8 @@ FinalizeControlNode::FinalizeControlNode() : rclcpp::Node("finalize_control") {
     landed = true;
     last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     control_state = false;
+    in_hover = false;
+    last_position_PX4 = {0.0f, 0.0f, 0.0f};
     last_q = {1, 0, 0, 0};
     yaw_W = 0;
     current_loop_state = NodeLoopState::INIT;
@@ -63,7 +65,7 @@ FinalizeControlNode::~FinalizeControlNode() {
     PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 1, 1);
 }
 
-/*########################################## Callbacks */
+#pragma region Callbacks
 
 void FinalizeControlNode::FinalCtrlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     last_final_ctrl = msg;
@@ -82,10 +84,11 @@ void FinalizeControlNode::VehicleLandedCallback(const px4_msgs::msg::VehicleLand
 }
 
 void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
+    if(!in_hover) last_position_PX4 = msg->position;
     last_q = frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(msg->q));
 }
 
-/*########################################## FSM */
+#pragma endregion
 
 void FinalizeControlNode::NodeLoopCallback() {
     // Update drone data
@@ -107,7 +110,7 @@ void FinalizeControlNode::NodeLoopCallback() {
             offboard_mode = OffboardMode::ATTITUDE;
         }
         else {
-            if(offboard_mode != OffboardMode::VELOCITY) {
+            if(offboard_mode != OffboardMode::VELOCITY && !in_hover) {
                 RCLCPP_WARN(this->get_logger(), GREEN "Changed mode to VECLOCITY" RESET);
             }
             offboard_mode = OffboardMode::VELOCITY;
@@ -213,20 +216,21 @@ void FinalizeControlNode::NodeLoopCallback() {
     }
 }
 
-/*########################################## Methods */
+#pragma region Methods
 
 void FinalizeControlNode::SendOffboardCmd() {
-    PublishOffboardControlMode();
-
     if(offboard_attitude_counter > 0) PublishAttitudeSetPoint();
     else if(offboard_attitude_counter < OFFBOARD_MODE_CHANGE_THRESHOLD) PublishTrajectorySetpoint();
     else PublishTrajectorySetpoint();
-
+    
+    PublishOffboardControlMode();
+    
     if(loss_final_control_count >= LOSS_FINAL_CONTROL_THRESHOLD) last_final_ctrl = nullptr;
 }
 
 void FinalizeControlNode::PublishOffboardControlMode() {
     auto msg = px4_msgs::msg::OffboardControlMode();
+    if(in_hover) offboard_mode = OffboardMode::POSITION;
     switch(offboard_mode) {
         case OffboardMode::POSITION:
             msg.position = true;
@@ -267,14 +271,23 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         if(last_final_ctrl->up > 0) vz = last_final_ctrl->up * Drone::SPEED_MAX_UP;
         else vz = last_final_ctrl->up * Drone::SPEED_MAX_DOWN;
 
-        msg.position.fill(NO_DATA_f);
-        msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
+        // Hover, keep last positon to avoid drip
+        if(vx == 0 && vy == 0 && vz == 0) {
+            in_hover = true;
+            msg.position = last_position_PX4;
+            msg.velocity = {0.0f, 0.0f, 0.0f};
+        }
+        else {
+            in_hover = false;
+            msg.position.fill(NO_DATA_f);
+            msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
+        }
         msg.yaw = NO_DATA_f;
         msg.yawspeed = -last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
     }
-    else {
-        msg.position.fill(NO_DATA_f);
-        msg.velocity = {0.0f, 0.0f, 0.0f};
+    else { // Hover, keep last position to avoid drip
+        in_hover = true;
+        msg.position = last_position_PX4;
         msg.yaw = NO_DATA_f;
         msg.yawspeed = 0.0f;
     }
@@ -374,3 +387,5 @@ bool FinalizeControlNode::SendForceDisarmCmd() {
     RCLCPP_INFO(this->get_logger(), RED "Force Disarm command sended" RESET);
     return true;
 }
+
+#pragma endregion

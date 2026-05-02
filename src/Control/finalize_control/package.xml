@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>finalize_control</name>
-  <version>0.0.1</version>
+  <version>0.1.0</version>
   <description>Final node before sending setpoint to PX4</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>

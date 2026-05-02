@@ -163,7 +163,7 @@ namespace Sensor {
     constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);
     constexpr int VFH_TOTAL_BINS = VFH_AZIMUTH_BINS * VFH_LATITUDE_BINS;
     constexpr int VFH_MSG_BIT_SIZE = 32;
-    constexpr int VFH_MSG_CHUNK_SIZE = std::ceil(VFH_TOTAL_BINS / VFH_MSG_BIT_SIZE);
+    constexpr int VFH_MSG_CHUNK_SIZE = std::ceil(static_cast<float>(VFH_TOTAL_BINS) / VFH_MSG_BIT_SIZE);
 
 }
 

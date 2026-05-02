@@ -13,7 +13,7 @@ def generate_launch_description():
         # Clock
         {"gz_topic": "/clock", "gz_type": "gz.msgs.Clock", "ros_topic": "/clock", "ros_type": "rosgraph_msgs/msg/Clock"},
         
-        # --- DYNAMIC TRANSFORMS ---
+        #_ DYNAMIC TRANSFORMS
         # {"gz_topic": f"/model/{drone_name}/pose", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf", "ros_type": "tf2_msgs/msg/TFMessage"},
         # {"gz_topic": f"/model/{drone_name}/pose_static", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf_static", "ros_type": "tf2_msgs/msg/TFMessage"},
 
@@ -26,12 +26,12 @@ def generate_launch_description():
         {"gz_topic": "/alpha_depth_cam/left/camera/image/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/depth_cam/left/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
         {"gz_topic": "/alpha_depth_cam/right/camera/image/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/depth_cam/right/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
         
-        # --- EXTRA CAMERAS ---
+        #_ EXTRA CAMERAS
         # {"gz_topic": "/alpha_cam_front/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "/sensor/rgb_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
         # {"gz_topic": "/gimbal/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "sensor/gimbal_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
         {"gz_topic": "/alpha_cam_overview/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "/sensor/overview_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
         
-        # --- DYNAMIC CONTACT SENSORS ---
+        #_ DYNAMIC CONTACT SENSORS
         {"gz_topic": f"/world/{world_name}/model/{drone_name}/link/base_link/sensor/alpha_body_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_body/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
         {"gz_topic": f"/world/{world_name}/model/{drone_name}/link/rotor_0/sensor/alpha_rotor_0_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor0/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
         {"gz_topic": f"/world/{world_name}/model/{drone_name}/link/rotor_1/sensor/alpha_rotor_1_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor1/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},

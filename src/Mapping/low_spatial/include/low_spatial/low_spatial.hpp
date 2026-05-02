@@ -1,7 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 
-#include <voxblox/core/layer.h>
-#include <voxblox/core/voxel.h>
+#include "voxblox/core/layer.h"
+#include "voxblox/core/voxel.h"
 #include "voxblox/integrator/tsdf_integrator.h"
 
 #include "global_utils/system_config.hpp"
@@ -18,7 +18,7 @@
 #define DEBUG (ALLOW_DEBUG & 1)
 #define FLOW (ALLOW_DEBUG & 0)
 #define VISUALIZE (ALLOW_DEBUG & 1) // voxblox local map
-#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
 
 #if VISUALIZE
 #include "alpha_msgs/msg/voxel_block.hpp"

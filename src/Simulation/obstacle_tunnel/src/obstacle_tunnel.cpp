@@ -8,22 +8,22 @@ using std::placeholders::_1;
 using namespace std::chrono_literals;
 
 ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
-    // Parameters
+    //_ Parameters
     manager_ = std::make_unique<ObstacleManager>();
     slice_depth_ = manager_->get_slice_depth();
     
-    // --- GZ Clients ---
+    //_ GZ Clients
     spawn_client_ = this->create_client<ros_gz_interfaces::srv::SpawnEntity>(Service::WORLD_SPAWN);
     delete_client_ = this->create_client<ros_gz_interfaces::srv::DeleteEntity>(Service::WORLD_KILL);
     control_world_client_ = this->create_client<ros_gz_interfaces::srv::ControlWorld>(Service::WORLD_CONTROL);
     set_pose_client_ = this->create_client<ros_gz_interfaces::srv::SetEntityPose>(Service::WORLD_SET_POSE);
 
-    // --- Subscriptions ---
+    //_ Subscriptions
     perception_sub_ = this->create_subscription<alpha_msgs::msg::FusePerception>(
         Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS(), 
         std::bind(&ObstacleTunnelNode::perception_callback, this, _1));
 
-    // PX4 Status (Best Effort)
+    //_ PX4 Status (Best Effort)
     rclcpp::QoS px4_qos(10);
     px4_qos.reliability(rclcpp::ReliabilityPolicy::BestEffort);
     px4_qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
@@ -34,11 +34,11 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
         std::bind(&ObstacleTunnelNode::vehicle_status_callback, this, _1)
     );
 
-    // --- Publishers ---
+    //_ Publishers
     record_pub_ = this->create_publisher<alpha_msgs::msg::RecordControl>(
         Topic::LOGGER_RECORD, 10);
 
-    // --- Shutdown Hook ---
+    //_ Shutdown Hook
     rclcpp::on_shutdown([this]() {
         std::cout << "\n[ObstacleTunnel] Shutdown signal received. Cleaning up tunnel slices...\n";
 
@@ -53,7 +53,7 @@ ObstacleTunnelNode::ObstacleTunnelNode() : Node("obstacle_tunnel") {
 
     RCLCPP_INFO(this->get_logger(), "Tunnel Node Active. Slice Depth: %.2f", slice_depth_);
     
-    // Initial Connection Check
+    //_ Initial Connection Check
     if(control_world_client_->wait_for_service(std::chrono::seconds(5))) {
         // Initial spawn - Safe zone
         spawn_slice(0);
@@ -82,7 +82,7 @@ void ObstacleTunnelNode::cleanup_all_slices() {
 void ObstacleTunnelNode::perception_callback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
     if (current_state_ != TunnelState::RUNNING) return;
 
-    // --- FIX: NaN Protection ---
+    // FIX: NaN Protection
     // If fusion dies or PX4 stops, we receive NaN positions. 
     // Trying to calculate slices with NaN results in undefined indices, causing a wipe.
     if (!std::isfinite(msg->position[0])) {
@@ -147,7 +147,7 @@ void ObstacleTunnelNode::execute_soft_reset() {
         pose_req->entity.name = drone_name.get();
         pose_req->entity.type = 2; // MODEL
         
-        // --- SAFE X CALCULATION (THE SEAM) ---
+        // SAFE X CALCULATION (THE SEAM)
         // Slice N is from [N*depth - depth/2] to [N*depth + depth/2]
         // The SEAM (connection) between current slice and next is at (N + 0.5) * depth
         float current_slice_idx = std::floor(current_drone_x_ / slice_depth_);

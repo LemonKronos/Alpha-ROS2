@@ -18,7 +18,7 @@
 #define DEBUG (ALLOW_DEBUG & 1)
 #define FLOW (ALLOW_DEBUG & 0)
 #define VISUALIZE (ALLOW_DEBUG & 0)
-#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
 
 namespace alpha_brain {
 
@@ -47,9 +47,7 @@ private:
 
     // TODO how to bring this compile time to the threads?
     // Time analyzer
-#if TIME_ANALYSE
     std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
-#endif
 
     // Callbacks
     void FusePerceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);

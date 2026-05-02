@@ -228,7 +228,7 @@ void ReactiveOANode::computeCorrectionVector() {
         constexpr float MOVEMENT_WEIGHT = 2.0f;
         constexpr float CONTROL_X_WEIGHT = 5.0f;
         constexpr float CONTROL_Y_WEIGHT = 1.0f;
-        constexpr float CONTROL_UP_WEIGHT = 80.0f;
+        constexpr float CONTROL_UP_WEIGHT = 50.0f;
         constexpr float CONTROL_DOWN_WEIGHT = 20.0f; 
         float ACCEPTABLE_COST = -0.0f; // Set to 0 or negative for exact best direction.
         

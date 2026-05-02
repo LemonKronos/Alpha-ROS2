@@ -158,7 +158,7 @@
             "type": "pickString",
             "description": "Dude U sure want to re-build full ROS2 workspace?",
             "options": ["Yes", "No"],
-            "default": "Yes"
+            "default": "No"
         },
         {
             "id": "outsourceSub",

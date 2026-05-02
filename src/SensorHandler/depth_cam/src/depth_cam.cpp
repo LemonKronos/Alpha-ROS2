@@ -57,7 +57,7 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
 }
 
 alpha_brain::DepthCamNode::~DepthCamNode() {
-#if DEBUG && TIME_ANALYSE
+#if TIME_ANALYSE
         analyzer->printSummary();
 #endif
 }

@@ -13,8 +13,6 @@
 #include "px4_msgs/msg/vehicle_attitude_setpoint.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 
-#include <algorithm>
-
 constexpr float ATTITUDE_THRESHOLD = 0.01f;
 constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 8;
 constexpr uint8_t OFFBOARD_STREAM_THRESHOLD = 20;
@@ -54,6 +52,8 @@ private:
     bool landed = true;
     uint8_t last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     bool control_state = false;
+    bool in_hover = false;
+    std::array<float, 3> last_position_PX4;
     Eigen::Quaternionf last_q = {1, 0, 0, 0};
     float yaw_W = 0;
 

@@ -247,8 +247,8 @@ alpha_brain::HazardPointThread::~HazardPointThread() {
     RCLCPP_INFO(this->theNode->get_logger(), BLUE "Hazard point thread destructor called" RESET);
 #endif    
 
-#if DEBUG && TIME_ANALYSE
-        // theNode->analyzer->printSummary();
+#if TIME_ANALYSE
+        theNode->analyzer->printSummary();
 #endif
 }
 
