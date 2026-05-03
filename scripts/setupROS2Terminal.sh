@@ -48,8 +48,8 @@ cd $HOME/MyCode/Project/Drone/ROS2
 if [ "$ALL_GOOD" -eq 1 ]; then
     # echo $'\033[32m <| Setup complete! |>\033[0m'
     # clear
-    source $HOME/.config/terminal-tag/ROS2.sh
+    source $HOME/.config/terminal-tag/Alpha-ROS2.sh
 else
     echo $'\033[31m <| Setup incomplete! |>\033[0m'
-    source $HOME/.config/terminal-tag/ROS2-incomplete.sh
+    source $HOME/.config/terminal-tag/Alpha-ROS2-incomplete.sh
 fi
