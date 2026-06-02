@@ -37,6 +37,10 @@ start_micro_xrce_agent() {
   printf "\033[92m[MicroXRCEAgent] Running ...\033[0m\n"
 }
 
+MODEL_POSE="0,0,1"
+if [[ "$WORLD_NAME" == "grasslands" ]]; then
+  MODEL_POSE="0,13,1"
+fi
 start_px4_sitl() {
   kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
 cd ~/MyCode/Project/Drone/PX4-Autopilot &&
@@ -47,7 +51,7 @@ PX4_GZ_WORLD="$WORLD_NAME" \\
 PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=0 \\
-PX4_GZ_MODEL_POSE="0,0,1" \\
+PX4_GZ_MODEL_POSE="$MODEL_POSE" \\
 make px4_sitl "gz_$DRONE_NAME"
 exec zsh
 EOF
