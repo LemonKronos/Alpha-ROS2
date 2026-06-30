@@ -4,6 +4,9 @@ import json
 import threading
 import time
 
+DEFAULT_IP = "0.0.0.0" # Unspecify, listen to all
+DEFAULT_PORT = 8765
+
 # --- SPLIT DATA STRUCTURES ---
 DEFAULT_CONTROL = {
     'control_state': False,
@@ -20,7 +23,7 @@ class WebSocketController:
     Manages WebSocket server with DUAL LOCKING.
     Splits Flight Control data from UI/State data to prevent lock contention.
     """
-    def __init__(self, host="10.57.99.129", port=8765, enable_logging=False):
+    def __init__(self, host=DEFAULT_IP, port=DEFAULT_PORT, enable_logging=False):
         self._host = host
         self._port = port
         self._enable_logging = enable_logging

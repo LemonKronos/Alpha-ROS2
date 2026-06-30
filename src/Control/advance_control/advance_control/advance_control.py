@@ -5,6 +5,8 @@ advance_control.py
 ROS2 node for advance 6 DoF input from a phone through web socket
 """
 import rclpy
+import argparse
+import socket
 import sys
 from rclpy.node import Node
 from rclpy.clock import Clock
@@ -15,8 +17,16 @@ from alpha_msgs.msg import RecordControl
 from alpha_msgs.msg import ControlInterface
 from python_utils.utils import *
 
+# Get machine IP as default
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+DEFAULT_IP = s.getsockname()[0]
+s.close()
+
+DEFAULT_PORT = 8765
+
 class AdvanceControlNode(Node):
-    def __init__(self, debug=False):
+    def __init__(self, debug = False, ip = DEFAULT_IP, port = DEFAULT_PORT):
         super().__init__('advance_control_node')
 
         Global.setup_for_simulation(self)
@@ -28,7 +38,7 @@ class AdvanceControlNode(Node):
         # 2. Start Web Controller
         self.is_connected = False
         self.last_is_connected = False
-        self.web_controller = WebSocketController()
+        self.web_controller = WebSocketController(host=ip, port=port)
         self.web_controller.start()
         
         # 3. Publishers
@@ -44,6 +54,9 @@ class AdvanceControlNode(Node):
         # 5. Timers
         self.timer_control = self.create_timer(Clock.LOOP_CYCLE_FAST, self.timer_control_callback)
         self.timer_realtime = self.create_timer(Clock.LOOP_CYCLE, self.timer_realtime_callback, clock=self.wall_clock)
+
+        self.get_logger().info(f"Control server on {f"{YELLOW}Default{RESET} " if ip is DEFAULT_IP else ''}IP: {GREEN}{ip}{RESET}, {f"{YELLOW}Default{RESET} " if port is DEFAULT_PORT else ''}port: {GREEN}{port}{RESET}")
+        self.get_logger().warn(f"{YELLOW} ⏳ Wating for controller... {RESET}")
 
     def timer_control_callback(self):
         commands = self.web_controller.get_latest_control_cmd()
@@ -118,8 +131,14 @@ class AdvanceControlNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     passed_args = rclpy.utilities.remove_ros_args(args=sys.argv)
-    is_debug = len(passed_args) > 1 and passed_args[1] == 'debug'
-    node = AdvanceControlNode(debug=is_debug)
+
+    parser = argparse.ArgumentParser(description='Advance Control Node')
+    parser.add_argument('--debug', action='store_true', help='Enable debug print')
+    parser.add_argument('--ip', type=str, default=DEFAULT_IP, help='Target IPv4')
+    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Target port number')
+    parser, _ = parser.parse_known_args(passed_args[1:])
+
+    node = AdvanceControlNode(debug=parser.debug, ip=parser.ip, port=parser.port)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
