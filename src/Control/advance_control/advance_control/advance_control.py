@@ -55,7 +55,7 @@ class AdvanceControlNode(Node):
         self.timer_control = self.create_timer(Clock.LOOP_CYCLE_FAST, self.timer_control_callback)
         self.timer_realtime = self.create_timer(Clock.LOOP_CYCLE, self.timer_realtime_callback, clock=self.wall_clock)
 
-        self.get_logger().info(f"Control server on {f"{YELLOW}Default{RESET} " if ip is DEFAULT_IP else ''}IP: {GREEN}{ip}{RESET}, {f"{YELLOW}Default{RESET} " if port is DEFAULT_PORT else ''}port: {GREEN}{port}{RESET}")
+        self.get_logger().warn(f"Control server on {f"{YELLOW}Default{RESET} " if ip is DEFAULT_IP else ''}IP: {GREEN}{ip}{RESET}, {f"{YELLOW}Default{RESET} " if port is DEFAULT_PORT else ''}port: {GREEN}{port}{RESET}")
         self.get_logger().warn(f"{YELLOW} ⏳ Wating for controller... {RESET}")
 
     def timer_control_callback(self):
