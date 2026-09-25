@@ -51,7 +51,7 @@ AddNoobControlNode::AddNoobControlNode(int ep_num)
     // 5. Subscribers
     sub_input_ = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT, 
-        10,
+        rclcpp::SensorDataQoS(),
         std::bind(&AddNoobControlNode::input_callback, this, std::placeholders::_1));
 
     sub_record_ = this->create_subscription<alpha_msgs::msg::RecordControl>(

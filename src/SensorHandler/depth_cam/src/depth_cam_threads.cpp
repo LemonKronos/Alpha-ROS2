@@ -488,7 +488,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
                         alpha_brain::global_map.config, 
                         alpha_brain::global_map.tsdf_layer.get()
                     );
-                    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map!" RESET);
+                    RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map" RESET);
                 }
 
                 // Dummy gray color for voxblox API

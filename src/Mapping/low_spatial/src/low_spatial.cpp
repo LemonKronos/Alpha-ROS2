@@ -42,6 +42,8 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
         frame_transform.setIdentity();
         hazard_distance = Drone::HAZARD_DISTANCE;
 
+        hazard_voxels.reserve(512);
+
         #if TIME_ANALYSE
         analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger());
         #endif
@@ -111,10 +113,8 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
         return;
     }
 
-    // Init storage
-    // #CanBeOptimize
-    std::vector<Eigen::Vector3f> hazard_voxels;
-    hazard_voxels.reserve(512);
+    // Clear storage
+    hazard_voxels.clear();
 
     {// Global map mutex space
         std::shared_lock lock(alpha_brain::global_map.mutex);

@@ -1,47 +1,65 @@
 #include "finalize_control/finalize_control.hpp"
 
-#define ALLOW_ATTITUDE true
-
-FinalizeControlNode::FinalizeControlNode():
+FinalizeControlNode::FinalizeControlNode() :
     rclcpp::Node("finalize_control")
 {
     Global::setup_for_simulation(this);
+
+    //: Callback group
+    timer_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    msg_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    auto msg_group_option = rclcpp::SubscriptionOptions();
+    msg_group_option.callback_group = msg_group;
     
-    // Create Subscriber
-    final_ctrl_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
+    //: Create Subscriber
+    input_control_SUB = this->create_subscription<ControlInterface>(
         Topic::CONTROL_REACTIVE,
-        10,
-        std::bind(&FinalizeControlNode::FinalCtrlCallback, this, _1)
+        rclcpp::SensorDataQoS(),
+        std::bind(&FinalizeControlNode::InputControlCallback, this, _1),
+        msg_group_option
     );
 
-    vehicle_status_SUB = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+    vehicle_status_SUB = this->create_subscription<VehicleStatus>(
         "/fmu/out/vehicle_status_v1",
         rclcpp::SystemDefaultsQoS(),
-        std::bind(&FinalizeControlNode::VehicleStatusCallback, this, _1)
+        std::bind(&FinalizeControlNode::VehicleStatusCallback, this, _1),
+        msg_group_option
     );
 
-    odometry_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
+    vehicle_land_SUB = this->create_subscription<VehicleLandDetected>(
+        "/fmu/out/vehicle_land_detected",
+        rclcpp::SystemDefaultsQoS(),
+        std::bind(&FinalizeControlNode::VehicleLandedCallback, this, _1),
+        msg_group_option
+    );
+
+    odometry_SUB = this->create_subscription<VehicleOdometry>(
         "/fmu/out/vehicle_odometry",
         rclcpp::SensorDataQoS(),
-        std::bind(&FinalizeControlNode::OdometryCallback, this, _1)
+        std::bind(&FinalizeControlNode::OdometryCallback, this, _1),
+        msg_group_option
     );
 
-    // Create Publisher
-    vehicle_cmd_PUB = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+    //: Create Publisher
+    vehicle_cmd_PUB = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
     
-    offboard_ctrl_PUB = this->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
+    offboard_ctrl_PUB = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
     
-    attitude_set_PUB = this->create_publisher<px4_msgs::msg::VehicleAttitudeSetpoint>("/fmu/in/vehicle_attitude_setpoint", 10);
+    attitude_set_PUB = this->create_publisher<VehicleAttitudeSetpoint>("/fmu/in/vehicle_attitude_setpoint", 10);
 
-    trajectory_set_PUB = this->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
+    trajectory_set_PUB = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 
-    // Create wall timer
+    //: Create timer
     node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
-        std::bind(&FinalizeControlNode::NodeLoopCallback, this)
+        std::bind(&FinalizeControlNode::NodeLoopCallback, this),
+        timer_group
     );
 
-    // Set variables
+    //: Set variables
+    latest_input_control = nullptr;
+    input_control = latest_input_control;
     loss_final_control_count = 0;
     offboard_stream_counter = 0;
     offboard_attitude_counter = 0;
@@ -49,54 +67,82 @@ FinalizeControlNode::FinalizeControlNode():
     offboard_state = false;
     in_failure = false;
     landed = true;
-    last_nav_state = px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
+    last_nav_state = VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     control_state = false;
     in_hover = false;
-    last_position_PX4 = {0.0f, 0.0f, 0.0f};
-    last_q = {1, 0, 0, 0};
-    yaw_W = 0;
+    latest_position_NED = {0.0f, 0.0f, 0.0f};
+    position_NED = latest_position_NED;
+    latest_quaternion = {1.0f, 0.0f, 0.0f, 0.0f};
+    quaternion = latest_quaternion;
+    yaw_W = 0.0f;
     current_loop_state = NodeLoopState::INIT;
     just_change_loop_state = true;
+
+    // Test
+#if TIME_ANALYSE
+    analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger(), 800);
+#endif
 }
 
 FinalizeControlNode::~FinalizeControlNode() {
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 5);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 5);
     SendDisarmCmd();
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 1, 1);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 1, 1);
+
+#if TIME_ANALYSE
+    analyzer->printSummary();
+#endif
 }
 
 #pragma region Callbacks
 
-void FinalizeControlNode::FinalCtrlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
-    last_final_ctrl = msg;
+void FinalizeControlNode::InputControlCallback(const ControlInterface::SharedPtr msg) {
+    lock_guard lock(mx_control);
+    latest_input_control = msg;
 }
 
-void FinalizeControlNode::VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg) {
-    arming_state = msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
-    offboard_state = msg->nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD;
+void FinalizeControlNode::VehicleStatusCallback(const VehicleStatus::SharedPtr msg) {
+    arming_state = msg->arming_state == VehicleStatus::ARMING_STATE_ARMED;
+    offboard_state = msg->nav_state == VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     last_nav_state = msg->nav_state;
-    in_failure = msg->failure_detector_status != px4_msgs::msg::VehicleStatus::FAILURE_NONE;
+    in_failure = msg->failure_detector_status != VehicleStatus::FAILURE_NONE;
     // RCLCPP_INFO(this->get_logger(), PINK "current nav_state = %d" RESET, msg->nav_state);
 }
 
-void FinalizeControlNode::VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
+void FinalizeControlNode::VehicleLandedCallback(const VehicleLandDetected::SharedPtr msg) {
     landed = msg->landed;
 }
 
-void FinalizeControlNode::OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
-    if(!in_hover) last_position_PX4 = msg->position;
-    last_q = frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(msg->q));
+void FinalizeControlNode::OdometryCallback(const VehicleOdometry::SharedPtr msg) {
+    lock_guard lock(mx_spatial);
+    if(!in_hover) latest_position_NED = msg->position;
+    latest_quaternion = frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(msg->q));
 }
 
 #pragma endregion
 
 void FinalizeControlNode::NodeLoopCallback() {
-    // Update drone data
-    if(last_final_ctrl != nullptr) {
-        loss_final_control_count = 0;
-        control_state = last_final_ctrl->control_state;
+#if TIME_ANALYSE
+    analyzer->start_segment("Node loop");
+#endif
 
-        if(ALLOW_ATTITUDE && (abs(last_final_ctrl->roll) > ATTITUDE_THRESHOLD || abs(last_final_ctrl->pitch) > ATTITUDE_THRESHOLD)) {
+    // Cache data
+    {
+        lock_guard lock(mx_control);
+        input_control = latest_input_control;
+    }
+    {
+        lock_guard lock(mx_spatial);
+        position_NED = latest_position_NED;
+        quaternion = latest_quaternion;
+    }
+
+    // Update drone data
+    if(input_control != nullptr) {
+        loss_final_control_count = 0;
+        control_state = input_control->control_state;
+
+        if(ALLOW_ATTITUDE && (abs(input_control->roll) > ATTITUDE_THRESHOLD || abs(input_control->pitch) > ATTITUDE_THRESHOLD)) {
             if(offboard_attitude_counter < OFFBOARD_MODE_CHANGE_THRESHOLD) offboard_attitude_counter++;
         }
         else {
@@ -121,7 +167,8 @@ void FinalizeControlNode::NodeLoopCallback() {
         offboard_mode = OffboardMode::VELOCITY;
         offboard_attitude_counter = 0;
     }
-    yaw_W = frame_utils::quaternionToYaw(last_q);
+
+    yaw_W = frame_utils::quaternionToYaw(quaternion);
 
     // Main FSM loop
     switch(current_loop_state) {
@@ -167,23 +214,30 @@ void FinalizeControlNode::NodeLoopCallback() {
         break;
         case NodeLoopState::OFFBOARD:
             if(just_change_loop_state) {
-                PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-                RCLCPP_INFO(this->get_logger(), YELLOW "System have entered offboard" RESET);
+                PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+                RCLCPP_INFO(this->get_logger(), YELLOW "System try to enter offboard" RESET);
                 just_change_loop_state = false;
+                offboard_stream_counter = 0; // Repurposed to lost offboard counter
             }
 
             if(control_state) {
+                SendOffboardCmd();
+
                 if(!arming_state) { // Lost arm
                     current_loop_state = NodeLoopState::INIT;
                     just_change_loop_state = true;
-                    RCLCPP_INFO(this->get_logger(), RED "System have been disarmed, rearm" RESET);
+                    RCLCPP_WARN(this->get_logger(), RED "System have been disarmed, rearm" RESET);
                 }
-                else if(last_nav_state != px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD) { // In RTL
-                    current_loop_state = NodeLoopState::INIT;
-                    just_change_loop_state = true;
-                    RCLCPP_INFO(this->get_logger(), RED "System have leave offboard, restart offboard" RESET);
+                else if(last_nav_state != px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD) {
+                    if(offboard_stream_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) offboard_stream_counter++;
+
+                    if(offboard_stream_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC) { // In Loiter, Return-to-launch
+                        current_loop_state = NodeLoopState::INIT;
+                        offboard_stream_counter = 0;
+                        just_change_loop_state = true;
+                        RCLCPP_INFO(this->get_logger(), RED "System have leave offboard, restart offboard" RESET);
+                    }
                 }
-                else SendOffboardCmd();
             }
             else {
                 current_loop_state = NodeLoopState::DISARM;
@@ -199,8 +253,8 @@ void FinalizeControlNode::NodeLoopCallback() {
                 just_change_loop_state = false;
             }
 
-            PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3);
-            if(arming_state && last_nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND) {
+            PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3);
+            if(arming_state && last_nav_state == VehicleStatus::NAVIGATION_STATE_AUTO_LAND) {
                 SendDisarmCmd();
             }
 
@@ -214,6 +268,10 @@ void FinalizeControlNode::NodeLoopCallback() {
             just_change_loop_state = true;
         break;
     }
+
+#if TIME_ANALYSE
+    analyzer->stop_segment("Node loop");
+#endif
 }
 
 #pragma region Methods
@@ -225,7 +283,7 @@ void FinalizeControlNode::SendOffboardCmd() {
     
     PublishOffboardControlMode();
     
-    if(loss_final_control_count >= LOSS_FINAL_CONTROL_THRESHOLD) last_final_ctrl = nullptr;
+    if(loss_final_control_count >= LOSS_FINAL_CONTROL_THRESHOLD) input_control = nullptr;
 }
 
 void FinalizeControlNode::PublishOffboardControlMode() {
@@ -260,21 +318,21 @@ void FinalizeControlNode::PublishOffboardControlMode() {
 }
 
 void FinalizeControlNode::PublishTrajectorySetpoint() {
-    auto msg = px4_msgs::msg::TrajectorySetpoint();
+    auto msg = TrajectorySetpoint();
 
-    if(last_final_ctrl != nullptr) {
+    if(input_control != nullptr) {
         float vx = 0;
-        if(last_final_ctrl->forward > 0) vx = last_final_ctrl->forward * Drone::SPEED_MAX_FORWARD;
-        else vx = last_final_ctrl->forward * Drone::SPEED_MAX_BACKWARD;
-        float vy = last_final_ctrl->left * Drone::SPEED_MAX_STRAFE;
+        if(input_control->forward > 0) vx = input_control->forward * Drone::SPEED_MAX_FORWARD;
+        else vx = input_control->forward * Drone::SPEED_MAX_BACKWARD;
+        float vy = input_control->left * Drone::SPEED_MAX_STRAFE;
         float vz = 0;
-        if(last_final_ctrl->up > 0) vz = last_final_ctrl->up * Drone::SPEED_MAX_UP;
-        else vz = last_final_ctrl->up * Drone::SPEED_MAX_DOWN;
+        if(input_control->up > 0) vz = input_control->up * Drone::SPEED_MAX_UP;
+        else vz = input_control->up * Drone::SPEED_MAX_DOWN;
 
         // Hover, keep last positon to avoid drip
         if(vx == 0 && vy == 0 && vz == 0) {
             in_hover = true;
-            msg.position = last_position_PX4;
+            msg.position = position_NED;
             msg.velocity = {0.0f, 0.0f, 0.0f};
         }
         else {
@@ -283,11 +341,11 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
             msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
         }
         msg.yaw = NO_DATA_f;
-        msg.yawspeed = -last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
+        msg.yawspeed = -input_control->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
     }
     else { // Hover, keep last position to avoid drip
         in_hover = true;
-        msg.position = last_position_PX4;
+        msg.position = position_NED;
         msg.yaw = NO_DATA_f;
         msg.yawspeed = 0.0f;
     }
@@ -298,33 +356,33 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
 }
 
 void FinalizeControlNode::PublishAttitudeSetPoint() {
-    auto msg = px4_msgs::msg::VehicleAttitudeSetpoint();
+    auto msg = VehicleAttitudeSetpoint();
 
-    if(last_final_ctrl != nullptr) {
+    if(input_control != nullptr) {
         // Body velocity rate to world quaternion
         Eigen::Vector3f omega( // in velocity
-            last_final_ctrl->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
-            last_final_ctrl->pitch * Drone::SPEED_MAX_ANGLE * 8,
-            last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE * 8
+            input_control->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
+            input_control->pitch * Drone::SPEED_MAX_ANGLE * 8,
+            input_control->yaw * Drone::SPEED_MAX_ANGLE * 8
         );
         float angle = omega.norm() * Clock::LOOP_CYCLE_FAST;
         Eigen::Quaternionf dq;
         if(angle > 1e-6f) dq = Eigen::AngleAxisf(angle, omega.normalized());
         else dq = Eigen::Quaternionf::Identity();
-        Eigen::Quaternionf q_new = last_q * dq;
+        Eigen::Quaternionf q_new = quaternion * dq;
         q_new.normalize();
         
         // Compute thrust maintaining world hover
-        Eigen::Vector3f euler = q_new.toRotationMatrix().eulerAngles(0, 1, 2);
-        float roll  = euler.x();
-        float pitch = euler.y();
-        float hover_thrust = Drone::HOVER_THRUST / (cosf(roll) * cosf(pitch));
+        //! This could be wrong
+        float z_projection = 1.0f - 2.0f * (q_new.x() * q_new.x() + q_new.y() * q_new.y());
+        z_projection = std::max(z_projection, 0.01f);
+        float hover_thrust = Drone::HOVER_THRUST / z_projection;
         Eigen::Vector3f hover_body(0.0f, 0.0f, hover_thrust);
         
         Eigen::Vector3f move_body(
             0.0f, // Do not matter in acrobatic control for multicopter
             0.0f,  // Do not matter in acrobatic control for multicopter
-            last_final_ctrl->up // See as throttle in acrobatic control for multicopter
+            input_control->up // See as throttle in acrobatic control for multicopter
         );
         
         Eigen::Vector3f total_thurst = hover_body + move_body;
@@ -332,7 +390,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
-        msg.yaw_sp_move_rate = -last_final_ctrl->yaw * Drone::SPEED_MAX_ANGLE; // Frame FLU to FRD
+        msg.yaw_sp_move_rate = -input_control->yaw * Drone::SPEED_MAX_ANGLE; // Frame FLU to FRD
     }
     else { // Hover still
         // Set body rate to flat, respect current yaw
@@ -351,7 +409,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
 }
 
 void FinalizeControlNode::PublishVehicleCmd(uint16_t command, float param1, float param2, float param3) {
-    auto msg = px4_msgs::msg::VehicleCommand();
+    auto msg = VehicleCommand();
 	msg.param1 = param1;
 	msg.param2 = param2;
     msg.param3 = param3;
@@ -367,14 +425,14 @@ void FinalizeControlNode::PublishVehicleCmd(uint16_t command, float param1, floa
 
 bool FinalizeControlNode::SendArmCmd() {
     if(in_failure) return false;
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
 	RCLCPP_INFO(this->get_logger(), BLUE "Arm command sended" RESET);
     return true;
 }
 
 bool FinalizeControlNode::SendDisarmCmd() {
     if(!landed) return false;
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
 	RCLCPP_INFO(this->get_logger(), RED "Disarm command sended" RESET);
     return true;
 }
@@ -383,7 +441,7 @@ bool FinalizeControlNode::SendForceDisarmCmd() {
     // Command: 400 (VEHICLE_CMD_COMPONENT_ARM_DISARM)
     // Param1: 0.0 (Disarm)
     // Param2: 21196.0 (Force Code)
-    PublishVehicleCmd(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196.0, 0.0);
     RCLCPP_INFO(this->get_logger(), RED "Force Disarm command sended" RESET);
     return true;
 }

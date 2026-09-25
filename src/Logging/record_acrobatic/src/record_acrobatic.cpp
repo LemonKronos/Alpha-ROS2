@@ -33,7 +33,7 @@ RecordAcrobaticNode::RecordAcrobaticNode()
 
     sub_expert_action_ = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
-        qos_reliable,
+        rclcpp::SensorDataQoS(),
         std::bind(&RecordAcrobaticNode::expert_action_callback, this, std::placeholders::_1));
 
     sub_perception_ = this->create_subscription<alpha_msgs::msg::FusePerception>(

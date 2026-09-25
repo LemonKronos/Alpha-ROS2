@@ -7,7 +7,7 @@ ReactiveOANode::ReactiveOANode():
     Global::setup_for_simulation(this);
     
     //_ Publisher
-    final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, 10);
+    final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
@@ -23,7 +23,7 @@ ReactiveOANode::ReactiveOANode():
     //_ Subscriber
     input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
-        10,
+        rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::inputControlCallback, this, _1)
     );
 

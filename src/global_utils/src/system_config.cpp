@@ -105,10 +105,10 @@ void Global::setup_for_simulation(rclcpp::Node *node) {
         } else {
              node->declare_parameter("use_sim_time", true);
         }
-        RCLCPP_WARN(node->get_logger(), YELLOW "Node run using simulation clock!" RESET);
+        RCLCPP_WARN(node->get_logger(), YELLOW "Node run using simulation clock" RESET);
     } else {
         // Default to Realtime if not found
-        RCLCPP_INFO(node->get_logger(), PINK "No simulation clock found, run in realtime" RESET);
+        RCLCPP_INFO(node->get_logger(), YELLOW "No simulation clock found, run in realtime" RESET);
         if (!node->has_parameter("use_sim_time")) {
              node->declare_parameter("use_sim_time", false);
         }
@@ -117,22 +117,3 @@ void Global::setup_for_simulation(rclcpp::Node *node) {
 
 #pragma endregion
 
-// Global::Info::Info() {
-//     // Setup fallback
-//     drone_name = "error_drone_name";
-//     world_name = "error_world_name";
-
-//     // Get info
-//     const char* env_drone = std::getenv("DRONE_NAME");
-//     const char* env_world = std::getenv("WORLD_NAME");
-
-//     // Check null
-//     if(env_drone) drone_name = std::string(env_drone);
-//     if(env_world) world_name = std::string(env_world);
-
-//     // printf(GREEN "Loaded %s in %s" RESET, drone_name.c_str(), world_name.c_str());
-// }
-
-// Global::Info::~Info() {
-//     // Destructor (can stay empty for this)
-// }

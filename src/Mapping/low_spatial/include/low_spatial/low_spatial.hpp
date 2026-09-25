@@ -55,6 +55,9 @@ private:
 
     std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer;
 
+    // Persistent allocation
+    std::vector<Eigen::Vector3f> hazard_voxels;
+
     // Methods
     void PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive);
 

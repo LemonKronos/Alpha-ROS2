@@ -10,6 +10,7 @@ import socket
 import sys
 from rclpy.node import Node
 from rclpy.clock import Clock
+from rclpy.qos import qos_profile_sensor_data
 import rclpy.clock 
 
 from advance_control.web_socket_controller import WebSocketController
@@ -42,7 +43,7 @@ class AdvanceControlNode(Node):
         self.web_controller.start()
         
         # 3. Publishers
-        self.control_interface_PUB = self.create_publisher(ControlInterface, Topic.CONTROL_INPUT, 10)
+        self.control_interface_PUB = self.create_publisher(ControlInterface, Topic.CONTROL_INPUT, qos_profile_sensor_data)
         self.record_control_PUB = self.create_publisher(RecordControl, Topic.LOGGER_RECORD, 10)
         
         # 4. State Tracking

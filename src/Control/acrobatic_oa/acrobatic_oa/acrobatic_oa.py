@@ -10,7 +10,7 @@ if os.path.exists(brain_src_path) and brain_src_path not in sys.path:
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
 from cv_bridge import CvBridge
 
 # ROS Messages
@@ -100,7 +100,7 @@ class BrainNode(Node):
         self.create_subscription(Image, sys_config.DEPTH_CAM_TOPIC, self.cb_depth, qos_sensor)
 
         # Pubs
-        self.pub_control = self.create_publisher(ControlInterface, sys_config.CONTROL_ACROBATIC_TOPIC, qos_reliable)
+        self.pub_control = self.create_publisher(ControlInterface, sys_config.Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         # --- Threads ---
         # 1. Inference Thread (GPU)

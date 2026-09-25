@@ -141,7 +141,7 @@ void FusePerceptionNode::PublishCallback() {
 
     }
     else {
-        if(lost_lidar_down == true) RCLCPP_WARN(this->get_logger(), GREEN "Received lidar scan donw" RESET);
+        if(lost_lidar_down == true) RCLCPP_WARN(this->get_logger(), GREEN "Received lidar scan down" RESET);
         lost_lidar_down = false;
     }
     msg.below_distance = handleScanDown(last_scan_down);
