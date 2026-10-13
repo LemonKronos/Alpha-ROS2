@@ -22,9 +22,9 @@ pkill -x px4 >/dev/null                           # exact binary name
 pkill -x micrortps_agent >/dev/null               # px4 agent name
 pkill -x MicroXRCEAgent >/dev/null                # alternative agent
 
-#_ Gazebo classic processes
-pkill -f "gz sim server" >/dev/null 
-pkill -f "gz sim gui" >/dev/null 
+#_ Gazebo processes
+pkill -INT -f 'gz sim -r .* -s$'  # Server
+pkill -KILL -f '^gz sim -g$'      # Client
 
 #_ ros_gz_bridge parameter bridge
 pkill -f "parameter_bridge" >/dev/null 

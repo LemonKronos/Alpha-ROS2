@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#_ SET UP 
 GLOBAL_ENV="$HOME/MyCode/Project/Drone/ROS2/scripts/global.sh"
 
 if [ -f "$GLOBAL_ENV" ]; then
@@ -11,20 +12,36 @@ fi
 export FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
 export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
 
-# export GAZEBO_HEADLESS="--headless"
-
-# ==========================================
-# Functions
-# ==========================================
-
+#_ GAZEBO SERVER
 start_gazebo() {
   (
-    cd ~/MyCode/Project/Drone/Gazebo 
-    exec rNvidia python3 simulation-gazebo --world "$WORLD_NAME" > /dev/null 2>&1 # rNvidia is a env set for Nvidia GPU on Linux
-  ) & echo $! >> /tmp/sim_pids.txt &&
-  printf "\033[92m[GZ SIM] running...\033[0m\n"
+    cd "$HOME/MyCode/Project/Drone/Gazebo" || exit 1
+    exec rNvidia python3 simulation-gazebo \
+      --world "$WORLD_NAME" --headless
+  ) >/dev/null 2>&1 &
+
+  echo $! >> /tmp/sim_pids.txt
+  printf "\033[92m[GZ SERVER] Running...\033[0m\n"
 }
 
+#_ GAZEBO GUI
+start_gazebo_gui() {
+  (
+    cd "$HOME/MyCode/Project/Drone/Gazebo" || exit 1
+
+    # Wait until the server publishes its simulation clock.
+    until gz topic -l 2>/dev/null | grep -q "/clock"; do
+      sleep 1
+    done
+
+    exec rNvidia python3 simulation-gazebo --gui
+  ) >/dev/null 2>&1 &
+
+  # Intentionally do NOT store the GUI PID.
+  printf "\033[92m[GZ GUI] Launching...\033[0m\n"
+}
+
+#_ MICRO XRCE AGENT
 start_micro_xrce_agent() {
   zsh -c '
     source "$FAST_DDS_SETUP"
@@ -37,6 +54,7 @@ start_micro_xrce_agent() {
   printf "\033[92m[MicroXRCEAgent] Running ...\033[0m\n"
 }
 
+#_ PX4
 MODEL_POSE="0,0,1"
 if [[ "$WORLD_NAME" == "grasslands" ]]; then
   MODEL_POSE="0,13,1"
@@ -59,6 +77,7 @@ EOF
   printf "\033[92m[PX4] Starting with Gazebo in standalone mode...\033[0m\n"
 }
 
+#_ QGROUND CONTROL
 start_qgroundcontrol() {
   zsh -c '
     QGroundControl-x86_64.AppImage > /dev/null 2>&1
@@ -66,6 +85,7 @@ start_qgroundcontrol() {
   printf "\033[92m[QGroundControl] running...\033[0m\n"
 }
 
+#_ ROS2 TERMINAL
 start_ros2_terminal() {
   kitty zsh -c '
     source "$SETUP_ROS2"
@@ -74,6 +94,7 @@ start_ros2_terminal() {
   printf "\033[92m[ROS2 Terminal] running...\033[0m\n"
 }
 
+#_ ROS GZ BRIDGE
 start_gz_ros_bridge() {
   zsh -c '
     source "$SETUP_ROS2"
@@ -82,22 +103,23 @@ start_gz_ros_bridge() {
     until gz topic -l | grep -q "/clock"; do sleep 1; done
 
     ros2 launch launch_utils ros_gz_bridge_launch.py
-  ' & echo $! >> /tmp/sim_pids.txt
+  ' >/dev/null 2>&1 &
+  echo $! >> /tmp/sim_pids.txt
   printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 }
 
+#_ RVIZ2
 start_rviz2() {
   env DISPLAY="$DISPLAY" QT_QPA_PLATFORM=xcb zsh -c '
     source "$SETUP_ROS2"
     rNvidia rviz2
     exec zsh
-  ' & echo $! >> /tmp/sim_pids.txt &&
+  ' >/dev/null 2>&1 &
+  echo $! >> /tmp/sim_pids.txt &&
   printf "\033[92m[Rviz2] running...\033[0m\n"
 }
 
-# ==========================================
-# Main Execution
-# ==========================================
+#_ MAIN FUNCTION
 main() {
   # Clear previous PIDs just in case
   > /tmp/sim_pids.txt
@@ -107,14 +129,16 @@ main() {
   start_gazebo
   start_micro_xrce_agent
   start_px4_sitl
-  start_qgroundcontrol
+  # start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
+  sleep 1
+  start_gazebo_gui
   start_rviz2
 
-  sleep 5
+  sleep 1
   echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat
 }
 
-# Run the script
+#_ Run the script
 main

@@ -25,6 +25,7 @@ private:
     
     // World Control Helper
     void send_pause_command(bool pause);
+    void step_simulation(double time_seconds);
 };
 
 #endif // SIMULATION_CONTROL_HPP_

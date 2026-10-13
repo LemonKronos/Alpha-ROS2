@@ -2,10 +2,11 @@
 
 #: ROS2
 export RCUTILS_COLORIZED_OUTPUT=1
-export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}]"$'\033[30;47m'"{name}"$'\033[0m'": {message}"
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="{date_time_with_ms} [{severity}]—"$'\033[30;47m'"{name}"$'\033[0m'":\n{message}\n"
+
 #: NAME
-# export WORLD_NAME="grasslands"
-export WORLD_NAME="obstacle_tunnel"
+export WORLD_NAME="grasslands"
+# export WORLD_NAME="obstacle_tunnel"
 
 export DRONE_NAME="alpha_minus_1"
 # export DRONE_NAME="alpha_minus_2"

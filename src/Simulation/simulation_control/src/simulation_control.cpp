@@ -50,6 +50,28 @@ void SimulationControlNode::send_pause_command(bool pause) {
     }
 }
 
+void SimulationControlNode::step_simulation(double time_seconds) {
+    if (!client_gz_->service_is_ready()) {
+        RCLCPP_WARN(this->get_logger(), "World control service not ready!");
+        return;
+    }
+
+    auto req = std::make_shared<ros_gz_interfaces::srv::ControlWorld::Request>();
+    
+    uint32_t iterations = static_cast<uint32_t>(time_seconds / Physics::STEP_SIZE);
+
+    // To step, you must assert the step flag and provide the iteration count
+    req->world_control.pause = true; // Ensure simulation remains paused after the step finishes
+    req->world_control.step = true;
+    req->world_control.multi_step = iterations;
+
+    client_gz_->async_send_request(req);
+
+    RCLCPP_INFO(this->get_logger(), 
+                "Command: STEP Simulation for %.3f seconds (%u iterations)", 
+                time_seconds, iterations);
+}
+
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<SimulationControlNode>();

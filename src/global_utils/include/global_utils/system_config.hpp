@@ -15,12 +15,12 @@
 
 // Time related settings
 namespace Clock {
-    constexpr float LOOP_CYCLE = 0.031f;
-    constexpr float LOOP_RATE  = 1.0f / LOOP_CYCLE;
+    constexpr float LOOP_RATE  = 30.0f;
+    constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
     constexpr int64_t LOOP_CYCLE_NANOSEC = static_cast<int64_t>(LOOP_CYCLE * 1e9);
 
-    constexpr float LOOP_CYCLE_FAST = 0.013f;
-    constexpr float LOOP_RATE_FAST = 1.0f / LOOP_CYCLE_FAST;
+    constexpr float LOOP_RATE_FAST = 100.0f;
+    constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
     constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_FAST * 1e9);
 
     constexpr float LOOP_CYCLE_SLOW = 0.1997f;
@@ -165,6 +165,10 @@ namespace Sensor {
     constexpr int VFH_MSG_BIT_SIZE = 32;
     constexpr int VFH_MSG_CHUNK_SIZE = std::ceil(static_cast<float>(VFH_TOTAL_BINS) / VFH_MSG_BIT_SIZE);
 
+}
+
+namespace Physics {
+    constexpr float STEP_SIZE = 0.001f;
 }
 
 namespace Window {
