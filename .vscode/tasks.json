@@ -3,7 +3,7 @@
     "tasks": [
         {"label": "Build ROS2 single Node and it Upstream",
             "type": "shell",
-            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-up-to ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && python3 -m colcon build --allow-overriding ${input:packageName} --packages-up-to ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -27,7 +27,7 @@
         },
         {"label": "Build ROS2 single Node and it Downstream",
             "type": "shell",
-            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-above ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && python3 -m colcon build --allow-overriding ${input:packageName} --packages-above ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -51,7 +51,7 @@
         },
         {"label": "Build ROS2 single Node, it Up and Downstream",
             "type": "shell",
-            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-above-and-dependencies ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && python3 -m colcon build --allow-overriding ${input:packageName} --packages-above-and-dependencies ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -75,7 +75,7 @@
         },
         {"label": "Build ROS2 single Node Only",
             "type": "shell",
-            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && colcon build --allow-overriding ${input:packageName} --packages-select ${input:packageName}",
+            "command": "source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && python3 -m colcon build --allow-overriding ${input:packageName} --packages-select ${input:packageName}",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {
@@ -99,7 +99,7 @@
         },
         {"label": "Build Full ROS2 Workspace",
             "type": "shell",
-            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && ionice -c2 -n7 nice -n 10 colcon build ; else echo \"Cancelled\"; fi",
+            "command": "if [ \"${input:confirmFullBuild}\" = \"Yes\" ]; then source $HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Build.sh && ionice -c2 -n7 nice -n 10 python3 -m colcon build ; else echo \"Cancelled\"; fi",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {

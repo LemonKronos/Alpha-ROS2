@@ -58,7 +58,7 @@ class Topic:
     ROTOR_3_CONTACT = "/sensor/contact_rotor3/contact"
 
     CONTROL_INPUT = "/internal/drone_control/input/control"
-    CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/control"
+    CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"
     CONTROL_REACTIVE = "/internal/drone_control/reactive/control"
     FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
     CONTACT_PARSER = "/internal/sensor/contacts"

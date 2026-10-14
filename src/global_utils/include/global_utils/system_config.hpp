@@ -94,7 +94,7 @@ namespace Topic {
     constexpr const char* ROTOR_3_CONTACT = "/sensor/contact_rotor3/contact";
 
     constexpr const char* CONTROL_INPUT = "/internal/drone_control/input/control"; // By control signal input Node
-    constexpr const char* CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/control"; // By Acrobatic OA Node
+    constexpr const char* CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"; // By Acrobatic OA Node
     constexpr const char* CONTROL_REACTIVE = "/internal/drone_control/reactive/control"; // By Reactive OA Node
     constexpr const char* FUSE_PERCEPTION = "/internal/sensor/fuse_perception"; // Combine perception info from px4 and sensors
     constexpr const char* CONTACT_PARSER = "/internal/sensor/contacts";

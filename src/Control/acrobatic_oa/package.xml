@@ -2,16 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>acrobatic_oa</name>
-  <version>0.0.1</version>
-  <description>Acrobatic obstacle avoidance node</description>
+  <version>0.0.2</version>
+  <description>Acrobatic OA node, wrapper for the AI</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
-
-  <depend>rclpy</depend>
-  <depend>alpha_msgs</depend>
-  <depend>python_utils</depend>
-  <depend>sensor_msgs</depend>
-  <depend>cv_bridge</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
