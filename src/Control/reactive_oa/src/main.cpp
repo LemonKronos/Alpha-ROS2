@@ -3,7 +3,9 @@
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<ReactiveOANode>());
+    rclcpp::NodeOptions options;
+    auto node = std::make_shared<alpha_brain::ReactiveOANode>(options);
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

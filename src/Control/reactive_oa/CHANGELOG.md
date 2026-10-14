@@ -9,3 +9,5 @@ Now allow dodging obstacles inferred from voxblox map
 - Added memory inferred VFH and repulsive vector
 - Allow visualize total VFH
 ___
+# Version 0.1.1
+The node can now run as a Component.

@@ -43,7 +43,7 @@ using sensor_msgs::PointCloud2ConstIterator;
 
 class OmniLidarNode : public rclcpp::Node {
 public:
-    OmniLidarNode(const rclcpp::NodeOptions& options);
+    OmniLidarNode(const rclcpp::NodeOptions &options);
     ~OmniLidarNode();
 
 

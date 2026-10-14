@@ -15,21 +15,45 @@ find_package(Eigen3 REQUIRED)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
-include_directories(
-  include
+include_directories(include)
+
+# ####################################### COMPONENT |>
+
+add_library(reactive_oa_component SHARED
+  src/reactive_oa.cpp
+  src/component.cpp
 )
 
-# Sources
-add_executable(reactive_oa
-  src/main.cpp
-  src/reactive_oa.cpp
-  )
+target_include_directories(reactive_oa_component PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
-ament_target_dependencies(reactive_oa
+ament_target_dependencies(reactive_oa_component
   rclcpp
   alpha_msgs
   global_utils
   visualization_msgs
+  Eigen3
+  osqp
+  OsqpEigen
+)
+
+rclcpp_components_register_nodes(reactive_oa_component "alpha_brain::ReactiveOANode")
+
+# ####################################### EXECUTABLE |>
+
+add_executable(reactive_oa
+  src/main.cpp
+)
+
+target_link_libraries(reactive_oa
+  reactive_oa_component
+)
+
+ament_target_dependencies(reactive_oa
+  rclcpp
+  rclcpp_components
 )
 
 target_link_libraries(reactive_oa
@@ -38,8 +62,11 @@ target_link_libraries(reactive_oa
 )
 
 install(TARGETS
+  reactive_oa_component
   reactive_oa
-  DESTINATION lib/${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/

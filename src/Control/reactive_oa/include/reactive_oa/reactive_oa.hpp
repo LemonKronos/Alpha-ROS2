@@ -30,9 +30,11 @@
 
 using std::placeholders::_1;
 
-class ReactiveOANode : public rclcpp::Node{
+namespace alpha_brain {
+
+class ReactiveOANode : public rclcpp::Node {
 public:
-    ReactiveOANode();
+    ReactiveOANode(const rclcpp::NodeOptions &options);
     ~ReactiveOANode();
 private:
     // Publisher
@@ -121,3 +123,5 @@ private:
     void nodeLoopCallback();
 
 };
+
+} // namespace alpha_brain

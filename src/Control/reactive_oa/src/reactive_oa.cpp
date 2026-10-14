@@ -1,7 +1,7 @@
 #include "reactive_oa/reactive_oa.hpp"
 
-ReactiveOANode::ReactiveOANode():
-    Node("reactive_oa_node")
+alpha_brain::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
+Node("reactive_oa_node", options)
 {
     
     Global::setup_for_simulation(this);
@@ -96,7 +96,7 @@ ReactiveOANode::ReactiveOANode():
     #endif
 }
 
-ReactiveOANode::~ReactiveOANode(){
+alpha_brain::ReactiveOANode::~ReactiveOANode(){
 #if TIME_ANALYSE
     analyzer->printSummary();
 #endif
@@ -157,7 +157,7 @@ float getSpeedScale(const float angle_deg, const float smooth_margin_deg = 20.0f
 
 #pragma region Compute vectors
 
-void ReactiveOANode::computeControlVector() {
+void alpha_brain::ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
         last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
         last_control_signal->left * Drone::SPEED_MAX_STRAFE,
@@ -173,7 +173,7 @@ void ReactiveOANode::computeControlVector() {
     // ); // body frame
 }
 
-void ReactiveOANode::computeMovementVector() {
+void alpha_brain::ReactiveOANode::computeMovementVector() {
     movement_vec = Eigen::Vector3f(
         last_perception->velocity[0],
         last_perception->velocity[1],
@@ -194,7 +194,7 @@ void ReactiveOANode::computeMovementVector() {
     // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
 }
 
-void ReactiveOANode::computeRepulsive(Eigen::Vector3f& output_repulsive_vec, const Eigen::Vector3f& point) {
+void alpha_brain::ReactiveOANode::computeRepulsive(Eigen::Vector3f& output_repulsive_vec, const Eigen::Vector3f& point) {
     // Compute new repulsive vector
     float urgency = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
     urgency = math_utils::linearMap<float>(urgency, 0.0f, 1.0f, 0.0f, 1.0f);
@@ -206,7 +206,7 @@ void ReactiveOANode::computeRepulsive(Eigen::Vector3f& output_repulsive_vec, con
     output_repulsive_vec = new_repulsive_vec * (1.0f - movement_speed_weight) * movement_angular_weight;
 }
 
-void ReactiveOANode::computeCorrectionVector() {
+void alpha_brain::ReactiveOANode::computeCorrectionVector() {
 #if TIME_ANALYSE
     analyzer->start_segment("Compute Correction");
 #endif
@@ -317,7 +317,7 @@ void ReactiveOANode::computeCorrectionVector() {
 #endif
 }
 
-void ReactiveOANode::parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
+void alpha_brain::ReactiveOANode::parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     VFH.reset();
 
     // Extract the VFH
@@ -326,7 +326,7 @@ void ReactiveOANode::parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BIN
     }
 }
 
-void ReactiveOANode::combineVectorFieldHistogram() {
+void alpha_brain::ReactiveOANode::combineVectorFieldHistogram() {
     total_VFH.reset();
     total_VFH = seeing_VFH | memory_VFH;
 
@@ -335,11 +335,11 @@ void ReactiveOANode::combineVectorFieldHistogram() {
     #endif
 }
 
-void ReactiveOANode::combineRepulsiveVector() {
+void alpha_brain::ReactiveOANode::combineRepulsiveVector() {
     total_repulsive_vec = seeing_repulsive_vec + memory_repulsive_vec;
 }
 
-void ReactiveOANode::resetVectors() {
+void alpha_brain::ReactiveOANode::resetVectors() {
     // Reset control signal
     if(lost_control_signal) {
         control_vec.setZero();
@@ -377,7 +377,7 @@ void ReactiveOANode::resetVectors() {
 
 #pragma endregion
 
-void ReactiveOANode::nodeLoopCallback() {
+void alpha_brain::ReactiveOANode::nodeLoopCallback() {
 #if DEBUG && TIME_ANALYSE
     analyzer->start_segment("Main Loop");
 #endif
@@ -463,7 +463,7 @@ void ReactiveOANode::nodeLoopCallback() {
 
 #pragma region Callbacks 
 
-void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg){
+void alpha_brain::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg){
     lost_control_signal = false;
     lost_control_signal_counter = 0;
 
@@ -471,19 +471,19 @@ void ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterfac
     computeControlVector();
 }
 
-void ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
+void alpha_brain::ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     parseVectorFieldHistogram(seeing_VFH, msg);
     computeRepulsive(seeing_repulsive_vec, {msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
-void ReactiveOANode::memoryVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
+void alpha_brain::ReactiveOANode::memoryVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
     has_memory_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
     parseVectorFieldHistogram(memory_VFH, msg);
     computeRepulsive(memory_repulsive_vec, {msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
 }
 
-void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){
+void alpha_brain::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){
     lost_perception_counter = 0;
 
     last_perception = msg;
@@ -494,7 +494,7 @@ void ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::S
 #pragma endregion 
 
 #if VISUALIZE
-void ReactiveOANode::publishVectorArrow(
+void alpha_brain::ReactiveOANode::publishVectorArrow(
     const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
     const Eigen::Vector3f& vec,
     float r, float g, float b) {
@@ -533,7 +533,7 @@ void ReactiveOANode::publishVectorArrow(
 #endif
 
 #if VISUAL_VFH
-void ReactiveOANode::PublishTotalVFH() {
+void alpha_brain::ReactiveOANode::PublishTotalVFH() {
     alpha_msgs::msg::VectorFieldHistogram msg;
 
     // Check if clear
