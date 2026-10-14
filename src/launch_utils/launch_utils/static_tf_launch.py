@@ -33,6 +33,20 @@ DRONE_TF_CONFIGS = {
             'suffix': '/base_link',
             'child_suffix': '/alpha_depth_cam_right'
         },
+        {
+            'name': 'lidar_down_static_tf',
+            'xyz': ['0.2', '0', '0.02'],
+            'quat': ['0', '0.7071', '0', '0.7071'],
+            'suffix': '/base_link',
+            'child_suffix': '/alpha_lidar_down'
+        },
+        {
+            'name': 'alpha_lidar_2d_static_tf',
+            'xyz': ['0', '0', '0.055'],
+            'quat': ['0', '0', '0', '1'],
+            'suffix': '/base_link',
+            'child_suffix': '/alpha_lidar_2d'
+        },
     ],
 
     'alpha_minus_2': [

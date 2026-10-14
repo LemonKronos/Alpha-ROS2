@@ -17,9 +17,12 @@ def generate_launch_description():
         # {"gz_topic": f"/model/{drone_name}/pose", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf", "ros_type": "tf2_msgs/msg/TFMessage"},
         # {"gz_topic": f"/model/{drone_name}/pose_static", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf_static", "ros_type": "tf2_msgs/msg/TFMessage"},
 
-        # Lidar 1d & 2d
-        {"gz_topic": "/alpha_lidar_down/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_1d_down/scan", "ros_type": "sensor_msgs/msg/LaserScan"},
-        {"gz_topic": "/alpha_lidar_2d/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_2d/scan", "ros_type": "sensor_msgs/msg/LaserScan"},
+        # Lidar 1d & 2d as ranges
+        {"gz_topic": "/alpha_lidar_down/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_1d_down/scan", "ros_type": "sensor_msgs/msg/LaserScan"}, #TODO Soon to be deprecated
+        {"gz_topic": "/alpha_lidar_2d/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_2d/scan", "ros_type": "sensor_msgs/msg/LaserScan"}, #TODO Soon to be deprecated
+        # As point clouds
+        {"gz_topic": "/alpha_lidar_down/scan/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/lidar_1d_down/scan/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
+        {"gz_topic": "/alpha_lidar_2d/scan/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/lidar_2d/scan/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
         
         # Depth camera x3
         {"gz_topic": "/alpha_depth_cam/front/camera/image/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/depth_cam/front/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
@@ -45,6 +48,7 @@ def generate_launch_description():
         {"base_name": "create", "type": "ros_gz_interfaces/srv/SpawnEntity"},
         {"base_name": "remove", "type": "ros_gz_interfaces/srv/DeleteEntity"},
         {"base_name": "set_pose", "type": "ros_gz_interfaces/srv/SetEntityPose"},
+        #DEV ADD Twist service here
     ]
 
     bridge_args = []

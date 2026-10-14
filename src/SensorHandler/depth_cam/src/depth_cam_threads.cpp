@@ -65,7 +65,7 @@ void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::Sh
             RCLCPP_INFO(this->theNode->get_logger(), GREEN "%s depth camera STATIC tf lookup complete" RESET, this->name.c_str());
         }
         catch(const tf2::TransformException& ex) {
-            RCLCPP_WARN(this->theNode->get_logger(), RED "%s point clouds msg denied, cause by STATIC tf: %s" RESET, this->name.c_str(), ex.what());
+            RCLCPP_WARN_SKIPFIRST(this->theNode->get_logger(), RED "%s point clouds msg denied, cause by STATIC tf: %s" RESET, this->name.c_str(), ex.what());
             return;
         }
     }
@@ -87,7 +87,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         sensor_msgs::msg::PointCloud2::SharedPtr msg;
         this->msg_queue.wait_dequeue(msg);
         while(this->msg_queue.try_dequeue(msg)) {
-            RCLCPP_WARN(this->theNode->get_logger(), YELLOW "%s flushed a mesage" RESET, this->name.c_str());
+            RCLCPP_WARN_THROTTLE(this->theNode->get_logger(),*this->theNode->get_clock(), 1000, YELLOW "%s flushed a mesage" RESET, this->name.c_str());
         } // FLush to only use latest msg
         if(!this->running.load(std::memory_order_relaxed)) break;
 
@@ -122,7 +122,7 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
                 );
             }
             catch(const tf2::TransformException& ex) {
-                RCLCPP_WARN(this->theNode->get_logger(), RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
+                RCLCPP_WARN_THROTTLE(this->theNode->get_logger(), *this->theNode->get_clock(), 1000, RED "%s transform denied, cause by DYNAMIC tf: %s" RESET, this->name.c_str(), ex.what());
             }
         }
 
@@ -502,7 +502,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
                 );
             }
             else {
-                RCLCPP_WARN(this->theNode->get_logger(), RED "Dropping scan, map memory not ready yet." RESET);
+                RCLCPP_WARN_SKIPFIRST_THROTTLE(this->theNode->get_logger(),*this->theNode->get_clock(), 1000, RED "Dropping scan, map memory not ready yet." RESET);
             }
         }
     } // Thread loop back

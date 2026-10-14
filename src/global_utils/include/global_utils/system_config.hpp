@@ -83,8 +83,10 @@ namespace Topic {
     constexpr const char* DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points";
     constexpr const char* RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image";
     constexpr const char* OVERVIEW_CAM = "/sensor/overview_cam/camera/image";
-    constexpr const char* LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan";
-    constexpr const char* LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan";
+    constexpr const char* LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan"; // Soon to be deprecated
+    constexpr const char* LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan"; // Soon to be deprecated
+    constexpr const char* LIDAR_2D_AROUND_PL = "/sensor/lidar_2d/scan/points";
+    constexpr const char* LIDAR_1D_DOWN_PL = "/sensor/lidar_1d_down/scan/points";
     constexpr const char* BODY_CONTACT = "/sensor/contact_body/contact";
     constexpr const char* ROTOR_0_CONTACT = "/sensor/contact_rotor0/contact";
     constexpr const char* ROTOR_1_CONTACT = "/sensor/contact_rotor1/contact";
@@ -147,10 +149,20 @@ namespace Drone {
 }
 
 namespace Sensor {
+    constexpr float LIDAR_DOWN_RANGE_MIN = 0.1f;
+    constexpr float LIDAR_DOWN_RANGE_MIN_SQ = LIDAR_DOWN_RANGE_MIN * LIDAR_DOWN_RANGE_MIN;
+    constexpr float LIDAR_DOWN_RANGE_MAX = 30.0f;
+    constexpr float LIDAR_DOWN_RANGE_MAX_SQ = LIDAR_DOWN_RANGE_MAX * LIDAR_DOWN_RANGE_MAX;
+
     constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
-    constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
+    constexpr int LIDAR_2D_SIZE = 1440;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
+    constexpr float LIDAR_2D_RANGE_MIN_SQ = LIDAR_2D_RANGE_MIN * LIDAR_2D_RANGE_MIN;
+    constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
+    constexpr float LIDAR_2D_RANGE_MAX_SQ = LIDAR_2D_RANGE_MAX * LIDAR_2D_RANGE_MAX;
+
     constexpr float DEPTH_CAM_RANGE = 30.0f;
+
     constexpr float VOXEL_RESOLUTION = 0.5f;
     constexpr size_t VOXEL_PER_SIDE = 8; // new voxel allocate to chunk of block 8x8x8 = 512 voxels, a 2 m^3 cube
     constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
@@ -158,6 +170,7 @@ namespace Sensor {
     constexpr float VOXEL_MAX_WEIGHT = 100.0f;
     constexpr bool VOXEL_USE_WEIGHT_DROPOFF = false;
     // constexpr float VOXEL_DROPOFF_EPSILON_WEIGHT = 15.0f; // Not been put in Low Spatial config
+
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
     constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
     constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);

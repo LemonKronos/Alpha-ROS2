@@ -27,6 +27,20 @@ def generate_launch_description():
         name='depth_cam'
     )
 
+    omni_lidar_node = ComposableNode(
+        package='omni_lidar',
+        plugin='alpha_brain::OmniLidarNode',
+        name='omni_lidar'
+    )
+
+    #DEV Acrobatic brain go here
+
+    map_visualizer_node = ComposableNode(
+        package='map_visualizer',
+        plugin='alpha_brain::MapVisualizerNode',
+        name='map_visualizer'
+    )
+
     alpha_brain_container = ComposableNodeContainer(
         name='alpha_brain',
         namespace='',
@@ -34,12 +48,15 @@ def generate_launch_description():
         executable='component_container_mt',
         composable_node_descriptions=[
             low_spatial_node,
-            depth_cam_node
+            depth_cam_node,
+            omni_lidar_node,
+            # map_visualizer_node
         ],
         # ros_arguments=[
         #     '--log-level',
         #     'low_spatial_node:=warn',
-        #     'depth_cam_node:=warn'
+        #     'depth_cam_node:=warn',
+        #     'omni_lidar_node:=warn'
         # ],
         output='screen'
     )
