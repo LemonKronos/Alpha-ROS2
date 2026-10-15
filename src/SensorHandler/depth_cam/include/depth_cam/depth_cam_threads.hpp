@@ -16,16 +16,24 @@
 #include "global_utils/utils.hpp"
 #include "global_utils/blockingconcurrentqueue.h"
 #include "global_utils/alpha_brain.hpp"
-#include "alpha_msgs/msg/vector_field_histogram.hpp"
 #include "voxblox/core/common.h"
 #include "voxblox/core/voxel.h"
 #include "voxblox/core/layer.h"
 #include "voxblox/integrator/tsdf_integrator.h"
 
+#ifndef ALLOW_DEBUG
+    #define ALLOW_DEBUG 0
+#endif
+
+// Local define
+#define DEBUG (ALLOW_DEBUG & 1)
+#define FLOW (ALLOW_DEBUG & 0)
+#define VISUALIZE (ALLOW_DEBUG & 0)
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
+
 namespace alpha_brain {
 
-constexpr int HAZARD_BATCH_SIZE = 512; // #NeedTuning
-constexpr int WORLD_BATCH_SIZE = 4096;
+constexpr int WORLD_BATCH_SIZE = 4800;
 
 using std::placeholders::_1;
 
@@ -42,14 +50,11 @@ public:
         rclcpp::Node* theNode,
         const std::string& topic,
         std::shared_ptr<tf2_ros::Buffer> tf_buffer,
-        moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& hazard_point_queue,
-        const std::atomic<bool>& world_update,
         moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue,
         time_utils::TimeAnalyzer* analyzer
     );
     ~ProcessingThread();
     void processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg);
-    void updateSafeBubble(const float hazard_distance_sq);
 
 private:
     // Subscribers
@@ -60,22 +65,12 @@ private:
     rclcpp::Node* theNode;
     const std::string& topic;
 
-    Name::Dynamic::BASE_LINK base_link;
-
     std::shared_ptr<tf2_ros::Buffer> tf_buffer;
-    bool has_tf_body;
-    Eigen::Isometry3f iso_body;
-
-    std::atomic<float> hazard_distance;
-
-    const std::atomic<bool>& world_update;
-    bool done_world_update;
     
     std::atomic<bool> running;
     std::thread processing_thread;
 
     moodycamel::BlockingConcurrentQueue<sensor_msgs::msg::PointCloud2::SharedPtr> msg_queue;
-    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& hazard_point_queue; // Send in batch of smaller point cloud
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue; // Send in batch of smaler point cloud
     
     // Methods
@@ -89,66 +84,22 @@ private:
 
 };
 
-// Publish hazard point to ReactiveOA Node
-class HazardPointThread {
-public:
-    HazardPointThread(
-        rclcpp::Node* theNode,
-        const int num_worker
-    );
-    ~HazardPointThread();
-
-    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>>& getQueue();
-
-private:
-    // Publishers
-    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_PUB;
-
-    // Data
-    rclcpp::Node* theNode;
-
-    Name::Dynamic::BASE_LINK base_link;
-
-    const int num_worker;
-
-    std::atomic<bool> running;
-    std::thread hazard_point_thread;
-
-    moodycamel::BlockingConcurrentQueue<std::vector<Eigen::Vector3f>> hazard_point_queue;
-
-    // Methods
-    void ConsumerLoop();
-    void PublishHazardPoint(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive);
-
-};
-
 // Put new scan to voxblox map
 class WorldUpdateThread {
 public:
     WorldUpdateThread(
         rclcpp::Node* theNode,
-        const int num_worker,
         time_utils::TimeAnalyzer* analyzer
     );
     ~WorldUpdateThread();
 
-    const std::atomic<bool>& getStatus();
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& getQueue();
-    void doWorldUpdate();
     
 private:
-    // Timers
-    rclcpp::TimerBase::SharedPtr world_update_TIME;
-
     // Data
     rclcpp::Node* theNode;
 
-    Name::Dynamic::BASE_LINK base_link;
-
-    const int num_worker;
-
     std::atomic<bool> running;
-    std::atomic<bool> world_update;
     std::thread world_update_thread;
 
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch> world_update_queue;

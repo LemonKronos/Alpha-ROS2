@@ -65,8 +65,6 @@ class Topic:
     LOGGER_RECORD = "/internal/logger/record_control"
     LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour"
     LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour"
-    VFH_HAZARD_SEEING = "/internal/mapping/hazard/seeing/vfh"
-    VFH_HAZARD_MEMORY = "/internal/mapping/hazard/memory/vfh"
 
 
 class Service:
