@@ -5,7 +5,6 @@
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
-#include "sensor_msgs/msg/laser_scan.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "alpha_msgs/msg/contact_sensor.hpp"
@@ -28,34 +27,26 @@ private:
     // Subscriber
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odo_SUB;
     rclcpp::Subscription<alpha_msgs::msg::ContactSensor>::SharedPtr contact_SUB;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_down_SUB;
 
     // Stored topic Shared pointer
     px4_msgs::msg::VehicleOdometry::SharedPtr last_odo = nullptr;
     alpha_msgs::msg::ContactSensor::SharedPtr last_contact = nullptr;
-    sensor_msgs::msg::LaserScan::SharedPtr last_scan_down = nullptr;
 
     // Variales
     Name::Dynamic::BASE_LINK base_link;
-    bool lost_lidar_down;
-    uint8_t missed_lidar_down;
     bool lost_odometry;
     uint8_t missed_odometry;
-    float lidar_down_range_min;
-    float lidar_down_range_max;
     float last_hazard_distance;
 
     // Timers
     rclcpp::TimerBase::SharedPtr publish_TIM;
 
     // Methods
-    float handleScanDown(const sensor_msgs::msg::LaserScan::SharedPtr msg);
     void doFrameTransform(alpha_msgs::msg::FusePerception msg);
     
     // Callbacks
     void OdoCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
     void ContactCallback(const alpha_msgs::msg::ContactSensor::SharedPtr msg);
-    void ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
     void PublishCallback();
 
 };

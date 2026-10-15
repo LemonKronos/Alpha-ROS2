@@ -25,9 +25,6 @@ float32[3] angular_velocity
 bool bearable_contact
 bool critical_contact
 
-# Lidar down
-float32 below_distance
-
 # Safety
 float32 hazard_distance
 

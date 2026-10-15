@@ -13,7 +13,6 @@ find_package(px4_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(alpha_msgs REQUIRED)
 find_package(global_utils REQUIRED)
-find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 include_directories(
@@ -33,7 +32,6 @@ ament_target_dependencies(fuse_perception
   sensor_msgs
   alpha_msgs
   global_utils
-  geometry_msgs
   tf2_ros
 )
 

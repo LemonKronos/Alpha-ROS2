@@ -24,12 +24,6 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
         std::bind(&FusePerceptionNode::ContactCallback, this, _1)
     );
 
-    scan_down_SUB = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "sensor/lidar_1d_down/scan",
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::ScanDownCallback, this, _1)
-    );
-
     // Create wall timers
     publish_TIM = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
@@ -37,24 +31,12 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     );
 
     // Init variable
-    lost_lidar_down = true;
-    missed_lidar_down = Threshold::ALLOW_MISSED_FAST_TOPIC;
     lost_odometry = true;
     missed_odometry = Threshold::ALLOW_MISSED_FAST_TOPIC;
-    lidar_down_range_min = 0.1f;
-    lidar_down_range_max = 30.0f;
     last_hazard_distance = Drone::HAZARD_DISTANCE;
 }
 
 FusePerceptionNode::~FusePerceptionNode() {}
-
-float FusePerceptionNode::handleScanDown(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-    if(msg == nullptr) return NO_DATA_f;
-    if(msg->ranges[0] < lidar_down_range_min || msg->ranges[0] > lidar_down_range_max) {
-        return 0; // 0 mean CLEAR
-    }
-    else return msg->ranges[0];
-}
 
 void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     geometry_msgs::msg::TransformStamped tf;
@@ -131,20 +113,6 @@ void FusePerceptionNode::PublishCallback() {
         msg.bearable_contact = false;
         msg.critical_contact = false;
     }
-
-    // Scan down - stream
-    if(missed_lidar_down < Threshold::ALLOW_MISSED_FAST_TOPIC) missed_lidar_down++;
-    if(missed_lidar_down >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
-        if(lost_lidar_down == false) RCLCPP_WARN(this->get_logger(), YELLOW "Lost lidar scan down" RESET);
-        last_scan_down = nullptr;
-        lost_lidar_down = true;
-
-    }
-    else {
-        if(lost_lidar_down == true) RCLCPP_WARN(this->get_logger(), GREEN "Received lidar scan down" RESET);
-        lost_lidar_down = false;
-    }
-    msg.below_distance = handleScanDown(last_scan_down);
     
     // Publish msg
     msg.header.stamp = this->get_clock()->now();
@@ -159,13 +127,4 @@ void FusePerceptionNode::OdoCallback(const px4_msgs::msg::VehicleOdometry::Share
 
 void FusePerceptionNode::ContactCallback(const alpha_msgs::msg::ContactSensor::SharedPtr msg) {
     last_contact = msg;
-}
-
-void FusePerceptionNode::ScanDownCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-    last_scan_down = msg;
-    if(missed_lidar_down >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
-        lidar_down_range_min = msg->range_min;
-        lidar_down_range_max = msg->range_max;
-    }
-    missed_lidar_down = 0;
 }

@@ -99,10 +99,10 @@ namespace Topic {
     constexpr const char* FUSE_PERCEPTION = "/internal/sensor/fuse_perception"; // Combine perception info from px4 and sensors
     constexpr const char* CONTACT_PARSER = "/internal/sensor/contacts";
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
-    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour";
-    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour";
-    constexpr const char* VFH_HAZARD_SEEING = "/internal/mapping/hazard/seeing/vfh";
-    constexpr const char* VFH_HAZARD_MEMORY = "/internal/mapping/hazard/memory/vfh";
+    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour"; //* Soon to be deprecated
+    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour"; //* Soon to be deprecated
+    constexpr const char* VFH_HAZARD_SEEING = "/internal/mapping/hazard/seeing/vfh"; //* Soon to be deprecated
+    constexpr const char* VFH_HAZARD_MEMORY = "/internal/mapping/hazard/memory/vfh"; //* Soon to be deprecated
     
 }
 
