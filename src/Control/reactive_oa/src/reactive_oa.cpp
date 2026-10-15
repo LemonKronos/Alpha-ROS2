@@ -1,42 +1,28 @@
 #include "reactive_oa/reactive_oa.hpp"
+#include "voxblox/core/esdf_map.h"
 
 alpha_brain::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
 Node("reactive_oa_node", options)
 {
-    
     Global::setup_for_simulation(this);
     
-    //_ Publisher
+    // Publishers
     final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
+    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>("/alpha_brain/spatial_observation", rclcpp::SensorDataQoS());
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
         movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
         repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
         correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
+        foam_spheres_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>("/visualizer/foam_spheres", 10);
     #endif
 
-    #if VISUAL_VFH
-    total_VFH_PUB = this->create_publisher<alpha_msgs::msg::VectorFieldHistogram>("/visualizer/total_vfh", 10);
-    #endif
-
-    //_ Subscriber
+    // Subscribers
     input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::inputControlCallback, this, _1)
-    );
-
-    seeing_VFH_SUB = this->create_subscription<alpha_msgs::msg::VectorFieldHistogram>(
-        Topic::VFH_HAZARD_SEEING,
-        rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::seeingVFHCallback, this, _1)
-    );
-
-    memory_VFH_SUB = this->create_subscription<alpha_msgs::msg::VectorFieldHistogram>(
-        Topic::VFH_HAZARD_MEMORY,
-        rclcpp::SensorDataQoS(),
-        std::bind(&ReactiveOANode::memoryVFHCallback, this, _1)
     );
 
     perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
@@ -45,51 +31,30 @@ Node("reactive_oa_node", options)
         std::bind(&ReactiveOANode::perceptionCallback, this, _1)
     );
 
-    //_ Timer
+    // Timer
     node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );
 
-    //_ Check sycn
-    alpha_msgs::msg::VectorFieldHistogram test_msg;
-    if(test_msg.vfh_part.size() != Sensor::VFH_MSG_CHUNK_SIZE) {
-        std::string error_msg = 
-              "Wrong VFH msg size: expected "
-            + std::to_string(Sensor::VFH_MSG_CHUNK_SIZE)
-            + ", but got "
-            + std::to_string(test_msg.vfh_part.size());
-        RCLCPP_FATAL(this->get_logger(), RED "%s" RESET, error_msg.c_str());
-        throw std::runtime_error(error_msg);
-    }
-
-    //_ Init variables
+    // Initialize Vectors
     control_vec.setZero();
     movement_vec.setZero();
-    seeing_repulsive_vec.setZero();
-    memory_repulsive_vec.setZero();
     total_repulsive_vec.setZero();
     correction_vec.setZero();
-    // control_angular_vec.setZero();
-    // movement_angular_vec.setZero();
-    // repulsive_angular_vec.setZero();
-    // correction_angular_vec.setZero();
-
-    seeing_VFH.reset();
-    memory_VFH.reset();
-    total_VFH.reset();
 
     lost_control_signal = true;
     lost_control_signal_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
-    last_control_signal = nullptr;
-
+    
     lost_perception = true;
     lost_perception_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
-    last_perception = nullptr;
 
-    hazard_distance = Drone::HAZARD_DISTANCE;
-    has_seeing_vfh_counter = 0;
-    has_memory_vfh_counter = 0;
+    // Hardcode dummy FOAM skeleton (Center body + 4 arms). TODO: load from global YAML
+    foam_spheres.push_back(Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.3f));     // Core
+    foam_spheres.push_back(Eigen::Vector4f(0.2f, 0.2f, 0.05f, 0.15f));   // Front-Left
+    foam_spheres.push_back(Eigen::Vector4f(0.2f, -0.2f, 0.05f, 0.15f));  // Front-Right
+    foam_spheres.push_back(Eigen::Vector4f(-0.2f, 0.2f, 0.05f, 0.15f));  // Back-Left
+    foam_spheres.push_back(Eigen::Vector4f(-0.2f, -0.2f, 0.05f, 0.15f)); // Back-Right
 
     #if TIME_ANALYSE
     analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger(), 800);
@@ -102,396 +67,260 @@ alpha_brain::ReactiveOANode::~ReactiveOANode(){
 #endif
 }
 
-#pragma region Helpers
-
-float getSpeedScale(const float angle_deg, const float smooth_margin_deg = 20.0f * DEGREE) {
-    constexpr float A_90_DEG = 90.0f * DEGREE;
-    constexpr float A_180_DEG = 180.0f * DEGREE;
-
-    // Safety fallback: if margin is basically 0, just do the raw linear calculation with hard jumps
-    if (smooth_margin_deg < DEGREE) {
-        if (angle_deg <= A_90_DEG) return 1.0f - (angle_deg / A_90_DEG);
-        else return 1.0f - ((angle_deg - A_90_DEG) / A_90_DEG);
-    }
-
-    // Helper lambda: cubic smoothstep for organic, non-linear blending
-    auto smoothstep = [](float edge0, float edge1, float x) {
-        float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-        return t * t * (3.0f - 2.0f * t);
-    };
-
-    float speed = 0.0f;
-
-    // 3. Curve logic
-    if (angle_deg <= A_90_DEG) {
-        float threshold = A_90_DEG - smooth_margin_deg;
-        
-        if (angle_deg <= threshold) {
-            // Zone 1: Pure linear drop from 1.0 down towards 0.0
-            speed = 1.0f - (angle_deg / A_90_DEG);
-        } else {
-            // Zone 2: The smoothing zone (ramping back up to 1.0 at exactly 90)
-            float speed_at_threshold = 1.0f - (threshold / A_90_DEG);
-            float blend = smoothstep(threshold, A_90_DEG, angle_deg);
-            speed = speed_at_threshold + blend * (1.0f - speed_at_threshold);
-        }
-    } else {
-        float threshold = A_180_DEG - smooth_margin_deg;
-        
-        if (angle_deg <= threshold) {
-            // Zone 3: Drops linearly starting from 1.0 right after 90
-            speed = 1.0f - ((angle_deg - A_90_DEG) / A_90_DEG);
-        } else {
-            // Zone 4: The smoothing zone (ramping back up to 1.0 at exactly 180)
-            float speed_at_threshold = 1.0f - ((threshold - A_90_DEG) / A_90_DEG);
-            float blend = smoothstep(threshold, A_180_DEG, angle_deg);
-            speed = speed_at_threshold + blend * (1.0f - speed_at_threshold);
-        }
-    }
-    
-    // Final safety clamp just in case
-    return std::clamp(speed, 0.0f, 1.0f);
-}
-
-#pragma endregion
-
-#pragma region Compute vectors
-
 void alpha_brain::ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
         last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
         last_control_signal->left * Drone::SPEED_MAX_STRAFE,
         last_control_signal->up * Drone::SPEED_MAX_UP
-    ); // body frame
-
-    // RCLCPP_INFO(this->get_logger(), BLUE "Control vec = %0.2f" RESET, control_vec.norm());
-
-    // control_angular_vec = Eigen::Vector3f(
-    //     last_control_signal->roll,
-    //     last_control_signal->pitch,
-    //     last_control_signal->yaw
-    // ); // body frame
+    ); 
 }
 
 void alpha_brain::ReactiveOANode::computeMovementVector() {
-    movement_vec = Eigen::Vector3f(
+    Eigen::Vector3f world_vel(
         last_perception->velocity[0],
         last_perception->velocity[1],
         last_perception->velocity[2]
-    ); // world frame
-    if(movement_vec.hasNaN()) {
-        movement_vec.setZero();
-        // RCLCPP_WARN(this->get_logger(), RED "Movement has NaN" RESET);
-    }
+    );
+    if(world_vel.hasNaN()) world_vel.setZero();
+    
     Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
-    movement_vec = q.inverse() * movement_vec; // body frame
-
-    // movement_angular_vec = Eigen::Vector3f(
-    //     last_perception->angular_velocity[0],
-    //     last_perception->angular_velocity[1],
-    //     last_perception->angular_velocity[2]
-    // ); // world frame
-    // movement_angular_vec = q.inverse() * movement_angular_vec; // body frame
+    movement_vec = q.inverse() * world_vel; 
 }
 
-void alpha_brain::ReactiveOANode::computeRepulsive(Eigen::Vector3f& output_repulsive_vec, const Eigen::Vector3f& point) {
-    // Compute new repulsive vector
-    float urgency = (hazard_distance - point.norm()) / (hazard_distance - Drone::HAZARD_DISTANCE + 0.01f); // Linear cut depth repulsive strength
-    urgency = math_utils::linearMap<float>(urgency, 0.0f, 1.0f, 0.0f, 1.0f);
-    Eigen::Vector3f new_repulsive_vec = -(point.normalized() * urgency * Drone::SPEED_MAX_FORWARD);
+void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
+#if TIME_ANALYSE
+    analyzer->start_segment("Extract Spatial Boxes");
+#endif
 
-    float movement_speed_weight = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 0.8f); // slower mean more repulsive
-    float movement_angular_weight = std::clamp(std::fabs(movement_vec.normalized().dot(new_repulsive_vec.normalized())), 0.1f, 1.0f); // more perpendicular mean more relax
+    auto obs_msg = alpha_msgs::msg::SpatialObservation();
+    obs_msg.header.stamp = this->now();
+    obs_msg.header.frame_id = base_link.get();
 
-    output_repulsive_vec = new_repulsive_vec * (1.0f - movement_speed_weight) * movement_angular_weight;
+    // Ensure map is available
+    if (!global_map.esdf_layer) return;
+
+    Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
+    Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
+    Eigen::Matrix3f body_rot = drone_q.toRotationMatrix();
+
+    // --- Coarse Box Setup ---
+    float coarse_stride = (10.0f * UNIT_TO_METER) / BOX_DIM;
+    float coarse_ref_dist = std::sqrt(3.0f * std::pow(5.0f * UNIT_TO_METER, 2));
+
+    // --- Detail Box Setup ---
+    float intent_norm = std::clamp(control_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
+    float l_v = (5.0f + 15.0f * intent_norm) * UNIT_TO_METER;
+    float detail_stride_x = l_v / BOX_DIM;
+    float detail_stride_yz = (5.0f * UNIT_TO_METER) / BOX_DIM;
+    float detail_ref_dist = std::sqrt(std::pow(l_v, 2) + 2.0f * std::pow(2.5f * UNIT_TO_METER, 2));
+
+    // Intent Rotation Matrix (Align X with control_vec, Z roughly up)
+    Eigen::Matrix3f intent_rot = body_rot; 
+    if (control_vec.norm() > 1e-3f) {
+        Eigen::Vector3f intent_x = body_rot * control_vec.normalized();
+        Eigen::Vector3f intent_y = Eigen::Vector3f::UnitZ().cross(intent_x).normalized();
+        if(intent_y.hasNaN()) intent_y = Eigen::Vector3f::UnitY();
+        Eigen::Vector3f intent_z = intent_x.cross(intent_y).normalized();
+        intent_rot.col(0) = intent_x;
+        intent_rot.col(1) = intent_y;
+        intent_rot.col(2) = intent_z;
+    }
+
+    int coarse_idx = 0;
+    int detail_idx = 0;
+
+    // Loop Z, Y, X (Channel-First flattening)
+    for (int z = 0; z < BOX_DIM; ++z) {
+        for (int y = 0; y < BOX_DIM; ++y) {
+            for (int x = 0; x < BOX_DIM; ++x) {
+                
+                // --- Coarse Cell ---
+                Eigen::Vector3f c_local(
+                    (x - BOX_DIM/2.0f + 0.5f) * coarse_stride,
+                    (y - BOX_DIM/2.0f + 0.5f) * coarse_stride,
+                    (z - BOX_DIM/2.0f + 0.5f) * coarse_stride
+                );
+                Eigen::Vector3f c_world = drone_pos + body_rot * c_local;
+                
+                double c_dist = 0.0;
+                bool c_obs = global_map.esdf_layer->getDistanceAtPosition(c_world.cast<double>(), &c_dist);
+                
+                // Write Coarse Channels [Mean ESDF, Mask]
+                obs_msg.coarse_box[coarse_idx] = c_obs ? static_cast<float>(c_dist) / coarse_ref_dist : 1.0f;
+                obs_msg.coarse_box[1728 + coarse_idx] = c_obs ? 1.0f : 0.0f;
+                
+                // --- Detail Cell ---
+                Eigen::Vector3f d_local(
+                    (x + 0.5f) * detail_stride_x, // Origin at drone, extending forward
+                    (y - BOX_DIM/2.0f + 0.5f) * detail_stride_yz,
+                    (z - BOX_DIM/2.0f + 0.5f) * detail_stride_yz
+                );
+                Eigen::Vector3f d_world = drone_pos + intent_rot * d_local;
+
+                double d_dist = 0.0;
+                bool d_obs = global_map.esdf_layer->getDistanceAtPosition(d_world.cast<double>(), &d_dist);
+
+                // Write Detail Channels [Min ESDF, Mean ESDF, Mask] 
+                // (Using point sample as both Min/Mean approximation for this grid resolution)
+                float d_val = d_obs ? static_cast<float>(d_dist) / detail_ref_dist : 1.0f;
+                obs_msg.detail_box[detail_idx] = d_val;         // Min
+                obs_msg.detail_box[1728 + detail_idx] = d_val;  // Mean
+                obs_msg.detail_box[3456 + detail_idx] = d_obs ? 1.0f : 0.0f; // Mask
+
+                coarse_idx++;
+                detail_idx++;
+            }
+        }
+    }
+
+    spatial_obs_PUB->publish(obs_msg);
+
+#if TIME_ANALYSE
+    analyzer->stop_segment("Extract Spatial Boxes");
+#endif
+}
+
+void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
+#if TIME_ANALYSE
+    analyzer->start_segment("Compute Multi-Sphere Gradient");
+#endif
+    
+    total_repulsive_vec.setZero();
+    if (!global_map.esdf_layer || lost_perception) return;
+
+    Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
+    Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
+
+    float speed_factor = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
+    float speed_inflation = 1.0f + (1.5f * speed_factor); // Inflate bubbles up to 2.5x at max speed
+
+    for (const auto& sphere : foam_spheres) {
+        Eigen::Vector3f center_body = sphere.head<3>();
+        float base_radius = sphere.w();
+        float dynamic_radius = base_radius * speed_inflation;
+
+        Eigen::Vector3f center_world = drone_pos + (drone_q * center_body);
+
+        double distance = 0.0;
+        Eigen::Vector3d gradient;
+        bool observed = global_map.esdf_layer->getDistanceAndGradientAtPosition(center_world.cast<double>(), &distance, &gradient);
+
+        if (observed && distance < dynamic_radius) {
+            float urgency = (dynamic_radius - distance) / dynamic_radius;
+            urgency = std::clamp(urgency, 0.0f, 1.0f);
+            
+            // Push away along the gradient in world frame, then convert back to body frame
+            Eigen::Vector3f push_world = gradient.cast<float>().normalized() * urgency * Drone::SPEED_MAX_FORWARD;
+            Eigen::Vector3f push_body = drone_q.inverse() * push_world;
+
+            total_repulsive_vec += push_body;
+        }
+    }
+
+#if TIME_ANALYSE
+    analyzer->stop_segment("Compute Multi-Sphere Gradient");
+#endif
 }
 
 void alpha_brain::ReactiveOANode::computeCorrectionVector() {
-#if TIME_ANALYSE
-    analyzer->start_segment("Compute Correction");
-#endif
-
     Eigen::Vector3f target_vec = control_vec + total_repulsive_vec;
-    float target_speed = target_vec.norm();
-
-    // Init correction
-    Eigen::Vector3f new_correction_vec = target_vec;
-
-    // Compute correction
-    if(target_speed < 1e-3f) new_correction_vec.setZero();
-    else if(total_VFH.any()) {
-        // Get directions
-        Eigen::Vector3f target_direction = target_vec.normalized();
-        Eigen::Vector3f movement_direction = movement_vec.squaredNorm() > 1e-6f ?  movement_vec.normalized() : target_direction;
-        
-        // Setup weights
-        constexpr float MOVEMENT_WEIGHT = 2.0f;
-        constexpr float CONTROL_X_WEIGHT = 5.0f;
-        constexpr float CONTROL_Y_WEIGHT = 1.0f;
-        constexpr float CONTROL_UP_WEIGHT = 50.0f;
-        constexpr float CONTROL_DOWN_WEIGHT = 20.0f; 
-        float ACCEPTABLE_COST = -0.0f; // Set to 0 or negative for exact best direction.
-        
-        // Init search intermediates
-        float min_cost = std::numeric_limits<float>::max();
-        Eigen::Vector3f best_direction = target_direction;
-        bool found_safe_path = false;
-        
-        // Start search
-        for(int index = 0; index < Sensor::VFH_TOTAL_BINS; index++) {
-            // Skip occupied space
-            if(total_VFH[index] == true) continue;
-
-            // Get row and column
-            int row = index / Sensor::VFH_AZIMUTH_BINS;
-            int col = index % Sensor::VFH_AZIMUTH_BINS;
-
-            // Get candinate vector
-            float yaw = (col * Sensor::VFH_RESOLUTION) - M_PI + Sensor::VFH_RESOLUTION / 2.0f;
-            float pitch = (row * Sensor::VFH_RESOLUTION) - M_PI_2 + Sensor::VFH_RESOLUTION / 2.0f;
-            Eigen::Vector3f candinate_direction = math_utils::toCartesian({yaw, pitch, 1.0f});
-
-            // Compute cost
-            Eigen::Vector3f diff = candinate_direction - target_direction;
-            float target_cost = 
-                CONTROL_X_WEIGHT * diff.x() * diff.x()
-                + CONTROL_Y_WEIGHT * diff.y() * diff.y()
-                + (diff.z() > 0 ? CONTROL_UP_WEIGHT : CONTROL_DOWN_WEIGHT) * diff.z() * diff.z();
-            float movement_cost = 1.0f - candinate_direction.dot(movement_direction);
-            float total_cost = target_cost + MOVEMENT_WEIGHT * movement_cost;
-
-            // Evaluate cost
-            if(total_cost < min_cost) {
-                min_cost = total_cost;
-                best_direction = candinate_direction;
-                found_safe_path = true;
-                if(min_cost <= ACCEPTABLE_COST) break;
-            }
-        }
-
-        if(!found_safe_path) {
-            new_correction_vec.setZero();
-        }
-        else {
-            // Get deviation
-            float dot = std::clamp(target_direction.dot(best_direction), -1.0f, 1.0f);
-            float angle = std::acos(dot);
-
-            constexpr float HALF_CELL = 2.5f * DEGREE;
-
-            if(angle > HALF_CELL) {
-                float speed_scaler = getSpeedScale(angle);
-                new_correction_vec = best_direction * speed_scaler * target_speed;
-            }
-        }
-    }
     
-    correction_vec = new_correction_vec;
-
-#if TIME_ANALYSE
-    analyzer->stop_segment("Compute Correction");
-#endif
-
-#if DEBUG && 0
-    if(control_vec.squaredNorm() < effect_vec.squaredNorm()) RCLCPP_INFO(this->get_logger(), YELLOW "Use Effect vector" RESET);
-#endif
-
-#if DEBUG && 0
-    Eigen::Vector3f spherical_target_vec = math_utils::toSpherical(target_vec);
-    RCLCPP_INFO(
-        this->get_logger(), GREEN "Target  = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_target_vec.z(), 
-        spherical_target_vec.x() / DEGREE, 
-        spherical_target_vec.y() / DEGREE
-    );
-#endif
-
-#if DEBUG & 0
-    Eigen::Vector3f spherical_correction_vec = math_utils::toSpherical(correction_vec);
-    RCLCPP_INFO(
-        this->get_logger(), YELLOW "Correction = %.2f, yaw = %.0f, pitch = %.0f" RESET, 
-        spherical_correction_vec.z(), 
-        spherical_correction_vec.x() / DEGREE, 
-        spherical_correction_vec.y() / DEGREE
-    );
-#endif
-}
-
-void alpha_brain::ReactiveOANode::parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    VFH.reset();
-
-    // Extract the VFH
-    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
-        VFH[i] = (msg->vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] >> (i % Sensor::VFH_MSG_BIT_SIZE)) & 1;
+    // Hard cutoff if opposing vectors cancel out perfectly near an obstacle
+    if(target_vec.norm() < 1e-3f) {
+        correction_vec.setZero();
+    } else {
+        // Here you would add smoothing or kinematic limits if necessary. 
+        // For now, it passes the pure summed potential field vector.
+        correction_vec = target_vec;
     }
-}
-
-void alpha_brain::ReactiveOANode::combineVectorFieldHistogram() {
-    total_VFH.reset();
-    total_VFH = seeing_VFH | memory_VFH;
-
-    #if VISUAL_VFH
-    PublishTotalVFH();
-    #endif
-}
-
-void alpha_brain::ReactiveOANode::combineRepulsiveVector() {
-    total_repulsive_vec = seeing_repulsive_vec + memory_repulsive_vec;
 }
 
 void alpha_brain::ReactiveOANode::resetVectors() {
-    // Reset control signal
-    if(lost_control_signal) {
-        control_vec.setZero();
-    }
-
-    // Reset seeing VFH
-    // ?! Cannot use VFH.any() here if change VFH anything but bitset
-    if(!has_seeing_vfh_counter && seeing_VFH.any()) {
-        seeing_VFH.reset();
-        seeing_repulsive_vec.setZero();
-
-#if FLOW
-        RCLCPP_INFO(this->get_logger(), GRAY "Reset seeing VFH" RESET);
-#endif
-    }
-
-    // Reset memory VFH
-    if(!has_memory_vfh_counter && memory_VFH.any()) {
-        memory_VFH.reset();
-        memory_repulsive_vec.setZero();
-
-#if FLOW
-        RCLCPP_INFO(this->get_logger(), GRAY "Reset memory VFH" RESET);
-#endif
-    }
-
-    // Keep correction vector
+    if(lost_control_signal) control_vec.setZero();
+    if(lost_perception) movement_vec.setZero();
     correction_vec.setZero();
-
-    // Reset movement
-    if(lost_perception) {
-        movement_vec.setZero();
-    }
+    total_repulsive_vec.setZero();
 }
 
-#pragma endregion
-
 void alpha_brain::ReactiveOANode::nodeLoopCallback() {
-#if DEBUG && TIME_ANALYSE
+#if TIME_ANALYSE
     analyzer->start_segment("Main Loop");
 #endif
 
-    combineVectorFieldHistogram();
-    combineRepulsiveVector();
+    // Update statuses
+    if(lost_perception_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_perception_counter++;
+    lost_perception = (lost_perception_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC);
+
+    if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
+    lost_control_signal = (lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC);
+
+    // --- Critical Sequential Block ---
+    {
+        std::shared_lock<std::shared_mutex> lock(global_map.mutex);
+        if (!lost_perception && !lost_control_signal) {
+            extractAndPublishSpatialBoxes();
+            computeMultiSphereGradient();
+        }
+    }
+    // Lock Released
+
     computeCorrectionVector();
 
+    // Publish Final Control
     auto msg = alpha_msgs::msg::ControlInterface();
-
-    #if DO_REACTIVE_OA
-    msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
-    msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
-    msg.up = correction_vec.z() / Drone::SPEED_MAX_UP;
-    #else
-    msg.forward  = last_control_signal->forward;
-    msg.left = last_control_signal->left;
-    msg.up = last_control_signal->up;
-    #endif
-
-    // Odometry callback check
-    if(lost_perception_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_perception_counter++;
-    if(lost_perception_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
-        if(lost_perception == false) RCLCPP_INFO(this->get_logger(), YELLOW "Lost odometry" RESET);
-        lost_perception = true;
-        last_perception = nullptr;
-    }
-    else {
-        if(lost_perception == true) RCLCPP_INFO(this->get_logger(), GREEN "Received odometry" RESET);
-        lost_perception = false;
-    }
-
-    // Control signal callback check
-    if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
-    if(lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC) {
-        if(lost_control_signal == false) RCLCPP_INFO(this->get_logger(), YELLOW "Waiting for control signal." RESET);
-        lost_control_signal = true;
-        last_control_signal = nullptr;
-    }
-    else {
-        if(lost_control_signal == true) RCLCPP_INFO(this->get_logger(), GREEN "Received control signal." RESET);
-        lost_control_signal = false;
-    }
-
-    // Build msg
+    msg.header.stamp = this->now();
+    
     if(!lost_control_signal) {
-        msg.control_state = last_control_signal->control_state;
+        #if DO_REACTIVE_OA
+        msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
+        msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
+        msg.up = correction_vec.z() / Drone::SPEED_MAX_UP;
+        #else
+        msg.forward = last_control_signal->forward;
+        msg.left = last_control_signal->left;
+        msg.up = last_control_signal->up;
+        #endif
 
+        msg.control_state = last_control_signal->control_state;
         msg.roll = last_control_signal->roll;
         msg.pitch = last_control_signal->pitch;
         msg.yaw = last_control_signal->yaw;
-        
         msg.control_by = last_control_signal->control_by;
         msg.wings_mode = last_control_signal->wings_mode;
-    }
-    else {
+    } else {
         msg.control_state = alpha_msgs::msg::ControlInterface::ARM;
         msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
     }
 
-    // Update alive VFH callbacks
-    if(has_seeing_vfh_counter > 0) has_seeing_vfh_counter--;
-    if(has_memory_vfh_counter > 0) has_memory_vfh_counter--;
-
-    // Publish msg
-    msg.header.stamp = this->get_clock()->now();
     final_control_PUB->publish(msg);
 
     #if VISUALIZE
-    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green
-    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); // Blue
-    publishVectorArrow(repulsive_vec_PUB, total_repulsive_vec, 1.0f, 0.0f, 0.0f); // Red
-    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); // Yellow 
+    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); 
+    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); 
+    publishVectorArrow(repulsive_vec_PUB, total_repulsive_vec, 1.0f, 0.0f, 0.0f); 
+    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); 
     #endif
 
     resetVectors();
 
-#if DEBUG && TIME_ANALYSE
+#if TIME_ANALYSE
     analyzer->stop_segment("Main Loop");
 #endif
-
 }
 
-#pragma region Callbacks 
-
-void alpha_brain::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg){
+void alpha_brain::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     lost_control_signal = false;
     lost_control_signal_counter = 0;
-
     last_control_signal = msg;
     computeControlVector();
 }
 
-void alpha_brain::ReactiveOANode::seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    has_seeing_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
-    parseVectorFieldHistogram(seeing_VFH, msg);
-    computeRepulsive(seeing_repulsive_vec, {msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
-}
-
-void alpha_brain::ReactiveOANode::memoryVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg) {
-    has_memory_vfh_counter = Threshold::ALLOW_MISSED_NORMAL_TO_FAST_TOPIC;
-    parseVectorFieldHistogram(memory_VFH, msg);
-    computeRepulsive(memory_repulsive_vec, {msg->closest_obstacle.x, msg->closest_obstacle.y, msg->closest_obstacle.z});
-}
-
-void alpha_brain::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg){
+void alpha_brain::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
+    lost_perception = false;
     lost_perception_counter = 0;
-
     last_perception = msg;
-    hazard_distance = msg->hazard_distance;
     computeMovementVector();
 }
-
-#pragma endregion 
 
 #if VISUALIZE
 void alpha_brain::ReactiveOANode::publishVectorArrow(
@@ -505,49 +334,13 @@ void alpha_brain::ReactiveOANode::publishVectorArrow(
     arrow.id = 0;
     arrow.type = visualization_msgs::msg::Marker::ARROW;
     arrow.action = visualization_msgs::msg::Marker::ADD;
-
-    // Arrow scale (bigger arrow)
-    arrow.scale.x = 0.2;  // shaft thickness
-    arrow.scale.y = 0.2;   // head diameter
-    arrow.scale.z = 0.2;   // head length
-
-    // Color
-    arrow.color.r = r;
-    arrow.color.g = g;
-    arrow.color.b = b;
-    arrow.color.a = 1.0;
-
-    // Define start and end points
+    arrow.scale.x = 0.2;  
+    arrow.scale.y = 0.2;   
+    arrow.scale.z = 0.2;   
+    arrow.color.r = r; arrow.color.g = g; arrow.color.b = b; arrow.color.a = 1.0;
     arrow.points.resize(2);
-    arrow.points[0].x = 0.0;
-    arrow.points[0].y = 0.0;
-    arrow.points[0].z = 0.0;
-
-    float viz_scale = 1.0f;  // make vector longer visually if needed
-    arrow.points[1].x = vec.x() * viz_scale;
-    arrow.points[1].y = vec.y() * viz_scale;
-    arrow.points[1].z = vec.z() * viz_scale;
-
+    arrow.points[0].x = 0.0; arrow.points[0].y = 0.0; arrow.points[0].z = 0.0;
+    arrow.points[1].x = vec.x(); arrow.points[1].y = vec.y(); arrow.points[1].z = vec.z();
     pub->publish(arrow);
-}
-#endif
-
-#if VISUAL_VFH
-void alpha_brain::ReactiveOANode::PublishTotalVFH() {
-    alpha_msgs::msg::VectorFieldHistogram msg;
-
-    // Check if clear
-    if(total_VFH.none()) return;
-
-    // Generate payload
-    memset(&msg.vfh_part, 0, sizeof(msg.vfh_part)); // Init all the bits to 0s
-    for(size_t i = 0; i < Sensor::VFH_TOTAL_BINS; i++) {
-        msg.vfh_part[i / Sensor::VFH_MSG_BIT_SIZE] |= (total_VFH[i] << (i % Sensor::VFH_MSG_BIT_SIZE));
-    }
-
-    // The rest of msg
-    msg.header.frame_id = this->base_link.get();
-    msg.header.stamp = this->get_clock()->now();
-    this->total_VFH_PUB->publish(msg);
 }
 #endif
