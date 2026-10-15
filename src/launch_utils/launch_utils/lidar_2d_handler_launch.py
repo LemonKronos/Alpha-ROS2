@@ -1,1 +1,0 @@
-/home/mr_lemon/MyCode/Project/Drone/ROS2/src/launch_utils/launch_utils/lidar_2d_handler_launch.py

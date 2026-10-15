@@ -53,7 +53,7 @@ private:
     voxblox::Transformation frame_transform; // World -> Body
     float hazard_distance;
 
-    std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer;
+    std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer; //* Just to be compatiple with VFH, will be gone, needed to sync back to MapManager
 
     // Persistent allocation
     std::vector<Eigen::Vector3f> hazard_voxels;

@@ -25,15 +25,10 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
         config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
         config.voxel_carving_enabled = true;
         config.use_weight_dropoff = Sensor::VOXEL_USE_WEIGHT_DROPOFF;
-        
-        tsdf_layer = std::make_shared<voxblox::Layer<voxblox::TsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);
 
-        // Put map in shared memory space
-        {
-            std::unique_lock lock(global_map.mutex);
-            global_map.tsdf_layer = tsdf_layer;
-            global_map.config = config;
-        }
+        // Init map
+        global_map.initialize(voxel_resolution, config);
+        this->tsdf_layer = global_map.tsdf_layer; //* just for VFH, will gone soon
         
         RCLCPP_INFO(this->get_logger(), GREEN "Voxblox map ready" RESET);
 
