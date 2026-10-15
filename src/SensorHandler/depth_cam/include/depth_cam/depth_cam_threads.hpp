@@ -29,7 +29,7 @@
 #define DEBUG (ALLOW_DEBUG & 1)
 #define FLOW (ALLOW_DEBUG & 0)
 #define VISUALIZE (ALLOW_DEBUG & 0)
-#define TIME_ANALYSE (ALLOW_DEBUG & 0)
+#define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
 namespace alpha_brain {
 
@@ -74,7 +74,7 @@ private:
     moodycamel::BlockingConcurrentQueue<VoxbloxBatch>& world_update_queue; // Send in batch of smaler point cloud
     
     // Methods
-    void ConsumerLoop();
+    void ProducerLoop();
 
     // Callbacks
     void DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);

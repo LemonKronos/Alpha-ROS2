@@ -28,7 +28,7 @@ alpha_brain::ProcessingThread::ProcessingThread(
     this->running.store(true);
 
     // Spawn thread
-    this->processing_thread = std::thread(&ProcessingThread::ConsumerLoop, this);
+    this->processing_thread = std::thread(&ProcessingThread::ProducerLoop, this);
 
 #if FLOW
     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Spawn worker %s processing thread" RESET, this->name.c_str());
@@ -53,7 +53,7 @@ void alpha_brain::ProcessingThread::DepthCamCallback(const sensor_msgs::msg::Poi
     processMsg(msg);
 }
 
-void alpha_brain::ProcessingThread::ConsumerLoop() {
+void alpha_brain::ProcessingThread::ProducerLoop() {
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the msg
         sensor_msgs::msg::PointCloud2::SharedPtr msg;
@@ -62,6 +62,12 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
             RCLCPP_WARN_THROTTLE(this->theNode->get_logger(),*this->theNode->get_clock(), 1000, YELLOW "%s flushed a mesage" RESET, this->name.c_str());
         } // FLush to only use latest msg
         if(!this->running.load(std::memory_order_relaxed)) break;
+
+        #if TIME_ANALYSE
+        std::string seg_name = "batch ";
+        seg_name.append(msg->header.frame_id);
+        this->analyzer->start_segment(seg_name);
+        #endif
 
         // Lookup world frame
         std::optional<voxblox::Transformation> voxblox_tf_world;
@@ -120,6 +126,10 @@ void alpha_brain::ProcessingThread::ConsumerLoop() {
         if(world_update_cloud.points.size() > 0) {
             this->world_update_queue.enqueue(std::move(world_update_cloud));
         }
+
+        #if TIME_ANALYSE
+        this->analyzer->stop_segment(seg_name);
+        #endif
     }
 }
 
@@ -175,7 +185,11 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
         // Receive valid batch
         #if FLOW
         RCLCPP_INFO(this->theNode->get_logger(), GRAY "Receive batch with %d points" RESET, batch_cloud.points.size());
-        #endif        
+        #endif
+
+        #if TIME_ANALYSE
+        this->analyzer->start_segment("consumer_loop");
+        #endif
 
         // Put new scan to voxblox map
         {
@@ -208,6 +222,11 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
                 RCLCPP_WARN_SKIPFIRST_THROTTLE(this->theNode->get_logger(),*this->theNode->get_clock(), 1000, RED "Dropping scan, map memory not ready yet." RESET);
             }
         }
+
+        #if TIME_ANALYSE
+        this->analyzer->stop_segment("consumer_loop");
+        #endif
+
     } // Thread loop back
 
     #if FLOW
