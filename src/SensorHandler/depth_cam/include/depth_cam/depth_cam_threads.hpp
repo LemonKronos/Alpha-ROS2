@@ -29,7 +29,7 @@
 #define DEBUG (ALLOW_DEBUG & 1)
 #define FLOW (ALLOW_DEBUG & 0)
 #define VISUALIZE (ALLOW_DEBUG & 0)
-#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
 
 namespace alpha_brain {
 
