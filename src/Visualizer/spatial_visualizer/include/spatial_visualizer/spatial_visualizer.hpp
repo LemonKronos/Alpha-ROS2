@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include "voxblox/core/layer.h"
 #include "voxblox/core/voxel.h"
@@ -18,7 +19,7 @@ public:
     ~SpatialVisualizerNode();
 
 private:
-    rclcpp::Publisher<alpha_msgs::msg::VoxelBlock>::SharedPtr nearby_voxels_PUB;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr nearby_voxels_PUB;
 
     // Subscribers
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;

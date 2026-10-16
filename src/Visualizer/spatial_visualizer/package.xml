@@ -13,6 +13,7 @@
   <depend>rclcpp_components</depend>
   <depend>alpha_msgs</depend>
   <depend>global_utils</depend>
+  <depend>visualization_msgs</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
   <depend>glog</depend> <!-- Voxblox leaky dependency -->

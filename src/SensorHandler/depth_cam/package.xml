@@ -13,6 +13,7 @@
   <depend>rclcpp_components</depend>
   <depend>global_utils</depend>
   <depend>alpha_msgs</depend>
+  <depend>low_spatial</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>tf2_ros</depend>

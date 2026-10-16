@@ -12,6 +12,10 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
             {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)},
             {"voxel_carving_enabled", rclcpp::ParameterValue(true)},
             {"use_weight_dropoff", rclcpp::ParameterValue(false)},
+
+            {"max_ray_length", rclcpp::ParameterValue(20.0)},
+            {"sparsity_compensation_factor", rclcpp::ParameterValue(5.0)},
+
             {"esdf_min_distance", rclcpp::ParameterValue(0.0)},
             {"esdf_max_distance", rclcpp::ParameterValue(10.0)},
             {"esdf_default_distance", rclcpp::ParameterValue(10.0)}
@@ -25,12 +29,19 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
         }
         
         //_ Init variables
-        //: TSDF
-        voxblox::TsdfIntegratorBase::Config tsdf_config;
-        tsdf_config.default_truncation_distance = static_cast<float>(this->get_parameter("truncation_distance").as_double());
-        tsdf_config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
-        tsdf_config.voxel_carving_enabled = this->get_parameter("voxel_carving_enabled").as_bool();
-        tsdf_config.use_weight_dropoff = this->get_parameter("use_weight_dropoff").as_bool();
+        //: TSDF Dense
+        voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
+        tsdf_dense_config.default_truncation_distance = static_cast<float>(this->get_parameter("truncation_distance").as_double());
+        tsdf_dense_config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
+        tsdf_dense_config.voxel_carving_enabled = this->get_parameter("voxel_carving_enabled").as_bool();
+        tsdf_dense_config.use_weight_dropoff = this->get_parameter("use_weight_dropoff").as_bool();
+
+        //: TSDF Sparse - modify from the Dense
+        voxblox::TsdfIntegratorBase::Config tsdf_sparse_config = tsdf_dense_config;
+        tsdf_sparse_config.use_const_weight = true;
+        tsdf_sparse_config.use_sparsity_compensation_factor = true;
+        tsdf_sparse_config.max_ray_length_m = this->get_parameter("max_ray_length").as_double();
+        tsdf_sparse_config.sparsity_compensation_factor = this->get_parameter("sparsity_compensation_factor").as_double();
 
         //: ESDF
         voxblox::EsdfIntegrator::Config esdf_config;
@@ -39,7 +50,7 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
         esdf_config.default_distance_m = this->get_parameter("esdf_default_distance").as_double();
 
         //: Init Voxblox map
-        global_map.initialize(voxel_resolution, tsdf_config, esdf_config);
+        global_map.initialize(voxel_resolution, tsdf_dense_config, tsdf_sparse_config, esdf_config);
         
         RCLCPP_INFO(this->get_logger(), GREEN "Voxblox map ready" RESET);
 

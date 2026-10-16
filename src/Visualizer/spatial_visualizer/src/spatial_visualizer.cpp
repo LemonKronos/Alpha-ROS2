@@ -12,9 +12,9 @@ spatial_container::SpatialVisualizerNode::SpatialVisualizerNode(const rclcpp::No
         frame_transform.setIdentity();
 
         //_ Publishers
-        nearby_voxels_PUB = this->create_publisher<alpha_msgs::msg::VoxelBlock>(
-            "/visualizer/hazard_voxel",
-            rclcpp::SensorDataQoS()
+        nearby_voxels_PUB = this->create_publisher<visualization_msgs::msg::Marker>(
+            "/visualizer/nearby_voxel",
+            10
         );
 
         //_ Subscribers
@@ -109,20 +109,45 @@ void spatial_container::SpatialVisualizerNode::TimerCallback() {
     PublishNearbyVoxels(nearby_voxels);
 }
 
-void spatial_container::SpatialVisualizerNode::PublishNearbyVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels) {
-    alpha_msgs::msg::VoxelBlock msg;
+// Toggle 1 for CUBE_LIST, 0 for POINTS
+#define VISUALIZE_AS_CUBES 0
 
-    msg.header.frame_id = this->base_link.get();
-    msg.header.stamp = this->get_clock()->now();
-    msg.size = hazard_voxels.size();
+void spatial_container::SpatialVisualizerNode::PublishNearbyVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels) {
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = this->base_link.get();
+    marker.header.stamp = this->get_clock()->now();
+    marker.ns = "hazard_voxels";
+    marker.id = 0;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+#if VISUALIZE_AS_CUBES
+    marker.type = visualization_msgs::msg::Marker::CUBE_LIST;
+#else
+    marker.type = visualization_msgs::msg::Marker::POINTS;
+#endif
+
+    // Adjust scale to match your voxel resolution (equivalent to Sensor.VOXEL_RESOLUTION)
+    marker.scale.x = Sensor::VOXEL_RESOLUTION; 
+    marker.scale.y = Sensor::VOXEL_RESOLUTION;
+    marker.scale.z = Sensor::VOXEL_RESOLUTION;
+
+    // Solid semi-transparent orange
+    marker.color.r = 1.0f;
+    marker.color.g = 0.36f;
+    marker.color.b = 0.0f;
+    marker.color.a = 0.3f;
+
+    // Pre-allocate memory to avoid reallocations during the loop
+    marker.points.reserve(hazard_voxels.size());
     
-    for(auto& voxel : hazard_voxels) {
-        geometry_msgs::msg::Point32 v;
-        v.x = voxel.x();
-        v.y = voxel.y();
-        v.z = voxel.z();
-        msg.point_array.points.push_back(v);
+    for(const auto& voxel : hazard_voxels) {
+        geometry_msgs::msg::Point p;
+        p.x = voxel.x();
+        p.y = voxel.y();
+        p.z = voxel.z();
+        marker.points.push_back(p);
     }
 
-    nearby_voxels_PUB->publish(msg);
+    nearby_voxels_PUB->publish(marker);
 }

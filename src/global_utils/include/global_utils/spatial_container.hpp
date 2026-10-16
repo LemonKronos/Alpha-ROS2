@@ -26,8 +26,9 @@ public:
     // The shared lock for all nodes to use manually if needed
     mutable std::shared_mutex mutex;
 
-    // Base config
-    voxblox::TsdfIntegratorBase::Config tsdf_config;
+    // Intergrator config
+    voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
+    voxblox::TsdfIntegratorBase::Config tsdf_sparse_config;
     voxblox::EsdfIntegrator::Config esdf_config;
 
     // The 3D Voxel Memory Layers and Map Wrapper
@@ -38,11 +39,13 @@ public:
 
     void initialize(
         float voxel_resolution,
-        voxblox::TsdfIntegratorBase::Config tsdf_config,
+        voxblox::TsdfIntegratorBase::Config tsdf_dense_config,
+        voxblox::TsdfIntegratorBase::Config tsdf_sparse_config,
         voxblox::EsdfIntegrator::Config esdf_config
     ) {
         std::unique_lock<std::shared_mutex> lock(mutex);
-        this->tsdf_config = tsdf_config;
+        this->tsdf_dense_config = tsdf_dense_config;
+        this->tsdf_sparse_config = tsdf_sparse_config;
         this->tsdf_layer = std::make_shared<voxblox::Layer<voxblox::TsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);
         this->esdf_config = esdf_config;
         this->esdf_layer = std::make_shared<voxblox::Layer<voxblox::EsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);

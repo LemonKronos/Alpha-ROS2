@@ -202,7 +202,7 @@ void spatial_container::WorldUpdateThread::ConsumerLoop() {
                 // Lazy init intergrator (once)
                 if(!this->tsdf_integrator) {
                     this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
-                        spatial_container::global_map.tsdf_config, 
+                        spatial_container::global_map.tsdf_dense_config, 
                         spatial_container::global_map.tsdf_layer.get()
                     );
                     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map" RESET);

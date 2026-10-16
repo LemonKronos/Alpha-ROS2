@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(global_utils REQUIRED)
 find_package(alpha_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 include_directories(include)
 
@@ -34,6 +35,7 @@ ament_target_dependencies(spatial_visualizer_component
   rclcpp_components
   global_utils
   alpha_msgs
+  visualization_msgs
 )
 
 rclcpp_components_register_nodes(spatial_visualizer_component "spatial_container::SpatialVisualizerNode")

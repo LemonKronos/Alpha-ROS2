@@ -102,16 +102,8 @@ void spatial_container::OmniLidarNode::SyncedLidarCallback(
             
             // Lazy init intergrator (once)
             if(!this->tsdf_integrator) {
-                // Override config for sparse sensors
-                voxblox::TsdfIntegratorBase::Config sparse_config = spatial_container::global_map.tsdf_config;
-
-                sparse_config.use_const_weight = true;
-                sparse_config.max_ray_length_m = 20.0;
-                sparse_config.use_sparsity_compensation_factor = true;
-                sparse_config.sparsity_compensation_factor = 5.0f;
-
                 this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
-                    sparse_config,
+                    spatial_container::global_map.tsdf_sparse_config,
                     spatial_container::global_map.tsdf_layer.get()
                 );
                 RCLCPP_INFO(this->get_logger(), GREEN "Integrator locked onto shared map" RESET);
