@@ -3,11 +3,14 @@
 #include "rclcpp/rclcpp.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
+#include "global_utils/alpha_brain.hpp"
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/fuse_perception.hpp"
-#include "alpha_msgs/msg/vector_field_histogram.hpp"
+#include "alpha_msgs/msg/spatial_observation.hpp"
 
-#include <bitset>
+#include <Eigen/Dense>
+#include <vector>
+#include <shared_mutex>
 
 #ifndef ALLOW_DEBUG
     #define ALLOW_DEBUG 0
@@ -17,14 +20,12 @@
     #define DO_REACTIVE_OA 1
 #endif
 
-//_ Local define
 #define DEBUG (ALLOW_DEBUG & 1)
-#define VISUALIZE (ALLOW_DEBUG & 1) // vectors
-#define TIME_ANALYSE (ALLOW_DEBUG & 0)
-#define FLOW (ALLOW_DEBUG & 0)
-#define VISUAL_VFH (ALLOW_DEBUG & 1) // Total VFH
+#define VISUALIZE (ALLOW_DEBUG & 1) 
+#define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
 #ifdef VISUALIZE
+    #include <visualization_msgs/msg/marker_array.hpp>
     #include <visualization_msgs/msg/marker.hpp>
 #endif
 
@@ -37,24 +38,21 @@ public:
     ReactiveOANode(const rclcpp::NodeOptions &options);
     ~ReactiveOANode();
 private:
-    // Publisher
+    // Publishers
     rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::SpatialObservation>::SharedPtr spatial_obs_PUB;
+    
     #if VISUALIZE
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr repulsive_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr correction_vec_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr foam_spheres_PUB;
     #endif
 
-    #if VISUAL_VFH
-    rclcpp::Publisher<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr total_VFH_PUB;
-    #endif
-
-    // Subscriber
+    // Subscribers
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
-    rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr seeing_VFH_SUB;
-    rclcpp::Subscription<alpha_msgs::msg::VectorFieldHistogram>::SharedPtr memory_VFH_SUB;
 
     // Objects
     #if TIME_ANALYSE
@@ -64,40 +62,27 @@ private:
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
-    float hazard_distance = Drone::HAZARD_DISTANCE;
-
+    
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
     bool lost_perception = true;
     uint8_t lost_perception_counter = 0;
-    uint8_t has_seeing_vfh_counter = 0;
-    uint8_t has_memory_vfh_counter = 0;
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
-    Eigen::Vector3f seeing_repulsive_vec;
-    Eigen::Vector3f memory_repulsive_vec;
     Eigen::Vector3f total_repulsive_vec;
     Eigen::Vector3f correction_vec;
-    // Eigen::Vector3f control_angular_vec;
-    // Eigen::Vector3f movement_angular_vec;
-    // Eigen::Vector3f repulsive_angular_vec;
-    // Eigen::Vector3f correction_angular_vec;
-    
-    std::bitset<Sensor::VFH_TOTAL_BINS> seeing_VFH;
-    std::bitset<Sensor::VFH_TOTAL_BINS> memory_VFH;
-    std::bitset<Sensor::VFH_TOTAL_BINS> total_VFH;
+
+    // FOAM Spheres (x, y, z in body frame, w = radius)
+    std::vector<Eigen::Vector4f> foam_spheres;
 
     // Methods
     void computeControlVector();
     void computeMovementVector();
-    void computeRepulsive(Eigen::Vector3f& output_repulsive_vec, const Eigen::Vector3f& point);
+    void extractAndPublishSpatialBoxes();
+    void computeMultiSphereGradient();
     void computeCorrectionVector();
     void resetVectors();
-
-    void parseVectorFieldHistogram(std::bitset<Sensor::VFH_TOTAL_BINS>& VFH , const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
-    void combineVectorFieldHistogram();
-    void combineRepulsiveVector();
     
     #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;
@@ -106,10 +91,7 @@ private:
             const Eigen::Vector3f& vec,
             float r, float g, float b
         );
-    #endif
-
-    #if VISUAL_VFH
-    void PublishTotalVFH();
+        void publishFoamSpheres();
     #endif
 
     // Timer
@@ -117,11 +99,12 @@ private:
 
     // Callbacks
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
-    void seeingVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
-    void memoryVFHCallback(const alpha_msgs::msg::VectorFieldHistogram::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
 
+    // Constants for Extraction
+    static constexpr float UNIT_TO_METER = 0.5f;
+    static constexpr int BOX_DIM = 12;
 };
 
 } // namespace alpha_brain
