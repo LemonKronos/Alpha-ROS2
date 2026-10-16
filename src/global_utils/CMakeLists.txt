@@ -9,14 +9,12 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(alpha_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(voxblox REQUIRED)
 find_package(voxblox_ros REQUIRED)
 
 # build the library (no main function needed)
 add_library(${PROJECT_NAME}
-  src/surrounding.cpp
   src/utils.cpp
   src/system_config.cpp
   src/spatial_container.cpp
@@ -34,7 +32,6 @@ target_include_directories(${PROJECT_NAME}
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   std_msgs
-  alpha_msgs
   Eigen3
   voxblox
   voxblox_ros

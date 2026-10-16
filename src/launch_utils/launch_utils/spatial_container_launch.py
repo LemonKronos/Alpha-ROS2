@@ -47,7 +47,13 @@ def generate_launch_description():
         name='map_visualizer'
     )
 
-    spatial_container_container = ComposableNodeContainer(
+    spatial_visualizer = ComposableNode(
+        package='spatial_visualizer',
+        plugin='spatial_container::SpatialVisualizerNode',
+        name='spatial_visualizer'
+    )
+
+    spatial_container = ComposableNodeContainer(
         name='spatial_container',
         namespace='',
         package='rclcpp_components',
@@ -57,6 +63,7 @@ def generate_launch_description():
             depth_cam_node,
             omni_lidar_node,
             reactive_oa_node,
+            spatial_visualizer,
             # map_visualizer_node
         ],
         # ros_arguments=[
@@ -69,4 +76,4 @@ def generate_launch_description():
         # prefix=['gdb -ex run --args'], #DEBUG
     )
 
-    return LaunchDescription([spatial_container_container])
+    return LaunchDescription([spatial_container])

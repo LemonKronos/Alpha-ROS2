@@ -12,7 +12,6 @@
     <!-- Dependencies -->
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
-  <depend>alpha_msgs</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
 

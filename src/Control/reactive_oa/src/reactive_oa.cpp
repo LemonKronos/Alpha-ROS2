@@ -135,8 +135,6 @@ void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
                 
                 float c_dist = 0.0f;
                 bool c_obs = spatial_container::global_map.getDistance(c_world, c_dist);
-                
-                //DEV look at the mean and min handling in the previous commit, but that is not accurate
 
                 obs_msg.coarse_box[coarse_idx] = c_obs ? (c_dist / coarse_ref_dist) : 1.0f;
                 obs_msg.coarse_box[1728 + coarse_idx] = c_obs ? 1.0f : 0.0f;

@@ -9,11 +9,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(global_utils REQUIRED)
-find_package(alpha_msgs REQUIRED)
-find_package(voxblox REQUIRED)
-find_package(voxblox_ros REQUIRED)
-find_package(glog REQUIRED) #! Voxblox leaky dependency
-find_package(Eigen3 REQUIRED)
 
 include_directories(include)
 
@@ -37,10 +32,6 @@ ament_target_dependencies(low_spatial_component
   rclcpp
   rclcpp_components
   global_utils
-  alpha_msgs
-  Eigen3
-  voxblox
-  voxblox_ros
 )
 
 rclcpp_components_register_nodes(low_spatial_component "spatial_container::LowSpatialNode")
