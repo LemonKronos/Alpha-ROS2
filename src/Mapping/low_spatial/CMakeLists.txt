@@ -43,7 +43,7 @@ ament_target_dependencies(low_spatial_component
   voxblox_ros
 )
 
-rclcpp_components_register_nodes(low_spatial_component "alpha_brain::LowSpatialNode")
+rclcpp_components_register_nodes(low_spatial_component "spatial_container::LowSpatialNode")
 
 # ####################################### EXECUTABLE |>
 

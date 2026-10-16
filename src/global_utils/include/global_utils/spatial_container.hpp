@@ -12,7 +12,7 @@
 
 #include "global_utils/system_config.hpp"
 
-namespace alpha_brain {
+namespace spatial_container {
 
 //! Only Low Spatial Node shall init and config this
 class MapManager {
@@ -96,7 +96,7 @@ public:
     }
 };
 
-// Global instance in alpha_brain shared memory
+// Global instance in spatial_container shared memory
 inline MapManager global_map;
 
-} // namespace alpha_brain
+} // namespace spatial_container

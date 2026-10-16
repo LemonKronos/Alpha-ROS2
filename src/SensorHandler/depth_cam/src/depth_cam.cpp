@@ -1,6 +1,6 @@
 #include "depth_cam/depth_cam.hpp"
 
-alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
+spatial_container::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     Node("depth_cam_node", options)
     {
 
@@ -43,7 +43,7 @@ alpha_brain::DepthCamNode::DepthCamNode(const rclcpp::NodeOptions & options) :
     );
 }
 
-alpha_brain::DepthCamNode::~DepthCamNode() {
+spatial_container::DepthCamNode::~DepthCamNode() {
 #if TIME_ANALYSE
         analyzer->printSummary();
 #endif

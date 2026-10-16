@@ -44,7 +44,7 @@ ament_target_dependencies(reactive_oa_component
   OsqpEigen
 )
 
-rclcpp_components_register_nodes(reactive_oa_component "alpha_brain::ReactiveOANode")
+rclcpp_components_register_nodes(reactive_oa_component "spatial_container::ReactiveOANode")
 
 # ####################################### EXECUTABLE |>
 

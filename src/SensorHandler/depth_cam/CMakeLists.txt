@@ -54,7 +54,7 @@ ament_target_dependencies(depth_cam_component
   voxblox_ros
 )
 
-rclcpp_components_register_nodes(depth_cam_component "alpha_brain::DepthCamNode")
+rclcpp_components_register_nodes(depth_cam_component "spatial_container::DepthCamNode")
 
 # ####################################### EXECUTABLE |>
 

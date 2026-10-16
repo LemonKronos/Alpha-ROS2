@@ -54,7 +54,7 @@ ament_target_dependencies(omni_lidar_component
   voxblox_ros
 )
 
-rclcpp_components_register_nodes(omni_lidar_component "alpha_brain::OmniLidarNode")
+rclcpp_components_register_nodes(omni_lidar_component "spatial_container::OmniLidarNode")
 
 # ####################################### EXECUTABLE |>
 

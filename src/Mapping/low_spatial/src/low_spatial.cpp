@@ -1,6 +1,6 @@
 #include "low_spatial/low_spatial.hpp"
 
-alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) :
+spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) :
     Node("low_spatial", options)
 {        
         Global::setup_for_simulation(this);
@@ -72,23 +72,23 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
         perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
             Topic::FUSE_PERCEPTION,
             rclcpp::SensorDataQoS(),
-            std::bind(&alpha_brain::LowSpatialNode::FusePerceptionCallback, this, std::placeholders::_1)
+            std::bind(&spatial_container::LowSpatialNode::FusePerceptionCallback, this, std::placeholders::_1)
         );
 
         //_ Timers
         memory_VFH_update_TIME = this->create_timer(
             std::chrono::nanoseconds(Clock::LOOP_CYCLE_NANOSEC),
-            std::bind(&alpha_brain::LowSpatialNode::UpdateMemoryVFH, this)
+            std::bind(&spatial_container::LowSpatialNode::UpdateMemoryVFH, this)
         );
 }
 
-alpha_brain::LowSpatialNode::~LowSpatialNode() {
+spatial_container::LowSpatialNode::~LowSpatialNode() {
     #if TIME_ANALYSE
     analyzer->printSummary();
     #endif
 }
 
-void alpha_brain::LowSpatialNode::FusePerceptionCallback(alpha_msgs::msg::FusePerception::SharedPtr msg) {
+void spatial_container::LowSpatialNode::FusePerceptionCallback(alpha_msgs::msg::FusePerception::SharedPtr msg) {
     perception_alive_counter = Threshold::ALLOW_MISSED_TOPIC;
 
     hazard_distance = msg->hazard_distance;
@@ -102,13 +102,13 @@ void alpha_brain::LowSpatialNode::FusePerceptionCallback(alpha_msgs::msg::FusePe
     frame_transform = frame_transform.inverse(); // World -> Body
 }
 
-void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
+void spatial_container::LowSpatialNode::UpdateMemoryVFH() {
     #if TIME_ANALYSE
     analyzer->start_segment("main loop");
     #endif
 
     //_ Build Voxblox ESDF here
-    alpha_brain::global_map.updateEsdf();
+    spatial_container::global_map.updateEsdf();
 
     // Check if current position is alive
     if(perception_alive_counter > 0) perception_alive_counter--;
@@ -127,7 +127,7 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
     hazard_voxels.clear();
 
     {// Global map mutex space
-        std::shared_lock lock(alpha_brain::global_map.mutex);
+        std::shared_lock lock(spatial_container::global_map.mutex);
 
         if(!tsdf_layer) return;
 
@@ -218,7 +218,7 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
     #endif
 }
 
-void alpha_brain::LowSpatialNode::PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive) {
+void spatial_container::LowSpatialNode::PublishMemoryVFH(const std::bitset<Sensor::VFH_TOTAL_BINS>& VFH, const Eigen::Vector3f& sum_repulsive) {
     alpha_msgs::msg::VectorFieldHistogram msg;
 
     // Check if clear
@@ -242,7 +242,7 @@ void alpha_brain::LowSpatialNode::PublishMemoryVFH(const std::bitset<Sensor::VFH
 }
 
 #if VISUALIZE
-void alpha_brain::LowSpatialNode::PublishHazardVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels) {
+void spatial_container::LowSpatialNode::PublishHazardVoxels(const std::vector<Eigen::Vector3f>& hazard_voxels) {
     alpha_msgs::msg::VoxelBlock msg;
 
     msg.header.frame_id = this->base_link.get();

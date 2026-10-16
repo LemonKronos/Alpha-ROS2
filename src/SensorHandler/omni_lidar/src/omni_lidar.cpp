@@ -1,6 +1,6 @@
 #include "omni_lidar/omni_lidar.hpp"
 
-alpha_brain::OmniLidarNode::OmniLidarNode(const rclcpp::NodeOptions &options) :
+spatial_container::OmniLidarNode::OmniLidarNode(const rclcpp::NodeOptions &options) :
 Node("omni_lidar_node", options)
 {
     Global::setup_for_simulation(this);
@@ -34,11 +34,11 @@ Node("omni_lidar_node", options)
 
 }
 
-alpha_brain::OmniLidarNode::~OmniLidarNode() {
+spatial_container::OmniLidarNode::~OmniLidarNode() {
 
 }
 
-void alpha_brain::OmniLidarNode::ProcessBatch(
+void spatial_container::OmniLidarNode::ProcessBatch(
     intergrator_batch &batch,
     const PointCloud2::ConstSharedPtr &msg
 ) {
@@ -84,7 +84,7 @@ void alpha_brain::OmniLidarNode::ProcessBatch(
     }
 }
 
-void alpha_brain::OmniLidarNode::SyncedLidarCallback(
+void spatial_container::OmniLidarNode::SyncedLidarCallback(
     const PointCloud2::ConstSharedPtr &msg_down,
     const PointCloud2::ConstSharedPtr &msg_2d
 ) {
@@ -95,15 +95,15 @@ void alpha_brain::OmniLidarNode::SyncedLidarCallback(
     //: Put both batch into Voxblox map sequentially
     {
         // Mutex lock
-        std::unique_lock lock(alpha_brain::global_map.mutex);
+        std::unique_lock lock(spatial_container::global_map.mutex);
 
         // Check if map exist
-        if(alpha_brain::global_map.tsdf_layer) {
+        if(spatial_container::global_map.tsdf_layer) {
             
             // Lazy init intergrator (once)
             if(!this->tsdf_integrator) {
                 // Override config for sparse sensors
-                voxblox::TsdfIntegratorBase::Config sparse_config = alpha_brain::global_map.tsdf_config;
+                voxblox::TsdfIntegratorBase::Config sparse_config = spatial_container::global_map.tsdf_config;
 
                 sparse_config.use_const_weight = true;
                 sparse_config.max_ray_length_m = 20.0;
@@ -112,7 +112,7 @@ void alpha_brain::OmniLidarNode::SyncedLidarCallback(
 
                 this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
                     sparse_config,
-                    alpha_brain::global_map.tsdf_layer.get()
+                    spatial_container::global_map.tsdf_layer.get()
                 );
                 RCLCPP_INFO(this->get_logger(), GREEN "Integrator locked onto shared map" RESET);
             }

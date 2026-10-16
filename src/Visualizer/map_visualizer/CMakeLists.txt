@@ -53,7 +53,7 @@ ament_target_dependencies(map_visualizer_component
   voxblox_ros
 )
 
-rclcpp_components_register_nodes(map_visualizer_component "alpha_brain::MapVisualizerNode")
+rclcpp_components_register_nodes(map_visualizer_component "spatial_container::MapVisualizerNode")
 
 # ####################################### EXECUTABLE |>
 

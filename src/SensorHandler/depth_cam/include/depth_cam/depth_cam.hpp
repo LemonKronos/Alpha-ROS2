@@ -9,7 +9,7 @@
 #include "global_utils/utils.hpp"
 #include "depth_cam/depth_cam_threads.hpp"
 
-namespace alpha_brain {
+namespace spatial_container {
 
 using std::placeholders::_1;
 
@@ -33,4 +33,4 @@ private:
     std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
 };
 
-} // namespace alpha_brain
+} // namespace spatial_container

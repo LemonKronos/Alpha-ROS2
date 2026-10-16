@@ -19,7 +19,7 @@ add_library(${PROJECT_NAME}
   src/surrounding.cpp
   src/utils.cpp
   src/system_config.cpp
-  src/alpha_brain.cpp
+  src/spatial_container.cpp
 )
 
 set_target_properties(global_utils PROPERTIES POSITION_INDEPENDENT_CODE ON)

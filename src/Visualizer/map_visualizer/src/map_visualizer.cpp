@@ -2,7 +2,7 @@
 #include <geometry_msgs/msg/point.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 
-alpha_brain::MapVisualizerNode::MapVisualizerNode(const rclcpp::NodeOptions &options) :
+spatial_container::MapVisualizerNode::MapVisualizerNode(const rclcpp::NodeOptions &options) :
 Node("map_visualizer_node", options)
 {
     // Create publisher
@@ -20,10 +20,10 @@ Node("map_visualizer_node", options)
     RCLCPP_INFO(this->get_logger(), "Map Visualizer initialized.");
 }
 
-alpha_brain::MapVisualizerNode::~MapVisualizerNode() {
+spatial_container::MapVisualizerNode::~MapVisualizerNode() {
 }
 
-void alpha_brain::MapVisualizerNode::PublishMap() {
+void spatial_container::MapVisualizerNode::PublishMap() {
     // Only proceed if there are subscribers to save CPU
     if (map_marker_PUB->get_subscription_count() == 0) return;
 
@@ -38,24 +38,24 @@ void alpha_brain::MapVisualizerNode::PublishMap() {
 
     // Shared read lock to prevent modifying the map while we iterate, 
     // but allowing multiple readers (like Reactive OA) to access it simultaneously.
-    std::shared_lock<std::shared_mutex> lock(alpha_brain::global_map.mutex);
+    std::shared_lock<std::shared_mutex> lock(spatial_container::global_map.mutex);
 
-    if (!alpha_brain::global_map.tsdf_layer) {
+    if (!spatial_container::global_map.tsdf_layer) {
         return; // Map not initialized yet
     }
 
     // Set scale based on the actual voxel size
-    float voxel_size = alpha_brain::global_map.tsdf_layer->voxel_size();
+    float voxel_size = spatial_container::global_map.tsdf_layer->voxel_size();
     marker.scale.x = voxel_size;
     marker.scale.y = voxel_size;
     marker.scale.z = voxel_size;
 
     // Extract blocks
     voxblox::BlockIndexList blocks;
-    alpha_brain::global_map.tsdf_layer->getAllAllocatedBlocks(&blocks);
+    spatial_container::global_map.tsdf_layer->getAllAllocatedBlocks(&blocks);
 
     for (const voxblox::BlockIndex& index : blocks) {
-        voxblox::Block<voxblox::TsdfVoxel>::ConstPtr block = alpha_brain::global_map.tsdf_layer->getBlockPtrByIndex(index);
+        voxblox::Block<voxblox::TsdfVoxel>::ConstPtr block = spatial_container::global_map.tsdf_layer->getBlockPtrByIndex(index);
         
         for (size_t linear_index = 0; linear_index < block->num_voxels(); ++linear_index) {
             const voxblox::TsdfVoxel& voxel = block->getVoxelByLinearIndex(linear_index);

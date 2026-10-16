@@ -16,7 +16,7 @@
 
 #include "global_utils/system_config.hpp"
 #include "global_utils/utils.hpp"
-#include "global_utils/alpha_brain.hpp"
+#include "global_utils/spatial_container.hpp"
 #include "voxblox/core/common.h"
 #include "voxblox/core/voxel.h"
 #include "voxblox/core/layer.h"
@@ -32,7 +32,7 @@
 #define VISUALIZE (ALLOW_DEBUG & 0)
 #define TIME_ANALYSE (ALLOW_DEBUG & 0)
 
-namespace alpha_brain {
+namespace spatial_container {
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -97,4 +97,4 @@ private:
 
 };
 
-} // namespace alpha_brain
+} // namespace spatial_container

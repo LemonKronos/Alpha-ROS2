@@ -4,13 +4,13 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <shared_mutex>
 
-#include "global_utils/alpha_brain.hpp" // Contains the MapState global_map definition
+#include "global_utils/spatial_container.hpp" // Contains the MapState global_map definition
 #include "voxblox/core/common.h"
 #include "voxblox/core/voxel.h"
 #include "voxblox/core/layer.h"
 #include "voxblox/core/block.h"
 
-namespace alpha_brain {
+namespace spatial_container {
 
 class MapVisualizerNode : public rclcpp::Node {
 public:
@@ -28,4 +28,4 @@ private:
     void PublishMap();
 };
 
-} // namespace alpha_brain
+} // namespace spatial_container

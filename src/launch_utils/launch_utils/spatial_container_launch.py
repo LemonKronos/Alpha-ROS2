@@ -16,26 +16,26 @@ def generate_launch_description():
 
     low_spatial_node = ComposableNode(
         package='low_spatial',
-        plugin='alpha_brain::LowSpatialNode',
+        plugin='spatial_container::LowSpatialNode',
         name='low_spatial',
         parameters=[low_spatial_params]
     )
 
     depth_cam_node = ComposableNode(
         package='depth_cam',
-        plugin='alpha_brain::DepthCamNode',
+        plugin='spatial_container::DepthCamNode',
         name='depth_cam'
     )
 
     omni_lidar_node = ComposableNode(
         package='omni_lidar',
-        plugin='alpha_brain::OmniLidarNode',
+        plugin='spatial_container::OmniLidarNode',
         name='omni_lidar'
     )
 
     reactive_oa_node = ComposableNode(
         package='reactive_oa',
-        plugin='alpha_brain::ReactiveOANode',
+        plugin='spatial_container::ReactiveOANode',
         name='reactive_oa'
     )
 
@@ -43,12 +43,12 @@ def generate_launch_description():
 
     map_visualizer_node = ComposableNode(
         package='map_visualizer',
-        plugin='alpha_brain::MapVisualizerNode',
+        plugin='spatial_container::MapVisualizerNode',
         name='map_visualizer'
     )
 
-    alpha_brain_container = ComposableNodeContainer(
-        name='alpha_brain',
+    spatial_container_container = ComposableNodeContainer(
+        name='spatial_container',
         namespace='',
         package='rclcpp_components',
         executable='component_container_mt',
@@ -69,4 +69,4 @@ def generate_launch_description():
         # prefix=['gdb -ex run --args'], #DEBUG
     )
 
-    return LaunchDescription([alpha_brain_container])
+    return LaunchDescription([spatial_container_container])

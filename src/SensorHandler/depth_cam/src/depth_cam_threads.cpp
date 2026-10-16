@@ -2,7 +2,7 @@
 
 #pragma region ProcessingThread class
 
-alpha_brain::ProcessingThread::ProcessingThread(
+spatial_container::ProcessingThread::ProcessingThread(
     const std::string& name,
     rclcpp::Node* theNode,
     const std::string& topic,
@@ -21,7 +21,7 @@ alpha_brain::ProcessingThread::ProcessingThread(
     this->depth_cam_SUB = theNode->create_subscription<sensor_msgs::msg::PointCloud2>(
         this->topic,
         rclcpp::SensorDataQoS(),
-        std::bind(&alpha_brain::ProcessingThread::DepthCamCallback, this, _1)
+        std::bind(&spatial_container::ProcessingThread::DepthCamCallback, this, _1)
     );
 
     // Init variables
@@ -35,7 +35,7 @@ alpha_brain::ProcessingThread::ProcessingThread(
 #endif
 }
 
-alpha_brain::ProcessingThread::~ProcessingThread() {
+spatial_container::ProcessingThread::~ProcessingThread() {
     this->running.store(false);
     this->msg_queue.enqueue(nullptr);
     if(this->processing_thread.joinable()) this->processing_thread.join();
@@ -45,15 +45,15 @@ alpha_brain::ProcessingThread::~ProcessingThread() {
 #endif
 }
 
-void alpha_brain::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+void spatial_container::ProcessingThread::processMsg(sensor_msgs::msg::PointCloud2::SharedPtr msg) {
     this->msg_queue.enqueue(msg);
 }
 
-void alpha_brain::ProcessingThread::DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+void spatial_container::ProcessingThread::DepthCamCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
     processMsg(msg);
 }
 
-void alpha_brain::ProcessingThread::ProducerLoop() {
+void spatial_container::ProcessingThread::ProducerLoop() {
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the msg
         sensor_msgs::msg::PointCloud2::SharedPtr msg;
@@ -137,7 +137,7 @@ void alpha_brain::ProcessingThread::ProducerLoop() {
 
 #pragma region WorlUpdateThread class
 
-alpha_brain::WorldUpdateThread::WorldUpdateThread(
+spatial_container::WorldUpdateThread::WorldUpdateThread(
     rclcpp::Node* theNode,
     time_utils::TimeAnalyzer* analyzer
 ) : 
@@ -155,9 +155,9 @@ alpha_brain::WorldUpdateThread::WorldUpdateThread(
     #endif
 }
 
-alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
+spatial_container::WorldUpdateThread::~WorldUpdateThread() {
     this->running.store(false);
-    this->world_update_queue.enqueue(alpha_brain::VoxbloxBatch());
+    this->world_update_queue.enqueue(spatial_container::VoxbloxBatch());
     if(this->world_update_thread.joinable()) this->world_update_thread.join();
 
     #if FLOW    
@@ -165,11 +165,11 @@ alpha_brain::WorldUpdateThread::~WorldUpdateThread() {
     #endif    
 }
 
-moodycamel::BlockingConcurrentQueue<alpha_brain::VoxbloxBatch>& alpha_brain::WorldUpdateThread::getQueue() {
+moodycamel::BlockingConcurrentQueue<spatial_container::VoxbloxBatch>& spatial_container::WorldUpdateThread::getQueue() {
     return this->world_update_queue;
 }
 
-void alpha_brain::WorldUpdateThread::ConsumerLoop() {
+void spatial_container::WorldUpdateThread::ConsumerLoop() {
     // Thread loop
     while(this->running.load(std::memory_order_relaxed)) {
         // Dequeue the batch of point cloud
@@ -194,16 +194,16 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
         // Put new scan to voxblox map
         {
             // Mutex lock
-            std::unique_lock lock(alpha_brain::global_map.mutex);
+            std::unique_lock lock(spatial_container::global_map.mutex);
 
             // Check if map exist
-            if(alpha_brain::global_map.tsdf_layer) {
+            if(spatial_container::global_map.tsdf_layer) {
                 
                 // Lazy init intergrator (once)
                 if(!this->tsdf_integrator) {
                     this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
-                        alpha_brain::global_map.tsdf_config, 
-                        alpha_brain::global_map.tsdf_layer.get()
+                        spatial_container::global_map.tsdf_config, 
+                        spatial_container::global_map.tsdf_layer.get()
                     );
                     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map" RESET);
                 }

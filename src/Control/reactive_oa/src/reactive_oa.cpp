@@ -1,13 +1,13 @@
 #include "reactive_oa/reactive_oa.hpp"
 
-alpha_brain::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
+spatial_container::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
 Node("reactive_oa_node", options)
 {
     Global::setup_for_simulation(this);
     
     // Publishers
     final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
-    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>("/alpha_brain/spatial_observation", rclcpp::SensorDataQoS());
+    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>("/spatial_container/spatial_observation", rclcpp::SensorDataQoS());
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
@@ -59,13 +59,13 @@ Node("reactive_oa_node", options)
     #endif
 }
 
-alpha_brain::ReactiveOANode::~ReactiveOANode(){
+spatial_container::ReactiveOANode::~ReactiveOANode(){
 #if TIME_ANALYSE
     analyzer->printSummary();
 #endif
 }
 
-void alpha_brain::ReactiveOANode::computeControlVector() {
+void spatial_container::ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
         last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
         last_control_signal->left * Drone::SPEED_MAX_STRAFE,
@@ -73,7 +73,7 @@ void alpha_brain::ReactiveOANode::computeControlVector() {
     ); 
 }
 
-void alpha_brain::ReactiveOANode::computeMovementVector() {
+void spatial_container::ReactiveOANode::computeMovementVector() {
     Eigen::Vector3f world_vel(
         last_perception->velocity[0],
         last_perception->velocity[1],
@@ -85,7 +85,7 @@ void alpha_brain::ReactiveOANode::computeMovementVector() {
     movement_vec = q.inverse() * world_vel; 
 }
 
-void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
+void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
 #if TIME_ANALYSE
     analyzer->start_segment("Extract Spatial Boxes");
 #endif
@@ -134,7 +134,7 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
                 Eigen::Vector3f c_world = drone_pos + body_rot * c_local;
                 
                 float c_dist = 0.0f;
-                bool c_obs = alpha_brain::global_map.getDistance(c_world, c_dist);
+                bool c_obs = spatial_container::global_map.getDistance(c_world, c_dist);
                 
                 //DEV look at the mean and min handling in the previous commit, but that is not accurate
 
@@ -146,7 +146,7 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
                 Eigen::Vector3f d_world = drone_pos + intent_rot * d_local;
 
                 float d_dist = 0.0f;
-                bool d_obs = alpha_brain::global_map.getDistance(d_world, d_dist);
+                bool d_obs = spatial_container::global_map.getDistance(d_world, d_dist);
 
                 float d_val = d_obs ? (d_dist / detail_ref_dist) : 1.0f;
                 obs_msg.detail_box[detail_idx] = d_val;         
@@ -166,7 +166,7 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
     #endif
 }
 
-void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
+void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     #if TIME_ANALYSE
         analyzer->start_segment("Compute Multi-Sphere Gradient");
     #endif
@@ -187,7 +187,7 @@ void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
 
         float distance = 0.0f;
         // First, check distance alone
-        bool observed = alpha_brain::global_map.getDistance(center_world, distance);
+        bool observed = spatial_container::global_map.getDistance(center_world, distance);
 
         if(!observed) RCLCPP_WARN_THROTTLE(
             this->get_logger(),
@@ -200,7 +200,7 @@ void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
         // Only query the gradient if the sphere's safety margin is breached
         // if (observed && distance < dynamic_radius) {
             Eigen::Vector3f gradient = Eigen::Vector3f::Zero();
-            if(!alpha_brain::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
+            if(!spatial_container::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
                 this->get_logger(),
                 *this-> get_clock(), 1000,
                 RED "Unable to get ESDF gradient at (%.1f, %.1f, %.1f)" RESET,
@@ -223,7 +223,7 @@ void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
     #endif
 }
 
-void alpha_brain::ReactiveOANode::computeCorrectionVector() {
+void spatial_container::ReactiveOANode::computeCorrectionVector() {
     Eigen::Vector3f target_vec = control_vec + total_repulsive_vec;
     
     // Hard cutoff if opposing vectors cancel out perfectly near an obstacle
@@ -236,14 +236,14 @@ void alpha_brain::ReactiveOANode::computeCorrectionVector() {
     }
 }
 
-void alpha_brain::ReactiveOANode::resetVectors() {
+void spatial_container::ReactiveOANode::resetVectors() {
     if(lost_control_signal) control_vec.setZero();
     if(lost_perception) movement_vec.setZero();
     correction_vec.setZero();
     total_repulsive_vec.setZero();
 }
 
-void alpha_brain::ReactiveOANode::nodeLoopCallback() {
+void spatial_container::ReactiveOANode::nodeLoopCallback() {
 #if TIME_ANALYSE
     analyzer->start_segment("Main Loop");
 #endif
@@ -304,14 +304,14 @@ void alpha_brain::ReactiveOANode::nodeLoopCallback() {
 #endif
 }
 
-void alpha_brain::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
+void spatial_container::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
     lost_control_signal = false;
     lost_control_signal_counter = 0;
     last_control_signal = msg;
     computeControlVector();
 }
 
-void alpha_brain::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
+void spatial_container::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
     lost_perception = false;
     lost_perception_counter = 0;
     last_perception = msg;
@@ -319,7 +319,7 @@ void alpha_brain::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::Fuse
 }
 
 #if VISUALIZE
-void alpha_brain::ReactiveOANode::publishVectorArrow(
+void spatial_container::ReactiveOANode::publishVectorArrow(
     const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
     const Eigen::Vector3f& vec,
     float r, float g, float b) {

@@ -13,7 +13,7 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch_utils/ros_gz_bridge_launch.py',
             'launch_utils/static_tf_launch.py',
-            'launch_utils/alpha_brain_launch.py',
+            'launch_utils/spatial_container_launch.py',
             'launch_utils/reactive_oa_launch.py',
         ]),
     ],

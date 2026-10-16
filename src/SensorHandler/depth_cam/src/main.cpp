@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions options;
-    auto node = std::make_shared<alpha_brain::DepthCamNode>(options);
+    auto node = std::make_shared<spatial_container::DepthCamNode>(options);
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

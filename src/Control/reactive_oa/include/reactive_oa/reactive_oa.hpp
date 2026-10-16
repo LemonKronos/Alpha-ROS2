@@ -3,7 +3,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "global_utils/utils.hpp"
 #include "global_utils/system_config.hpp"
-#include "global_utils/alpha_brain.hpp"
+#include "global_utils/spatial_container.hpp"
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/fuse_perception.hpp"
 #include "alpha_msgs/msg/spatial_observation.hpp"
@@ -30,7 +30,7 @@
 
 using std::placeholders::_1;
 
-namespace alpha_brain {
+namespace spatial_container {
 
 class ReactiveOANode : public rclcpp::Node {
 public:
@@ -107,4 +107,4 @@ private:
     static constexpr int BOX_DIM = 12;
 };
 
-} // namespace alpha_brain
+} // namespace spatial_container
