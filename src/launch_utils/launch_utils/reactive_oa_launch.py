@@ -39,13 +39,13 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        Node(
-            package='reactive_oa',
-            executable='reactive_oa',
-            name='reactive_oa',
-            output='screen',
-            # arguments=['--ros-args', '--log-level', 'warn']
-        ),
+        # Node(
+        #     package='reactive_oa',
+        #     executable='reactive_oa',
+        #     name='reactive_oa',
+        #     output='screen',
+        #     # arguments=['--ros-args', '--log-level', 'warn']
+        # ),
         Node(
             package='fuse_perception',
             executable='fuse_perception',

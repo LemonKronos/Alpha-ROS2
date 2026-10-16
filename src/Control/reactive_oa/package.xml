@@ -17,6 +17,7 @@
   <depend>depth_cam</depend>
   <depend>fuse_perception</depend>
   <depend>low_spatial</depend>
+  <depend>glog</depend> <!-- Voxblox leaky dependency -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

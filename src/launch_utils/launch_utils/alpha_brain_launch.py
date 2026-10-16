@@ -33,6 +33,12 @@ def generate_launch_description():
         name='omni_lidar'
     )
 
+    reactive_oa_node = ComposableNode(
+        package='reactive_oa',
+        plugin='alpha_brain::ReactiveOANode',
+        name='reactive_oa'
+    )
+
     #DEV Acrobatic brain go here
 
     map_visualizer_node = ComposableNode(
@@ -50,6 +56,7 @@ def generate_launch_description():
             low_spatial_node,
             depth_cam_node,
             omni_lidar_node,
+            reactive_oa_node,
             # map_visualizer_node
         ],
         # ros_arguments=[
@@ -58,7 +65,8 @@ def generate_launch_description():
         #     'depth_cam_node:=warn',
         #     'omni_lidar_node:=warn'
         # ],
-        output='screen'
+        output='screen',
+        # prefix=['gdb -ex run --args'], #DEBUG
     )
 
     return LaunchDescription([alpha_brain_container])

@@ -14,6 +14,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
+find_package(glog REQUIRED) #! Voxblox leaky dependency
 
 include_directories(include)
 
@@ -27,6 +28,10 @@ add_library(reactive_oa_component SHARED
 target_include_directories(reactive_oa_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(reactive_oa_component
+  glog::glog #! Voxblox leaky dependency
 )
 
 ament_target_dependencies(reactive_oa_component

@@ -10,7 +10,6 @@
 
 #include <Eigen/Dense>
 #include <vector>
-#include <shared_mutex>
 
 #ifndef ALLOW_DEBUG
     #define ALLOW_DEBUG 0
@@ -22,7 +21,7 @@
 
 #define DEBUG (ALLOW_DEBUG & 1)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
-#define TIME_ANALYSE (ALLOW_DEBUG & 1)
+#define TIME_ANALYSE (ALLOW_DEBUG & 0)
 
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker_array.hpp>
@@ -79,11 +78,13 @@ private:
     // Methods
     void computeControlVector();
     void computeMovementVector();
-    void extractAndPublishSpatialBoxes();
-    void computeMultiSphereGradient();
     void computeCorrectionVector();
     void resetVectors();
     
+    // Extraction Helpers
+    void extractAndPublishSpatialBoxes();
+    void computeMultiSphereGradient();
+
     #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;
         void publishVectorArrow(
@@ -91,7 +92,6 @@ private:
             const Eigen::Vector3f& vec,
             float r, float g, float b
         );
-        void publishFoamSpheres();
     #endif
 
     // Timer

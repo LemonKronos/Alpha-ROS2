@@ -1,5 +1,4 @@
 #include "reactive_oa/reactive_oa.hpp"
-#include "voxblox/core/esdf_map.h"
 
 alpha_brain::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
 Node("reactive_oa_node", options)
@@ -45,7 +44,6 @@ Node("reactive_oa_node", options)
 
     lost_control_signal = true;
     lost_control_signal_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
-    
     lost_perception = true;
     lost_perception_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
 
@@ -96,9 +94,6 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
     obs_msg.header.stamp = this->now();
     obs_msg.header.frame_id = base_link.get();
 
-    // Ensure map is available
-    if (!global_map.esdf_layer) return;
-
     Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
     Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
     Eigen::Matrix3f body_rot = drone_q.toRotationMatrix();
@@ -114,7 +109,7 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
     float detail_stride_yz = (5.0f * UNIT_TO_METER) / BOX_DIM;
     float detail_ref_dist = std::sqrt(std::pow(l_v, 2) + 2.0f * std::pow(2.5f * UNIT_TO_METER, 2));
 
-    // Intent Rotation Matrix (Align X with control_vec, Z roughly up)
+    //? Intent Rotation Matrix (Align X with control_vec, Z roughly up)
     Eigen::Matrix3f intent_rot = body_rot; 
     if (control_vec.norm() > 1e-3f) {
         Eigen::Vector3f intent_x = body_rot * control_vec.normalized();
@@ -134,38 +129,29 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
         for (int y = 0; y < BOX_DIM; ++y) {
             for (int x = 0; x < BOX_DIM; ++x) {
                 
-                // --- Coarse Cell ---
-                Eigen::Vector3f c_local(
-                    (x - BOX_DIM/2.0f + 0.5f) * coarse_stride,
-                    (y - BOX_DIM/2.0f + 0.5f) * coarse_stride,
-                    (z - BOX_DIM/2.0f + 0.5f) * coarse_stride
-                );
+                // Coarse Cell (queries distance only)
+                Eigen::Vector3f c_local((x - BOX_DIM/2.0f + 0.5f) * coarse_stride, (y - BOX_DIM/2.0f + 0.5f) * coarse_stride, (z - BOX_DIM/2.0f + 0.5f) * coarse_stride);
                 Eigen::Vector3f c_world = drone_pos + body_rot * c_local;
                 
-                double c_dist = 0.0;
-                bool c_obs = global_map.esdf_layer->getDistanceAtPosition(c_world.cast<double>(), &c_dist);
+                float c_dist = 0.0f;
+                bool c_obs = alpha_brain::global_map.getDistance(c_world, c_dist);
                 
-                // Write Coarse Channels [Mean ESDF, Mask]
-                obs_msg.coarse_box[coarse_idx] = c_obs ? static_cast<float>(c_dist) / coarse_ref_dist : 1.0f;
+                //DEV look at the mean and min handling in the previous commit, but that is not accurate
+
+                obs_msg.coarse_box[coarse_idx] = c_obs ? (c_dist / coarse_ref_dist) : 1.0f;
                 obs_msg.coarse_box[1728 + coarse_idx] = c_obs ? 1.0f : 0.0f;
                 
-                // --- Detail Cell ---
-                Eigen::Vector3f d_local(
-                    (x + 0.5f) * detail_stride_x, // Origin at drone, extending forward
-                    (y - BOX_DIM/2.0f + 0.5f) * detail_stride_yz,
-                    (z - BOX_DIM/2.0f + 0.5f) * detail_stride_yz
-                );
+                // Detail Cell (queries distance only)
+                Eigen::Vector3f d_local((x + 0.5f) * detail_stride_x, (y - BOX_DIM/2.0f + 0.5f) * detail_stride_yz, (z - BOX_DIM/2.0f + 0.5f) * detail_stride_yz);
                 Eigen::Vector3f d_world = drone_pos + intent_rot * d_local;
 
-                double d_dist = 0.0;
-                bool d_obs = global_map.esdf_layer->getDistanceAtPosition(d_world.cast<double>(), &d_dist);
+                float d_dist = 0.0f;
+                bool d_obs = alpha_brain::global_map.getDistance(d_world, d_dist);
 
-                // Write Detail Channels [Min ESDF, Mean ESDF, Mask] 
-                // (Using point sample as both Min/Mean approximation for this grid resolution)
-                float d_val = d_obs ? static_cast<float>(d_dist) / detail_ref_dist : 1.0f;
-                obs_msg.detail_box[detail_idx] = d_val;         // Min
-                obs_msg.detail_box[1728 + detail_idx] = d_val;  // Mean
-                obs_msg.detail_box[3456 + detail_idx] = d_obs ? 1.0f : 0.0f; // Mask
+                float d_val = d_obs ? (d_dist / detail_ref_dist) : 1.0f;
+                obs_msg.detail_box[detail_idx] = d_val;         
+                obs_msg.detail_box[1728 + detail_idx] = d_val;  
+                obs_msg.detail_box[3456 + detail_idx] = d_obs ? 1.0f : 0.0f; 
 
                 coarse_idx++;
                 detail_idx++;
@@ -175,24 +161,22 @@ void alpha_brain::ReactiveOANode::extractAndPublishSpatialBoxes() {
 
     spatial_obs_PUB->publish(obs_msg);
 
-#if TIME_ANALYSE
-    analyzer->stop_segment("Extract Spatial Boxes");
-#endif
+    #if TIME_ANALYSE
+        analyzer->stop_segment("Extract Spatial Boxes");
+    #endif
 }
 
 void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
-#if TIME_ANALYSE
-    analyzer->start_segment("Compute Multi-Sphere Gradient");
-#endif
+    #if TIME_ANALYSE
+        analyzer->start_segment("Compute Multi-Sphere Gradient");
+    #endif
     
     total_repulsive_vec.setZero();
-    if (!global_map.esdf_layer || lost_perception) return;
-
     Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
     Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
 
     float speed_factor = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
-    float speed_inflation = 1.0f + (1.5f * speed_factor); // Inflate bubbles up to 2.5x at max speed
+    float speed_inflation = 1.0f + (1.5f * speed_factor);
 
     for (const auto& sphere : foam_spheres) {
         Eigen::Vector3f center_body = sphere.head<3>();
@@ -201,25 +185,42 @@ void alpha_brain::ReactiveOANode::computeMultiSphereGradient() {
 
         Eigen::Vector3f center_world = drone_pos + (drone_q * center_body);
 
-        double distance = 0.0;
-        Eigen::Vector3d gradient;
-        bool observed = global_map.esdf_layer->getDistanceAndGradientAtPosition(center_world.cast<double>(), &distance, &gradient);
+        float distance = 0.0f;
+        // First, check distance alone
+        bool observed = alpha_brain::global_map.getDistance(center_world, distance);
 
-        if (observed && distance < dynamic_radius) {
+        if(!observed) RCLCPP_WARN_THROTTLE(
+            this->get_logger(),
+            *this-> get_clock(), 1000,
+            RED "Unable to get ESDF distance at (%.1f, %.1f, %.1f)" RESET,
+            center_world.x(),
+            center_world.y(),center_world.z()
+        );
+
+        // Only query the gradient if the sphere's safety margin is breached
+        // if (observed && distance < dynamic_radius) {
+            Eigen::Vector3f gradient = Eigen::Vector3f::Zero();
+            if(!alpha_brain::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
+                this->get_logger(),
+                *this-> get_clock(), 1000,
+                RED "Unable to get ESDF gradient at (%.1f, %.1f, %.1f)" RESET,
+                center_world.x(),
+                center_world.y(),center_world.z()
+            );
+
             float urgency = (dynamic_radius - distance) / dynamic_radius;
             urgency = std::clamp(urgency, 0.0f, 1.0f);
             
-            // Push away along the gradient in world frame, then convert back to body frame
-            Eigen::Vector3f push_world = gradient.cast<float>().normalized() * urgency * Drone::SPEED_MAX_FORWARD;
+            Eigen::Vector3f push_world = gradient.normalized() * urgency * Drone::SPEED_MAX_FORWARD;
             Eigen::Vector3f push_body = drone_q.inverse() * push_world;
 
             total_repulsive_vec += push_body;
-        }
+        // }
     }
 
-#if TIME_ANALYSE
-    analyzer->stop_segment("Compute Multi-Sphere Gradient");
-#endif
+    #if TIME_ANALYSE
+        analyzer->stop_segment("Compute Multi-Sphere Gradient");
+    #endif
 }
 
 void alpha_brain::ReactiveOANode::computeCorrectionVector() {
@@ -254,15 +255,10 @@ void alpha_brain::ReactiveOANode::nodeLoopCallback() {
     if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
     lost_control_signal = (lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC);
 
-    // --- Critical Sequential Block ---
-    {
-        std::shared_lock<std::shared_mutex> lock(global_map.mutex);
-        if (!lost_perception && !lost_control_signal) {
-            extractAndPublishSpatialBoxes();
-            computeMultiSphereGradient();
-        }
+    if (!lost_perception && !lost_control_signal) {
+        // extractAndPublishSpatialBoxes();
+        computeMultiSphereGradient();
     }
-    // Lock Released
 
     computeCorrectionVector();
 

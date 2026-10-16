@@ -95,6 +95,9 @@ void alpha_brain::LowSpatialNode::UpdateMemoryVFH() {
     analyzer->start_segment("main loop");
     #endif
 
+    //_ Build Voxblox ESDF here
+    alpha_brain::global_map.updateEsdf();
+
     // Check if current position is alive
     if(perception_alive_counter > 0) perception_alive_counter--;
     else {
