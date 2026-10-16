@@ -202,7 +202,7 @@ void alpha_brain::WorldUpdateThread::ConsumerLoop() {
                 // Lazy init intergrator (once)
                 if(!this->tsdf_integrator) {
                     this->tsdf_integrator = std::make_unique<voxblox::FastTsdfIntegrator>(
-                        alpha_brain::global_map.config, 
+                        alpha_brain::global_map.tsdf_config, 
                         alpha_brain::global_map.tsdf_layer.get()
                     );
                     RCLCPP_INFO(this->theNode->get_logger(), GREEN "Integrator locked onto shared map" RESET);

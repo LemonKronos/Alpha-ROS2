@@ -9,26 +9,38 @@ alpha_brain::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) 
         this->declare_parameters("", std::map<std::string, rclcpp::ParameterValue>{
             {"voxel_resolution", rclcpp::ParameterValue(-1.0)}, // use as kill pill
             {"truncation_distance", rclcpp::ParameterValue(Sensor::VOXEL_TRUNCATION_DISTANCE)},
-            {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)}
+            {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)},
+            {"voxel_carving_enabled", rclcpp::ParameterValue(true)},
+            {"use_weight_dropoff", rclcpp::ParameterValue(false)},
+            {"esdf_min_distance", rclcpp::ParameterValue(0.0)},
+            {"esdf_max_distance", rclcpp::ParameterValue(10.0)},
+            {"esdf_default_distance", rclcpp::ParameterValue(10.0)}
         });
 
+        // Check load params
         float voxel_resolution = static_cast<float>(this->get_parameter("voxel_resolution").as_double());
-        if(voxel_resolution < 0) { // Check kill pill
+        if(voxel_resolution < 0) { // kill pill
             RCLCPP_WARN(this->get_logger(), YELLOW "Config not loaded, use default" RESET);
             voxel_resolution = Sensor::VOXEL_RESOLUTION;
         }
         
         //_ Init variables
-        // Global map
-        voxblox::TsdfIntegratorBase::Config config;
-        config.default_truncation_distance = static_cast<float>(this->get_parameter("truncation_distance").as_double());
-        config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
-        config.voxel_carving_enabled = true;
-        config.use_weight_dropoff = Sensor::VOXEL_USE_WEIGHT_DROPOFF;
+        //: TSDF
+        voxblox::TsdfIntegratorBase::Config tsdf_config;
+        tsdf_config.default_truncation_distance = static_cast<float>(this->get_parameter("truncation_distance").as_double());
+        tsdf_config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
+        tsdf_config.voxel_carving_enabled = this->get_parameter("voxel_carving_enabled").as_bool();
+        tsdf_config.use_weight_dropoff = this->get_parameter("use_weight_dropoff").as_bool();
 
-        // Init map
-        global_map.initialize(voxel_resolution, config);
-        this->tsdf_layer = global_map.tsdf_layer; //* just for VFH, will gone soon
+        //: ESDF
+        voxblox::EsdfIntegrator::Config esdf_config;
+        esdf_config.min_distance_m = this->get_parameter("esdf_min_distance").as_double();
+        esdf_config.max_distance_m = this->get_parameter("esdf_max_distance").as_double();
+        esdf_config.default_distance_m = this->get_parameter("esdf_default_distance").as_double();
+
+        //: Init Voxblox map
+        global_map.initialize(voxel_resolution, tsdf_config, esdf_config);
+        this->tsdf_layer = global_map.tsdf_layer; //* just for VFH, soon to be deprecated
         
         RCLCPP_INFO(this->get_logger(), GREEN "Voxblox map ready" RESET);
 

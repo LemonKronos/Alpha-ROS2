@@ -168,7 +168,6 @@ namespace Sensor {
     constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
     constexpr float VOXEL_MIN_WEIGHT = 1.0f;
     constexpr float VOXEL_MAX_WEIGHT = 100.0f;
-    constexpr bool VOXEL_USE_WEIGHT_DROPOFF = false;
     // constexpr float VOXEL_DROPOFF_EPSILON_WEIGHT = 15.0f; // Not been put in Low Spatial config
 
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;

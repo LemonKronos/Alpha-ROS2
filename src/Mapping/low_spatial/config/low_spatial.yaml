@@ -3,3 +3,9 @@ low_spatial:
     voxel_resolution: 0.25
     truncation_distance: 1.0
     max_weight: 10000.0
+    voxel_carving_enabled: true
+    use_weight_dropoff: false
+
+    esdf_min_distance: 0.0
+    esdf_max_distance: 10.0
+    esdf_default_distance: 10.0

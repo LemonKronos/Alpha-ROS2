@@ -27,7 +27,7 @@ public:
     mutable std::shared_mutex mutex;
 
     // Base config
-    voxblox::TsdfIntegratorBase::Config config;
+    voxblox::TsdfIntegratorBase::Config tsdf_config;
     voxblox::EsdfIntegrator::Config esdf_config;
 
     // The 3D Voxel Memory Layers and Map Wrapper
@@ -36,18 +36,19 @@ public:
     std::shared_ptr<voxblox::EsdfMap> esdf_map = nullptr;
     std::unique_ptr<voxblox::EsdfIntegrator> esdf_integrator = nullptr; 
 
-    void initialize(float voxel_resolution, voxblox::TsdfIntegratorBase::Config config) {
+    void initialize(
+        float voxel_resolution,
+        voxblox::TsdfIntegratorBase::Config tsdf_config,
+        voxblox::EsdfIntegrator::Config esdf_config
+    ) {
         std::unique_lock<std::shared_mutex> lock(mutex);
-        this->config = config;
+        this->tsdf_config = tsdf_config;
         this->tsdf_layer = std::make_shared<voxblox::Layer<voxblox::TsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);
+        this->esdf_config = esdf_config;
         this->esdf_layer = std::make_shared<voxblox::Layer<voxblox::EsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);
         
         // EsdfMap provides the interpolation and gradient queries over the raw layer
         this->esdf_map = std::make_shared<voxblox::EsdfMap>(this->esdf_layer);
-
-        this->esdf_config.min_distance_m = 0.0f;
-        this->esdf_config.max_distance_m = 10.0f; // Max distance to calculate (adjust as needed)
-        this->esdf_config.default_distance_m = 10.0f; 
         
         this->esdf_integrator = std::make_unique<voxblox::EsdfIntegrator>(
             this->esdf_config, 
