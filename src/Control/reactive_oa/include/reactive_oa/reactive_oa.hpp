@@ -7,6 +7,7 @@
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/fuse_perception.hpp"
 #include "alpha_msgs/msg/spatial_observation.hpp"
+#include "global_utils/types.hpp"
 
 #include <Eigen/Dense>
 #include <vector>
@@ -72,8 +73,8 @@ private:
     Eigen::Vector3f total_repulsive_vec;
     Eigen::Vector3f correction_vec;
 
-    // FOAM Spheres (x, y, z in body frame, w = radius)
-    std::vector<Eigen::Vector4f> foam_spheres;
+    
+    std::vector<FoamSphere> foam;
 
     // Methods
     void computeControlVector();
@@ -81,7 +82,8 @@ private:
     void computeCorrectionVector();
     void resetVectors();
     
-    // Extraction Helpers
+    // Helpers
+    void loadFoamFromParams();
     void extractAndPublishSpatialBoxes();
     void computeMultiSphereGradient();
 

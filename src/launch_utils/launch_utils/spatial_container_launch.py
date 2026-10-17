@@ -12,8 +12,6 @@ def generate_launch_description():
         'low_spatial.yaml'
     )
 
-    #! Order matter here
-
     low_spatial_node = ComposableNode(
         package='low_spatial',
         plugin='spatial_container::LowSpatialNode',
@@ -33,10 +31,16 @@ def generate_launch_description():
         name='omni_lidar'
     )
 
+    reactive_oa_params = os.path.join(
+        get_package_share_directory('global_utils'),
+        'config',
+        'alpha-foam.yaml'
+    )
+
     reactive_oa_node = ComposableNode(
         package='reactive_oa',
         plugin='spatial_container::ReactiveOANode',
-        name='reactive_oa'
+        name='reactive_oa',parameters=[reactive_oa_params]
     )
 
     #DEV Acrobatic brain go here
@@ -59,6 +63,7 @@ def generate_launch_description():
         package='rclcpp_components',
         executable='component_container_mt',
         composable_node_descriptions=[
+            #! Order matter here
             low_spatial_node,
             depth_cam_node,
             omni_lidar_node,

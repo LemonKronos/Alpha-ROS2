@@ -4,8 +4,11 @@ spatial_container::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &opt
 Node("reactive_oa_node", options)
 {
     Global::setup_for_simulation(this);
+
+    //: Load Params
+    loadFoamFromParams();
     
-    // Publishers
+    //: Publishers
     final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
     spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>("/spatial_container/spatial_observation", rclcpp::SensorDataQoS());
 
@@ -17,7 +20,7 @@ Node("reactive_oa_node", options)
         foam_spheres_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>("/visualizer/foam_spheres", 10);
     #endif
 
-    // Subscribers
+    //: Subscribers
     input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
         Topic::CONTROL_INPUT,
         rclcpp::SensorDataQoS(),
@@ -30,13 +33,13 @@ Node("reactive_oa_node", options)
         std::bind(&ReactiveOANode::perceptionCallback, this, _1)
     );
 
-    // Timer
+    //: Timer
     node_loop_TIME = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&ReactiveOANode::nodeLoopCallback, this)
     );
 
-    // Initialize Vectors
+    //: Init variables
     control_vec.setZero();
     movement_vec.setZero();
     total_repulsive_vec.setZero();
@@ -47,13 +50,6 @@ Node("reactive_oa_node", options)
     lost_perception = true;
     lost_perception_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
 
-    // Hardcode dummy FOAM skeleton (Center body + 4 arms). TODO: load from global YAML
-    foam_spheres.push_back(Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.3f));     // Core
-    foam_spheres.push_back(Eigen::Vector4f(0.2f, 0.2f, 0.05f, 0.15f));   // Front-Left
-    foam_spheres.push_back(Eigen::Vector4f(0.2f, -0.2f, 0.05f, 0.15f));  // Front-Right
-    foam_spheres.push_back(Eigen::Vector4f(-0.2f, 0.2f, 0.05f, 0.15f));  // Back-Left
-    foam_spheres.push_back(Eigen::Vector4f(-0.2f, -0.2f, 0.05f, 0.15f)); // Back-Right
-
     #if TIME_ANALYSE
     analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger(), 800);
     #endif
@@ -63,6 +59,41 @@ spatial_container::ReactiveOANode::~ReactiveOANode(){
 #if TIME_ANALYSE
     analyzer->printSummary();
 #endif
+}
+
+void spatial_container::ReactiveOANode::loadFoamFromParams() {
+    const auto values = this->declare_parameter<std::vector<double>>("foam_spheres", std::vector<double>{});
+
+    if(values.empty() || values.size() % 4 != 0) {
+        foam.push_back({
+            Eigen::Vector3f::Zero(),
+            Drone::RADIUS
+        });
+
+        RCLCPP_ERROR(this->get_logger(), RED "Unable to load FOAM, replacing with single bubble" RESET);
+    }
+
+    foam.reserve(values.size() / 4);
+
+    for(std::size_t i = 0; i < values.size(); i += 4) {
+        const float radius = static_cast<float>(values[i + 3]);
+
+        if(!std::isfinite(radius) || radius <= 0.0f) {
+            RCLCPP_WARN(this->get_logger(), YELLOW "Contain FOAM with incorrect radius, skipped" RESET);
+            continue;
+        }
+
+        foam.push_back({
+            Eigen::Vector3f(
+                static_cast<float>(values[i]),
+                static_cast<float>(values[i + 1]),
+                static_cast<float>(values[i + 2])
+            ),
+            radius
+        });
+    }
+
+    RCLCPP_INFO(this->get_logger(), GREEN "Loaded %d FOAM spheres" RESET, foam.size());
 }
 
 void spatial_container::ReactiveOANode::computeControlVector() {
@@ -176,45 +207,45 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     float speed_factor = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
     float speed_inflation = 1.0f + (1.5f * speed_factor);
 
-    for (const auto& sphere : foam_spheres) {
-        Eigen::Vector3f center_body = sphere.head<3>();
-        float base_radius = sphere.w();
-        float dynamic_radius = base_radius * speed_inflation;
+    // for (const auto& sphere : foam_spheres) {
+    //     Eigen::Vector3f center_body = sphere.head<3>();
+    //     float base_radius = sphere.w();
+    //     float dynamic_radius = base_radius * speed_inflation;
 
-        Eigen::Vector3f center_world = drone_pos + (drone_q * center_body);
+    //     Eigen::Vector3f center_world = drone_pos + (drone_q * center_body);
 
-        float distance = 0.0f;
-        // First, check distance alone
-        bool observed = spatial_container::global_map.getDistance(center_world, distance);
+    //     float distance = 0.0f;
+    //     // First, check distance alone
+    //     bool observed = spatial_container::global_map.getDistance(center_world, distance);
 
-        if(!observed) RCLCPP_WARN_THROTTLE(
-            this->get_logger(),
-            *this-> get_clock(), 1000,
-            RED "Unable to get ESDF distance at (%.1f, %.1f, %.1f)" RESET,
-            center_world.x(),
-            center_world.y(),center_world.z()
-        );
+    //     if(!observed) RCLCPP_WARN_THROTTLE(
+    //         this->get_logger(),
+    //         *this-> get_clock(), 1000,
+    //         RED "Unable to get ESDF distance at (%.1f, %.1f, %.1f)" RESET,
+    //         center_world.x(),
+    //         center_world.y(),center_world.z()
+    //     );
 
-        // Only query the gradient if the sphere's safety margin is breached
-        // if (observed && distance < dynamic_radius) {
-            Eigen::Vector3f gradient = Eigen::Vector3f::Zero();
-            if(!spatial_container::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
-                this->get_logger(),
-                *this-> get_clock(), 1000,
-                RED "Unable to get ESDF gradient at (%.1f, %.1f, %.1f)" RESET,
-                center_world.x(),
-                center_world.y(),center_world.z()
-            );
+    //     // Only query the gradient if the sphere's safety margin is breached
+    //     if (observed && distance < dynamic_radius) {
+    //         Eigen::Vector3f gradient = Eigen::Vector3f::Zero();
+    //         if(!spatial_container::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
+    //             this->get_logger(),
+    //             *this-> get_clock(), 1000,
+    //             RED "Unable to get ESDF gradient at (%.1f, %.1f, %.1f)" RESET,
+    //             center_world.x(),
+    //             center_world.y(),center_world.z()
+    //         );
 
-            float urgency = (dynamic_radius - distance) / dynamic_radius;
-            urgency = std::clamp(urgency, 0.0f, 1.0f);
+    //         float urgency = (dynamic_radius - distance) / dynamic_radius;
+    //         urgency = std::clamp(urgency, 0.0f, 1.0f);
             
-            Eigen::Vector3f push_world = gradient.normalized() * urgency * Drone::SPEED_MAX_FORWARD;
-            Eigen::Vector3f push_body = drone_q.inverse() * push_world;
+    //         Eigen::Vector3f push_world = gradient.normalized() * urgency * Drone::SPEED_MAX_FORWARD;
+    //         Eigen::Vector3f push_body = drone_q.inverse() * push_world;
 
-            total_repulsive_vec += push_body;
-        // }
-    }
+    //         total_repulsive_vec += push_body;
+    //     }
+    // }
 
     #if TIME_ANALYSE
         analyzer->stop_segment("Compute Multi-Sphere Gradient");

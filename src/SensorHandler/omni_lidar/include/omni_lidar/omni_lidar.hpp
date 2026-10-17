@@ -64,9 +64,6 @@ private:
     // SHM pointer
     std::unique_ptr<voxblox::FastTsdfIntegrator> tsdf_integrator = nullptr;
 
-    // Variales
-    Name::Dynamic::BASE_LINK base_link;
-
     // Custom type
     struct intergrator_batch{
         // Static
