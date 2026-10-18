@@ -10,9 +10,20 @@ FoamVisualizerNode::FoamVisualizerNode(const rclcpp::NodeOptions& options) :
     tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
+    // Subcribers
+    perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
+        Topic::FUSE_PERCEPTION,
+        rclcpp::SensorDataQoS(),
+        std::bind(&FoamVisualizerNode::perceptionCallback, this, _1)
+    );
+
     // Setup Publisher
-    foam_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "/visualizer/foam",
+    static_foam_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "/visualizer/foam/static",
+        10
+    );
+    inflated_foam_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "/visualizer/foam/inflated",
         10
     );
 
@@ -20,7 +31,7 @@ FoamVisualizerNode::FoamVisualizerNode(const rclcpp::NodeOptions& options) :
 
     // Setup Timer
     loop_TIME = this->create_timer(
-        std::chrono::milliseconds(100),
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FoamVisualizerNode::TimerCallback, this)
     );
 }
@@ -64,41 +75,120 @@ void FoamVisualizerNode::loadFoamFromParams() {
 void FoamVisualizerNode::TimerCallback() {
     // Verify drone is alive and TF is available
     if (!tf_buffer->canTransform("world", base_link.get(), tf2::TimePointZero, tf2::durationFromSec(0.1))) {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(),
+            *this->get_clock(), 1000,
+            YELLOW "Unable to transform FOAM to world frame" RESET
+        );
         return;
     }
 
-    visualization_msgs::msg::MarkerArray marker_array;
     auto stamp = this->get_clock()->now();
 
-    int id = 0;
-    for(const auto& sphere : foam) {
-        visualization_msgs::msg::Marker marker;
-        marker.header.frame_id = base_link.get();
-        marker.header.stamp = stamp;
-        marker.ns = "foam";
-        marker.id = id++;
-        marker.type = visualization_msgs::msg::Marker::SPHERE;
-        marker.action = visualization_msgs::msg::Marker::ADD;
+    // Static foam
+    if(static_foam_PUB->get_subscription_count() != 0) {
+        visualization_msgs::msg::MarkerArray static_marker_array;
 
-        marker.pose.position.x = sphere.pos.x();
-        marker.pose.position.y = sphere.pos.y();
-        marker.pose.position.z = sphere.pos.z();
-        
-        marker.pose.orientation.w = 1.0;
+        int id = 0;
+        for(const auto& sphere : foam) {
+            visualization_msgs::msg::Marker marker;
+            marker.header.frame_id = base_link.get();
+            marker.header.stamp = stamp;
+            marker.ns = "foam_static";
+            marker.id = id++;
+            marker.type = visualization_msgs::msg::Marker::SPHERE;
+            marker.action = visualization_msgs::msg::Marker::ADD;
 
-        // Individual sphere radius
-        marker.scale.x = sphere.radius * 2.0; 
-        marker.scale.y = sphere.radius * 2.0;
-        marker.scale.z = sphere.radius * 2.0;
+            marker.pose.position.x = sphere.pos.x();
+            marker.pose.position.y = sphere.pos.y();
+            marker.pose.position.z = sphere.pos.z();
+            
+            marker.pose.orientation.w = 1.0;
 
-        // Solid semi-blue white
-        marker.color.r = 0.8f;
-        marker.color.g = 0.8f;
-        marker.color.b = 1.0f;
-        marker.color.a = 1.0f;
+            // Individual sphere radius
+            marker.scale.x = sphere.radius * 2.0; 
+            marker.scale.y = sphere.radius * 2.0;
+            marker.scale.z = sphere.radius * 2.0;
 
-        marker_array.markers.push_back(marker);
+            // Solid semi-blue white
+            marker.color.r = 0.8f;
+            marker.color.g = 0.8f;
+            marker.color.b = 1.0f;
+            marker.color.a = 1.0f;
+
+            static_marker_array.markers.push_back(marker);
+        }
+
+        static_foam_PUB->publish(static_marker_array);
     }
 
-    foam_PUB->publish(marker_array);
+    // Inflated foam
+    if(inflated_foam_PUB->get_subscription_count() != 0) {
+        visualization_msgs::msg::MarkerArray inflated_marker_array;
+        int id = 0;
+        for(const auto& sphere : foam) {
+
+            float r_hazard = Drone::hazard_distance(sphere.radius);
+            float r_brake = Drone::braking_distance(smoothed_speed_, r_hazard);
+            float r_push = Drone::pushing_distance(smoothed_speed_, r_brake);
+
+            visualization_msgs::msg::Marker marker;
+            marker.header.frame_id = base_link.get();
+            marker.header.stamp = stamp;
+            marker.ns = "foam_inflated";
+            marker.id = id++;
+            marker.type = visualization_msgs::msg::Marker::SPHERE;
+            marker.action = visualization_msgs::msg::Marker::ADD;
+
+            marker.pose.position.x = sphere.pos.x();
+            marker.pose.position.y = sphere.pos.y();
+            marker.pose.position.z = sphere.pos.z();
+            
+            marker.pose.orientation.w = 1.0;
+
+            // Individual sphere radius
+            marker.scale.x = r_push * 2.0; 
+            marker.scale.y = r_push * 2.0;
+            marker.scale.z = r_push * 2.0;
+
+            // Transparent yellow
+            marker.color.r = 0.8f;
+            marker.color.g = 0.8f;
+            marker.color.b = 0.0f;
+            marker.color.a = 0.5f;
+
+            inflated_marker_array.markers.push_back(marker);
+        }
+
+        inflated_foam_PUB->publish(inflated_marker_array);
+    }
+}
+
+void FoamVisualizerNode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
+    auto norm = [] (float speed, float max_speed) -> float {
+        return std::clamp(speed / max_speed, -1.0f, 1.0f);
+    };
+
+    Eigen::Vector3f world_vel(
+        norm(msg->velocity[0], Drone::SPEED_MAX_FORWARD),
+        norm(msg->velocity[1], Drone::SPEED_MAX_STRAFE),
+        norm(msg->velocity[2], Drone::SPEED_MAX_UP)
+    );
+    if(world_vel.hasNaN()) world_vel.setZero();
+
+    // This was copied from Reactive OA
+
+    // 1. Anticipated Speed Blending
+    float physical_speed = world_vel.norm();
+
+    // 2. Asymmetric Rate Limiting (Fast Inflate, Slow Deflate)
+    float dt = Clock::LOOP_CYCLE_FAST; // Assuming this is defined as seconds (e.g., 0.01f)
+    if (physical_speed > smoothed_speed_) {
+        // Inflate instantly to guarantee safety against sudden intent spikes
+        smoothed_speed_ = physical_speed;
+    } else {
+        // Deflate slowly constrained by the drone's maximum physical deceleration
+        smoothed_speed_ -= Drone::DECELERATE_MAX * dt;
+        if (smoothed_speed_ < physical_speed) smoothed_speed_ = physical_speed;
+    }
 }

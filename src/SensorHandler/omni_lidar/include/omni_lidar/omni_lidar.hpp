@@ -71,7 +71,7 @@ private:
         float range_max_sq;
 
         // Dynamic
-        voxblox::Transformation tranform;
+        voxblox::Transformation transform;
         voxblox::Pointcloud pointcloud;
         voxblox::Colors colors;
     };

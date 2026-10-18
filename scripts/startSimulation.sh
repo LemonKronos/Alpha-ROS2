@@ -57,11 +57,15 @@ start_micro_xrce_agent() {
 #_ PX4
 MODEL_POSE="0,0,1"
 if [[ "$WORLD_NAME" == "grasslands" ]]; then
-  MODEL_POSE="0,13,1"
+  MODEL_POSE="0,13,0.5"
 fi
 start_px4_sitl() {
   kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
 cd ~/MyCode/Project/Drone/PX4-Autopilot &&
+
+mkdir -p build/px4_sitl_default/rootfs/fs/microsd/etc &&
+echo "param set UXRCE_DDS_SYNCT 0" > build/px4_sitl_default/rootfs/fs/microsd/etc/extras.txt &&
+
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
@@ -74,7 +78,7 @@ make px4_sitl "gz_$DRONE_NAME"
 exec zsh
 EOF
 )" & echo $! >> /tmp/sim_pids.txt &&
-  printf "\033[92m[PX4] Starting with Gazebo in standalone mode...\033[0m\n"
+  printf "\033[92m[PX4] Starting with Gazebo time sync in standalone mode...\033[0m\n"
 }
 
 #_ QGROUND CONTROL

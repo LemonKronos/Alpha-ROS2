@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(global_utils REQUIRED)
+find_package(alpha_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -31,6 +32,7 @@ target_include_directories(foam_visualizer PUBLIC
 ament_target_dependencies(foam_visualizer
   rclcpp
   global_utils
+  alpha_msgs
   visualization_msgs
   tf2_ros
   tf2_eigen

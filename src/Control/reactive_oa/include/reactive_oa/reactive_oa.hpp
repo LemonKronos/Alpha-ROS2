@@ -22,7 +22,7 @@
 
 #define DEBUG (ALLOW_DEBUG & 1)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
-#define TIME_ANALYSE (ALLOW_DEBUG & 0)
+#define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
 #ifdef VISUALIZE
     #include <visualization_msgs/msg/marker_array.hpp>
@@ -46,8 +46,7 @@ private:
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr control_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr movement_vec_PUB;
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr repulsive_vec_PUB;
-        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr correction_vec_PUB;
-        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr foam_spheres_PUB;
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr reactive_vec_PUB;
     #endif
 
     // Subscribers
@@ -70,16 +69,17 @@ private:
 
     Eigen::Vector3f control_vec;
     Eigen::Vector3f movement_vec;
-    Eigen::Vector3f total_repulsive_vec;
-    Eigen::Vector3f correction_vec;
+    Eigen::Vector3f repulsive_vec;
+    Eigen::Vector3f reactive_vec;
 
-    
-    std::vector<FoamSphere> foam;
+    float smoothed_speed_ = 0.0f;
+
+    std::vector<FoamSphere> multi_sphere;
 
     // Methods
     void computeControlVector();
     void computeMovementVector();
-    void computeCorrectionVector();
+    void computeReactiveVector();
     void resetVectors();
     
     // Helpers

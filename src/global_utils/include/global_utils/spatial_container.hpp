@@ -85,15 +85,14 @@ public:
         return obs;
     }
 
-    bool getGradient(const Eigen::Vector3f& pos, Eigen::Vector3f& gradient) const {
+    bool getDistanceAndGradient(const Eigen::Vector3f &pos, float &distance, Eigen::Vector3f &gradient) const {
         std::shared_lock<std::shared_mutex> lock(mutex);
         if (!esdf_map) return false;
-        
-        // Voxblox requires distance to be extracted alongside the gradient.
-        // We isolate it here so the caller only gets the clean gradient vector.
+
         double dist_d = 0.0; 
         Eigen::Vector3d grad_d;
         bool obs = esdf_map->getDistanceAndGradientAtPosition(pos.cast<double>(), &dist_d, &grad_d);
+        distance = static_cast<float>(dist_d);
         gradient = grad_d.cast<float>();
         return obs;
     }

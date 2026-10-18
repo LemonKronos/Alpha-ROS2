@@ -5,7 +5,9 @@ spatial_container::SpatialVisualizerNode::SpatialVisualizerNode(const rclcpp::No
 {        
         Global::setup_for_simulation(this);
 
-        this->tsdf_layer = global_map.tsdf_layer;
+        this->tsdf_layer = spatial_container::global_map.tsdf_layer;
+
+        this->voxel_size = static_cast<float>(this->declare_parameter<double>("voxel_resolution", Sensor::VOXEL_RESOLUTION));
 
         perception_alive_counter = 0;
         current_position.setZero();
@@ -54,6 +56,8 @@ void spatial_container::SpatialVisualizerNode::TimerCallback() {
 
         return;
     }
+
+    if(nearby_voxels_PUB->get_subscription_count() == 0) return;
 
     // Clear storage
     nearby_voxels.clear();
@@ -123,20 +127,22 @@ void spatial_container::SpatialVisualizerNode::PublishNearbyVoxels(const std::ve
 
 #if VISUALIZE_AS_CUBES
     marker.type = visualization_msgs::msg::Marker::CUBE_LIST;
+    marker.scale.x = voxel_size;
+    marker.scale.y = voxel_size;
+    marker.scale.z = voxel_size;
 #else
     marker.type = visualization_msgs::msg::Marker::POINTS;
+    marker.scale.x = voxel_size / 2;
+    marker.scale.y = voxel_size / 2;
+    marker.scale.z = voxel_size / 2;
 #endif
 
-    // Adjust scale to match your voxel resolution (equivalent to Sensor.VOXEL_RESOLUTION)
-    marker.scale.x = Sensor::VOXEL_RESOLUTION; 
-    marker.scale.y = Sensor::VOXEL_RESOLUTION;
-    marker.scale.z = Sensor::VOXEL_RESOLUTION;
 
     // Solid semi-transparent orange
     marker.color.r = 1.0f;
     marker.color.g = 0.36f;
     marker.color.b = 0.0f;
-    marker.color.a = 0.3f;
+    marker.color.a = 0.7f;
 
     // Pre-allocate memory to avoid reallocations during the loop
     marker.points.reserve(hazard_voxels.size());

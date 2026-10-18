@@ -40,7 +40,8 @@ def generate_launch_description():
     reactive_oa_node = ComposableNode(
         package='reactive_oa',
         plugin='spatial_container::ReactiveOANode',
-        name='reactive_oa',parameters=[reactive_oa_params]
+        name='reactive_oa',
+        # parameters=[reactive_oa_params]
     )
 
     #DEV Acrobatic brain go here

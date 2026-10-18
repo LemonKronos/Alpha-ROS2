@@ -29,6 +29,7 @@ private:
 
     // Data
     Name::Dynamic::BASE_LINK base_link;
+    float voxel_size;
 
     uint8_t perception_alive_counter;
     voxblox::Point current_position;

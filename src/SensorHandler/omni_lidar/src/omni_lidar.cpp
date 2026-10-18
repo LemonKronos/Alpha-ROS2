@@ -57,7 +57,7 @@ void spatial_container::OmniLidarNode::ProcessBatch(
         // Directly convert to voxblox Transformation
         const auto& translate = tf_world.transform.translation;
         const auto& rotate = tf_world.transform.rotation;
-        batch.tranform = voxblox::Transformation(
+        batch.transform = voxblox::Transformation(
             voxblox::Rotation(rotate.w, rotate.x, rotate.y, rotate.z),
             voxblox::Point(translate.x, translate.y, translate.z)
         );
@@ -111,7 +111,7 @@ void spatial_container::OmniLidarNode::SyncedLidarCallback(
 
             if(!lidar_down_batch.pointcloud.empty()) {
                 this->tsdf_integrator->integratePointCloud(
-                    lidar_down_batch.tranform,
+                    lidar_down_batch.transform,
                     lidar_down_batch.pointcloud,
                     lidar_down_batch.colors
                 );
@@ -122,7 +122,7 @@ void spatial_container::OmniLidarNode::SyncedLidarCallback(
 
             if(!lidar_2d_batch.pointcloud.empty()) {
                 this->tsdf_integrator->integratePointCloud(
-                    lidar_2d_batch.tranform,
+                    lidar_2d_batch.transform,
                     lidar_2d_batch.pointcloud,
                     lidar_2d_batch.colors
                 );

@@ -14,3 +14,5 @@ ___
 # Version 0.1.1
 Update for DA1
 - The Voxblox now is a class
+- Remove old VFH setup
+- Added dynamic safe distance function for `Drone`

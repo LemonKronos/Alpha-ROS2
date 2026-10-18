@@ -105,7 +105,7 @@ def generate_launch_description():
             package='foam_visualizer',
             executable='foam_visualizer',
             name='foam_visualizer',
-            arguments=['--ros-args', '--log-level', 'warn'],
-            parameters=[foam_visualizer_params]
+            # arguments=['--ros-args', '--log-level', 'warn'],
+            # parameters=[foam_visualizer_params]
         )
     ])

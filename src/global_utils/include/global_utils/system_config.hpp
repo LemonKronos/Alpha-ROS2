@@ -96,13 +96,13 @@ namespace Topic {
     constexpr const char* CONTROL_INPUT = "/internal/drone_control/input/control"; // By control signal input Node
     constexpr const char* CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"; // By Acrobatic OA Node
     constexpr const char* CONTROL_REACTIVE = "/internal/drone_control/reactive/control"; // By Reactive OA Node
+
     constexpr const char* FUSE_PERCEPTION = "/internal/sensor/fuse_perception"; // Combine perception info from px4 and sensors
     constexpr const char* CONTACT_PARSER = "/internal/sensor/contacts";
+
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
-    constexpr const char* LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour"; //* Soon to be deprecated
-    constexpr const char* LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour"; //* Soon to be deprecated
-    constexpr const char* VFH_HAZARD_SEEING = "/internal/mapping/hazard/seeing/vfh"; //* Soon to be deprecated
-    constexpr const char* VFH_HAZARD_MEMORY = "/internal/mapping/hazard/memory/vfh"; //* Soon to be deprecated
+    
+    constexpr const char* OBSERVATION_BOXES = "internal/observation_boxes"; // For Acrobatic OA 
     
 }
 
@@ -126,26 +126,52 @@ namespace Drone {
     constexpr float SPEED_MAX_ANGLE = M_PI_2f;
     constexpr float SPEED_MAX_UP = 8.0f;
     constexpr float SPEED_MAX_DOWN = 4.0f;
-    constexpr float THRUST_SAFE_LIMIT = 0.9f;
+    constexpr float THRUST_SAFE_LIMIT = 1.0f;
     constexpr float HOVER_THRUST = 0.51f;
 
     // Safety
-    constexpr float RADIUS = 1.2f; // drone radius in meter
-    constexpr float UNCERTAINTY = 0.05f; // Tune-able
-    constexpr float SAFE_BUFFER = 0.15f; // Tune-able
-    constexpr float HAZARD_DISTANCE = RADIUS + SAFE_BUFFER + UNCERTAINTY;
-    constexpr float REACT_TIME = Clock::LOOP_CYCLE; // s
-    constexpr float DECELERATE_MAX = 1.0f; // m/s^2
-    // hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
-    // About 14m at the speed of 5m/s
+    constexpr float RADIUS = 1.2f; // Single sphere drone radius in meter
+    constexpr float SAFE_BUFFER = 0.1f; // Tune-able
+    constexpr float HAZARD_DISTANCE = RADIUS + SAFE_BUFFER; // Single sphere hazard distance
+
+    // Dynamic hazard distance
+    inline float hazard_distance(float radius) {
+        return radius + SAFE_BUFFER;
+    }
+
+    constexpr float SLEW_TIME = 2.0f; // s, Max time it takes enter max deceleration
+    constexpr float LOOKAHEAD_TIME = 2.0f; // s
+    constexpr float DECELERATE_MAX = 2.0f; // m/s^2
+    constexpr float DECELERATE_SMOOTH = 0.5f; // m/s^2
+
+    // Braking_distance = radius + speed * SLEW_TIME + (speed_sq / (2 * DECELERATE_MAX));
+    // About 2.65m at the speed of 1m/s with the current config
+    inline float braking_distance(float speed, float radius) {
+        return {
+            radius +
+            speed * SLEW_TIME +
+            (speed * speed) / (2 * DECELERATE_MAX)
+        };
+    };
+
+    // Pushing_distance = radius + speed * SLEW_TIME + (speed_sq / (2 * DECELERATE_SMOOTH));
+    // About 6.4m at the speed of 1m/s with the current config
+    inline float pushing_distance(float speed, float radius) {
+        return {
+            radius + 
+            speed * LOOKAHEAD_TIME + 
+            (speed * speed) / (2 * DECELERATE_SMOOTH)
+        };
+    };
 
     // Body box anti clipping, independent with sensor mount point, sensor data have to be body frame transformed
-    constexpr float MAX_X = 0.53f + UNCERTAINTY;
-    constexpr float MIN_X = -0.4f - UNCERTAINTY;
-    constexpr float MAX_Y = 1.075f + UNCERTAINTY;
-    constexpr float MIN_Y = -1.075f - UNCERTAINTY;
-    constexpr float MAX_Z = 0.21f + UNCERTAINTY;
-    constexpr float MIN_Z = -0.1f -UNCERTAINTY; 
+    //* Soon to be deprecated
+    constexpr float MAX_X = 0.53f + 0.05f;
+    constexpr float MIN_X = -0.4f - 0.05f;
+    constexpr float MAX_Y = 1.075f + 0.05f;
+    constexpr float MIN_Y = -1.075f - 0.05f;
+    constexpr float MAX_Z = 0.21f + 0.05f;
+    constexpr float MIN_Z = -0.1f -0.05f; 
 }
 
 namespace Sensor {

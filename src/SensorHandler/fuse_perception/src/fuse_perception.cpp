@@ -40,7 +40,8 @@ FusePerceptionNode::~FusePerceptionNode() {}
 
 void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     geometry_msgs::msg::TransformStamped tf;
-    tf.header.stamp = this->get_clock()->now();
+    tf.header.stamp.sec = last_odo->timestamp / 1000000;
+    tf.header.stamp.nanosec = (last_odo->timestamp % 1000000) * 1000;
     tf.header.frame_id = "world";
     tf.child_frame_id = base_link.get();
     tf.transform.translation.x = msg.position[0];
@@ -81,7 +82,7 @@ void FusePerceptionNode::PublishCallback() {
         float speed_sq = msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2];
         float speed = std::sqrt(speed_sq);
 
-        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::REACT_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
+        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::SLEW_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
         
         constexpr float DECREASE_CONSTANT = Drone::HAZARD_DISTANCE / 20.0f;
         if(hazard_distance + DECREASE_CONSTANT < last_hazard_distance) {

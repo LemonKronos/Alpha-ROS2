@@ -39,7 +39,7 @@ using std::placeholders::_1;
 
 struct VoxbloxBatch {
     voxblox::Pointcloud points;
-    voxblox::Transformation transfrom;
+    voxblox::Transformation transformm;
 };
 
 // Handle the depth camera sensors

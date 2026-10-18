@@ -100,7 +100,7 @@ void spatial_container::ProcessingThread::ProducerLoop() {
         // Prepare intermediate variables
         VoxbloxBatch world_update_cloud;
         world_update_cloud.points.reserve(WORLD_BATCH_SIZE);
-        world_update_cloud.transfrom = voxblox_tf_world.value();
+        world_update_cloud.transformm = voxblox_tf_world.value();
 
         sensor_msgs::PointCloud2Iterator<float> itx(*msg, "x");
         sensor_msgs::PointCloud2Iterator<float> ity(*msg, "y");
@@ -117,7 +117,7 @@ void spatial_container::ProcessingThread::ProducerLoop() {
                 this->world_update_queue.enqueue(std::move(world_update_cloud));
                 world_update_cloud = VoxbloxBatch(); // #CanBeOptimize
                 world_update_cloud.points.reserve(WORLD_BATCH_SIZE);
-                world_update_cloud.transfrom = voxblox_tf_world.value();
+                world_update_cloud.transformm = voxblox_tf_world.value();
             }
             world_update_cloud.points.push_back(raw_point.cast<voxblox::FloatingPoint>());
         }
@@ -213,7 +213,7 @@ void spatial_container::WorldUpdateThread::ConsumerLoop() {
 
                 // Intergrate batch pointcloud to the map
                 this->tsdf_integrator->integratePointCloud(
-                    batch_cloud.transfrom, 
+                    batch_cloud.transformm, 
                     batch_cloud.points, 
                     empty_colors
                 );

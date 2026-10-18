@@ -10,14 +10,13 @@ Node("reactive_oa_node", options)
     
     //: Publishers
     final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
-    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>("/spatial_container/spatial_observation", rclcpp::SensorDataQoS());
+    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>(Topic::OBSERVATION_BOXES, rclcpp::SensorDataQoS());
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
         movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
         repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
-        correction_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
-        foam_spheres_PUB = this->create_publisher<visualization_msgs::msg::MarkerArray>("/visualizer/foam_spheres", 10);
+        reactive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
     #endif
 
     //: Subscribers
@@ -42,8 +41,8 @@ Node("reactive_oa_node", options)
     //: Init variables
     control_vec.setZero();
     movement_vec.setZero();
-    total_repulsive_vec.setZero();
-    correction_vec.setZero();
+    repulsive_vec.setZero();
+    reactive_vec.setZero();
 
     lost_control_signal = true;
     lost_control_signal_counter = Threshold::ALLOW_MISSED_FAST_TOPIC;
@@ -65,7 +64,7 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
     const auto values = this->declare_parameter<std::vector<double>>("foam_spheres", std::vector<double>{});
 
     if(values.empty() || values.size() % 4 != 0) {
-        foam.push_back({
+        multi_sphere.push_back({
             Eigen::Vector3f::Zero(),
             Drone::RADIUS
         });
@@ -73,7 +72,7 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
         RCLCPP_ERROR(this->get_logger(), RED "Unable to load FOAM, replacing with single bubble" RESET);
     }
 
-    foam.reserve(values.size() / 4);
+    multi_sphere.reserve(values.size() / 4);
 
     for(std::size_t i = 0; i < values.size(); i += 4) {
         const float radius = static_cast<float>(values[i + 3]);
@@ -83,7 +82,7 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
             continue;
         }
 
-        foam.push_back({
+        multi_sphere.push_back({
             Eigen::Vector3f(
                 static_cast<float>(values[i]),
                 static_cast<float>(values[i + 1]),
@@ -93,22 +92,26 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
         });
     }
 
-    RCLCPP_INFO(this->get_logger(), GREEN "Loaded %d FOAM spheres" RESET, foam.size());
+    RCLCPP_INFO(this->get_logger(), GREEN "Loaded %d FOAM spheres" RESET, multi_sphere.size());
 }
 
 void spatial_container::ReactiveOANode::computeControlVector() {
     control_vec = Eigen::Vector3f(
-        last_control_signal->forward * Drone::SPEED_MAX_FORWARD,
-        last_control_signal->left * Drone::SPEED_MAX_STRAFE,
-        last_control_signal->up * Drone::SPEED_MAX_UP
+        last_control_signal->forward,
+        last_control_signal->left,
+        last_control_signal->up
     ); 
 }
 
 void spatial_container::ReactiveOANode::computeMovementVector() {
+    auto norm = [] (float speed, float max_speed) -> float {
+        return std::clamp(speed / max_speed, -1.0f, 1.0f);
+    };
+
     Eigen::Vector3f world_vel(
-        last_perception->velocity[0],
-        last_perception->velocity[1],
-        last_perception->velocity[2]
+        norm(last_perception->velocity[0], Drone::SPEED_MAX_FORWARD),
+        norm(last_perception->velocity[1], Drone::SPEED_MAX_STRAFE),
+        norm(last_perception->velocity[2], Drone::SPEED_MAX_UP)
     );
     if(world_vel.hasNaN()) world_vel.setZero();
     
@@ -197,85 +200,109 @@ void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
 
 void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     #if TIME_ANALYSE
-        analyzer->start_segment("Compute Multi-Sphere Gradient");
+        analyzer->start_segment("Compute Repulsive Vector");
     #endif
     
-    total_repulsive_vec.setZero();
+    repulsive_vec.setZero();
     Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
     Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
 
-    float speed_factor = std::clamp(movement_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
-    float speed_inflation = 1.0f + (1.5f * speed_factor);
+    // 1. Anticipated Speed Blending
+    float physical_speed = movement_vec.norm();
+    float intent_speed = control_vec.norm(); // control_vec is already scaled to m/s
+    float target_speed = std::max(physical_speed, intent_speed);
 
-    // for (const auto& sphere : foam_spheres) {
-    //     Eigen::Vector3f center_body = sphere.head<3>();
-    //     float base_radius = sphere.w();
-    //     float dynamic_radius = base_radius * speed_inflation;
+    // 2. Asymmetric Rate Limiting (Fast Inflate, Slow Deflate)
+    float dt = Clock::LOOP_CYCLE_FAST; // Assuming this is defined as seconds (e.g., 0.01f)
+    if (target_speed > smoothed_speed_) {
+        // Inflate instantly to guarantee safety against sudden intent spikes
+        smoothed_speed_ = target_speed;
+    } else {
+        // Deflate slowly constrained by the drone's maximum physical deceleration
+        smoothed_speed_ -= Drone::DECELERATE_MAX * dt;
+        if (smoothed_speed_ < target_speed) smoothed_speed_ = target_speed;
+    }
 
-    //     Eigen::Vector3f center_world = drone_pos + (drone_q * center_body);
+    for (size_t i = 0; i < multi_sphere.size(); ++i) {
+        const auto& sphere = multi_sphere[i];
+        
+        // Use the smoothed_speed_ instead of actual_speed for geometry scaling
+        float r_hazard = Drone::hazard_distance(sphere.radius); 
+        float r_brake = Drone::braking_distance(smoothed_speed_, r_hazard);
+        float r_push = Drone::pushing_distance(smoothed_speed_, r_brake);
 
-    //     float distance = 0.0f;
-    //     // First, check distance alone
-    //     bool observed = spatial_container::global_map.getDistance(center_world, distance);
+        Eigen::Vector3f center_world = drone_pos + (drone_q * sphere.pos);
+        float distance = 0.0f;
+        Eigen::Vector3f gradient_world = Eigen::Vector3f::Zero();
 
-    //     if(!observed) RCLCPP_WARN_THROTTLE(
-    //         this->get_logger(),
-    //         *this-> get_clock(), 1000,
-    //         RED "Unable to get ESDF distance at (%.1f, %.1f, %.1f)" RESET,
-    //         center_world.x(),
-    //         center_world.y(),center_world.z()
-    //     );
+        bool observed = spatial_container::global_map.getDistanceAndGradient(center_world, distance, gradient_world); 
 
-    //     // Only query the gradient if the sphere's safety margin is breached
-    //     if (observed && distance < dynamic_radius) {
-    //         Eigen::Vector3f gradient = Eigen::Vector3f::Zero();
-    //         if(!spatial_container::global_map.getGradient(center_world, gradient)) RCLCPP_WARN_THROTTLE(
-    //             this->get_logger(),
-    //             *this-> get_clock(), 1000,
-    //             RED "Unable to get ESDF gradient at (%.1f, %.1f, %.1f)" RESET,
-    //             center_world.x(),
-    //             center_world.y(),center_world.z()
-    //         );
+        if(!observed) continue;
 
-    //         float urgency = (dynamic_radius - distance) / dynamic_radius;
-    //         urgency = std::clamp(urgency, 0.0f, 1.0f);
+        #if DEBUG
+        RCLCPP_INFO(
+            this->get_logger(),
+            BLUE "ESDF Distance = %.2f" RESET,
+            distance
+        );
+        #endif
+
+        if (distance < r_push) {
+            float urgency = 0.0f;
+            if (distance > r_brake) {
+                urgency = (r_push - distance) / std::max(0.01f, r_push - r_brake);
+            } else if (distance > r_hazard) {
+                urgency = 1.0f + ((r_brake - distance) / std::max(0.01f, r_brake - r_hazard));
+            } else {
+                urgency = 3.0f; 
+            }
+
+            Eigen::Vector3f gradient_body = drone_q.inverse() * gradient_world.normalized();
             
-    //         Eigen::Vector3f push_world = gradient.normalized() * urgency * Drone::SPEED_MAX_FORWARD;
-    //         Eigen::Vector3f push_body = drone_q.inverse() * push_world;
+            float v_in = std::max(0.0f, movement_vec.dot(-gradient_body));
+            float i_in = std::max(0.0f, control_vec.dot(-gradient_body));
+            float v_slip = std::sqrt(std::max(0.0f, movement_vec.squaredNorm() - std::pow(movement_vec.dot(gradient_body), 2.0f)));
 
-    //         total_repulsive_vec += push_body;
-    //     }
-    // }
+            constexpr float V_ESCAPE = 0.2f; 
+            constexpr float GAMMA = 0.3f;    
+            
+            float m_repel = urgency * (i_in + v_in + V_ESCAPE + (GAMMA * v_slip));
+            
+            repulsive_vec += gradient_body * m_repel;
+
+            #if DEBUG
+            // Log exactly which sphere is triggering, its spatial boundaries, and the resulting urgency
+            RCLCPP_INFO(this->get_logger(),
+                YELLOW "Sphere %zu | Dist: %.2f | Bounds [Push: %.2f, Brake: %.2f, Haz: %.2f] | Urgency: %.2f | m_repel: %.2f" RESET,
+                i, distance, r_push, r_brake, r_hazard, urgency, m_repel);
+            #endif
+        }
+    }
 
     #if TIME_ANALYSE
-        analyzer->stop_segment("Compute Multi-Sphere Gradient");
+        analyzer->stop_segment("Compute Repulsive Vector");
     #endif
 }
 
-void spatial_container::ReactiveOANode::computeCorrectionVector() {
-    Eigen::Vector3f target_vec = control_vec + total_repulsive_vec;
+void spatial_container::ReactiveOANode::computeReactiveVector() {
+    reactive_vec = control_vec + repulsive_vec;
     
-    // Hard cutoff if opposing vectors cancel out perfectly near an obstacle
-    if(target_vec.norm() < 1e-3f) {
-        correction_vec.setZero();
-    } else {
-        // Here you would add smoothing or kinematic limits if necessary. 
-        // For now, it passes the pure summed potential field vector.
-        correction_vec = target_vec;
-    }
+    reactive_vec.x() = std::clamp(reactive_vec.x(), -1.0f, 1.0f);
+    reactive_vec.y() = std::clamp(reactive_vec.y(), -1.0f, 1.0f);
+    reactive_vec.z() = std::clamp(reactive_vec.z(), -1.0f, 1.0f);
 }
 
 void spatial_container::ReactiveOANode::resetVectors() {
     if(lost_control_signal) control_vec.setZero();
     if(lost_perception) movement_vec.setZero();
-    correction_vec.setZero();
-    total_repulsive_vec.setZero();
+    reactive_vec.setZero();
+    repulsive_vec.setZero();
 }
 
 void spatial_container::ReactiveOANode::nodeLoopCallback() {
-#if TIME_ANALYSE
-    analyzer->start_segment("Main Loop");
-#endif
+    #if TIME_ANALYSE
+        analyzer->start_segment("Node Loop");
+    #endif
 
     // Update statuses
     if(lost_perception_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_perception_counter++;
@@ -284,12 +311,12 @@ void spatial_container::ReactiveOANode::nodeLoopCallback() {
     if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
     lost_control_signal = (lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC);
 
-    if (!lost_perception && !lost_control_signal) {
+    if (!lost_perception) {
         // extractAndPublishSpatialBoxes();
         computeMultiSphereGradient();
     }
 
-    computeCorrectionVector();
+    computeReactiveVector();
 
     // Publish Final Control
     auto msg = alpha_msgs::msg::ControlInterface();
@@ -297,9 +324,9 @@ void spatial_container::ReactiveOANode::nodeLoopCallback() {
     
     if(!lost_control_signal) {
         #if DO_REACTIVE_OA
-        msg.forward = correction_vec.x() / Drone::SPEED_MAX_FORWARD;
-        msg.left = correction_vec.y() / Drone::SPEED_MAX_STRAFE;
-        msg.up = correction_vec.z() / Drone::SPEED_MAX_UP;
+        msg.forward = reactive_vec.x();
+        msg.left = reactive_vec.y();
+        msg.up = reactive_vec.z();
         #else
         msg.forward = last_control_signal->forward;
         msg.left = last_control_signal->left;
@@ -320,16 +347,16 @@ void spatial_container::ReactiveOANode::nodeLoopCallback() {
     final_control_PUB->publish(msg);
 
     #if VISUALIZE
-    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); 
-    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); 
-    publishVectorArrow(repulsive_vec_PUB, total_repulsive_vec, 1.0f, 0.0f, 0.0f); 
-    publishVectorArrow(correction_vec_PUB, correction_vec, 1.0f, 1.0f, 0.0f); 
+    publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green
+    publishVectorArrow(movement_vec_PUB, movement_vec, 0.0f, 0.0f, 1.0f); // Blue
+    publishVectorArrow(repulsive_vec_PUB, repulsive_vec, 1.0f, 0.0f, 0.0f); // Red
+    publishVectorArrow(reactive_vec_PUB, reactive_vec, 1.0f, 1.0f, 0.0f); // Yellow
     #endif
 
     resetVectors();
 
 #if TIME_ANALYSE
-    analyzer->stop_segment("Main Loop");
+    analyzer->stop_segment("Node Loop");
 #endif
 }
 
@@ -351,7 +378,15 @@ void spatial_container::ReactiveOANode::perceptionCallback(const alpha_msgs::msg
 void spatial_container::ReactiveOANode::publishVectorArrow(
     const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
     const Eigen::Vector3f& vec,
-    float r, float g, float b) {
+    float r, float g, float b
+) {
+    // De-norm the vector
+    Eigen::Vector3f real_value;
+    real_value.x() = vec.x() * Drone::SPEED_MAX_FORWARD;
+    real_value.y() = vec.y() * Drone::SPEED_MAX_STRAFE;
+    real_value.z() = vec.z() * Drone::SPEED_MAX_UP;
+
+    // Make marker
     visualization_msgs::msg::Marker arrow;
     arrow.header.frame_id = this->base_link.get();
     arrow.header.stamp = this->now();
@@ -365,7 +400,7 @@ void spatial_container::ReactiveOANode::publishVectorArrow(
     arrow.color.r = r; arrow.color.g = g; arrow.color.b = b; arrow.color.a = 1.0;
     arrow.points.resize(2);
     arrow.points[0].x = 0.0; arrow.points[0].y = 0.0; arrow.points[0].z = 0.0;
-    arrow.points[1].x = vec.x(); arrow.points[1].y = vec.y(); arrow.points[1].z = vec.z();
+    arrow.points[1].x = real_value.x(); arrow.points[1].y = real_value.y(); arrow.points[1].z = real_value.z();
     pub->publish(arrow);
 }
 #endif
