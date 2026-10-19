@@ -2,7 +2,7 @@
 
 spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& options) :
     Node("low_spatial", options)
-{        
+{
         Global::setup_for_simulation(this);
 
         //_ ROS2 params
@@ -11,15 +11,17 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
             {"truncation_distance", rclcpp::ParameterValue(Sensor::VOXEL_TRUNCATION_DISTANCE)},
             {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)},
             {"voxel_carving_enabled", rclcpp::ParameterValue(true)},
-            {"use_weight_dropoff", rclcpp::ParameterValue(true)},
-            {"full_euclidean_distance", rclcpp::ParameterValue(true)},
+            {"use_weight_dropoff", rclcpp::ParameterValue(false)},
+            {"integrator_threads", rclcpp::ParameterValue(4)},
 
-            {"max_ray_length", rclcpp::ParameterValue(20.0)},
+            {"dense_max_ray_length", rclcpp::ParameterValue(10.0)},  // depth camera (dense config)
+            {"max_ray_length", rclcpp::ParameterValue(20.0)},        // LiDAR (sparse config)
             {"sparsity_compensation_factor", rclcpp::ParameterValue(5.0)},
 
+            {"esdf_full_euclidean", rclcpp::ParameterValue(true)},
             {"esdf_min_distance", rclcpp::ParameterValue(0.2)},
-            {"esdf_max_distance", rclcpp::ParameterValue(10.0)},
-            {"esdf_default_distance", rclcpp::ParameterValue(11.0)}
+            {"esdf_max_distance", rclcpp::ParameterValue(8.0)},
+            {"esdf_default_distance", rclcpp::ParameterValue(9.0)}
         });
 
         // Check load params
@@ -28,7 +30,7 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
             RCLCPP_WARN(this->get_logger(), YELLOW "Config not loaded, use default" RESET);
             voxel_resolution = Sensor::VOXEL_RESOLUTION;
         }
-        
+
         //_ Init variables
         //: TSDF Dense
         voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
@@ -36,6 +38,8 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
         tsdf_dense_config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
         tsdf_dense_config.voxel_carving_enabled = this->get_parameter("voxel_carving_enabled").as_bool();
         tsdf_dense_config.use_weight_dropoff = this->get_parameter("use_weight_dropoff").as_bool();
+        tsdf_dense_config.max_ray_length_m = this->get_parameter("dense_max_ray_length").as_double();
+        tsdf_dense_config.integrator_threads = std::max<int>(1, static_cast<int>(this->get_parameter("integrator_threads").as_int()));
 
         //: TSDF Sparse - modify from the Dense
         voxblox::TsdfIntegratorBase::Config tsdf_sparse_config = tsdf_dense_config;
@@ -46,15 +50,26 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
 
         //: ESDF
         voxblox::EsdfIntegrator::Config esdf_config;
-        esdf_config.full_euclidean_distance = this->get_parameter("full_euclidean_distance").as_bool();
+        esdf_config.full_euclidean_distance = this->get_parameter("esdf_full_euclidean").as_bool();
         esdf_config.min_distance_m = this->get_parameter("esdf_min_distance").as_double();
         esdf_config.max_distance_m = this->get_parameter("esdf_max_distance").as_double();
         esdf_config.default_distance_m = this->get_parameter("esdf_default_distance").as_double();
 
+        if(esdf_config.min_distance_m <= 0.0) {
+            RCLCPP_ERROR(this->get_logger(), RED "esdf_min_distance must be > 0 (got %.3f), the ESDF would never propagate. Using 0.2" RESET, esdf_config.min_distance_m);
+            esdf_config.min_distance_m = 0.2;
+        }
+        if(esdf_config.default_distance_m <= esdf_config.max_distance_m) {
+            esdf_config.default_distance_m = esdf_config.max_distance_m + 1.0;
+            RCLCPP_WARN(this->get_logger(), YELLOW "esdf_default_distance must be > esdf_max_distance, using %.2f" RESET, esdf_config.default_distance_m);
+        }
+
         //: Init Voxblox map
         global_map.initialize(voxel_resolution, tsdf_dense_config, tsdf_sparse_config, esdf_config);
-        
-        RCLCPP_INFO(this->get_logger(), GREEN "Voxblox map ready" RESET);
+
+        RCLCPP_INFO(this->get_logger(), GREEN "Voxblox map ready (ESDF: full_euclidean=%d min=%.2f max=%.2f default=%.2f)" RESET,
+            static_cast<int>(esdf_config.full_euclidean_distance),
+            esdf_config.min_distance_m, esdf_config.max_distance_m, esdf_config.default_distance_m);
 
         #if TIME_ANALYSE
         analyzer = std::make_unique<time_utils::TimeAnalyzer>(this->get_logger());
@@ -84,4 +99,3 @@ void spatial_container::LowSpatialNode::EsdfUpdateCallback() {
     analyzer->stop_segment("esdf update");
     #endif
 }
-

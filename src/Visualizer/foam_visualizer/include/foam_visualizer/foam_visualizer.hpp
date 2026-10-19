@@ -32,7 +32,7 @@ private:
     // Variales
     std::vector<FoamSphere> foam;
     Name::Dynamic::BASE_LINK base_link;
-    float smoothed_speed_ = 0.0f;
+    float smoothed_speed = 0.0f;
 
     void loadFoamFromParams();
     void TimerCallback();

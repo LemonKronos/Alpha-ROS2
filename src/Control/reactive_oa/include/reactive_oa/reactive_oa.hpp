@@ -72,7 +72,9 @@ private:
     Eigen::Vector3f repulsive_vec;
     Eigen::Vector3f reactive_vec;
 
-    float smoothed_speed_ = 0.0f;
+    std::vector<float> smoothed_close;
+    Eigen::Vector3f repulsive_filter;
+    std::vector<SphereCache> sphere_cache;
 
     std::vector<FoamSphere> multi_sphere;
 

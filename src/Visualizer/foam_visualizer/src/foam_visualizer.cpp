@@ -129,8 +129,8 @@ void FoamVisualizerNode::TimerCallback() {
         for(const auto& sphere : foam) {
 
             float r_hazard = Drone::hazard_distance(sphere.radius);
-            float r_brake = Drone::braking_distance(smoothed_speed_, r_hazard);
-            float r_push = Drone::pushing_distance(smoothed_speed_, r_brake);
+            float r_brake = Drone::braking_distance(smoothed_speed, r_hazard);
+            float r_push = Drone::pushing_distance(smoothed_speed, r_brake);
 
             visualization_msgs::msg::Marker marker;
             marker.header.frame_id = base_link.get();
@@ -183,12 +183,12 @@ void FoamVisualizerNode::perceptionCallback(const alpha_msgs::msg::FusePerceptio
 
     // 2. Asymmetric Rate Limiting (Fast Inflate, Slow Deflate)
     float dt = Clock::LOOP_CYCLE_FAST; // Assuming this is defined as seconds (e.g., 0.01f)
-    if (physical_speed > smoothed_speed_) {
+    if (physical_speed > smoothed_speed) {
         // Inflate instantly to guarantee safety against sudden intent spikes
-        smoothed_speed_ = physical_speed;
+        smoothed_speed = physical_speed;
     } else {
         // Deflate slowly constrained by the drone's maximum physical deceleration
-        smoothed_speed_ -= Drone::DECELERATE_MAX * dt;
-        if (smoothed_speed_ < physical_speed) smoothed_speed_ = physical_speed;
+        smoothed_speed -= Drone::DECELERATE_MAX * dt;
+        if (smoothed_speed < physical_speed) smoothed_speed = physical_speed;
     }
 }

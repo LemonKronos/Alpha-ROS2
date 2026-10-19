@@ -1,4 +1,18 @@
 #include "reactive_oa/reactive_oa.hpp"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+namespace {
+    // --- Tuning (stability first) ---
+    constexpr float V_ESCAPE = 0.2f;            // constant outward push once inside the push zone
+    constexpr float GAMMA = 0.3f;               // weight of the sliding-along-obstacle speed
+    constexpr float URGENCY_MAX = 3.0f;
+    constexpr float ESDF_RANGE_MARGIN = 1.0f;   // push zone stays this far inside the ESDF max distance
+    constexpr float MIN_ZONE_GAP = 0.5f;        // min gap between brake and push radius
+    constexpr float TAU_RELEASE = 0.3f;         // s, release time constant of the repulsion filter (attack is instant)
+    constexpr int   MAX_CACHE_AGE_TICKS = 15;   // ~150 ms at 100 Hz: how long a cached ESDF read may replace a busy map
+}
 
 spatial_container::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
 Node("reactive_oa_node", options)
@@ -42,6 +56,7 @@ Node("reactive_oa_node", options)
     control_vec.setZero();
     movement_vec.setZero();
     repulsive_vec.setZero();
+    repulsive_filter.setZero();
     reactive_vec.setZero();
 
     lost_control_signal = true;
@@ -92,6 +107,9 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
         });
     }
 
+    sphere_cache.assign(multi_sphere.size(), SphereCache{});
+    smoothed_close.assign(multi_sphere.size(), 0.0f);
+
     RCLCPP_INFO(this->get_logger(), GREEN "Loaded %d FOAM spheres" RESET, multi_sphere.size());
 }
 
@@ -114,7 +132,7 @@ void spatial_container::ReactiveOANode::computeMovementVector() {
         norm(last_perception->velocity[2], Drone::SPEED_MAX_UP)
     );
     if(world_vel.hasNaN()) world_vel.setZero();
-    
+
     Eigen::Quaternionf q = frame_utils::arrayToQuaternion(last_perception->q);
     movement_vec = q.inverse() * world_vel; 
 }
@@ -202,87 +220,127 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     #if TIME_ANALYSE
         analyzer->start_segment("Compute Repulsive Vector");
     #endif
-    
-    repulsive_vec.setZero();
-    Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
-    Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
 
-    // 1. Anticipated Speed Blending
-    Eigen::Vector3f vel_ms(
-        last_perception->velocity[0],
-        last_perception->velocity[1],
-        last_perception->velocity[2]
-    );
+    const float dt = Clock::LOOP_CYCLE_FAST;
 
-    Eigen::Vector3f intent_ms(
-        control_vec.x() * Drone::SPEED_MAX_FORWARD,
-        control_vec.y() * Drone::SPEED_MAX_STRAFE,
-        control_vec.z() * Drone::SPEED_MAX_UP
-    );
+    const Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
+    const Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
+    const Eigen::Quaternionf drone_q_inv = drone_q.inverse();
 
-    float target_speed = std::max(vel_ms.norm(), intent_ms.norm());   // m/s
+    // Body-frame speeds in m/s (the geometry below needs real units; vectors elsewhere stay normalized)
+    const Eigen::Vector3f v_max(Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_UP);
+    const Eigen::Vector3f movement_ms = movement_vec.cwiseProduct(v_max);
+    const Eigen::Vector3f control_ms = control_vec.cwiseProduct(v_max);
 
-    // 2. Asymmetric Rate Limiting (Fast Inflate, Slow Deflate)
-    float dt = Clock::LOOP_CYCLE_FAST; // Assuming this is defined as seconds (e.g., 0.01f)
-    if (target_speed > smoothed_speed_) {
-        // Inflate instantly to guarantee safety against sudden intent spikes
-        smoothed_speed_ = target_speed;
-    } else {
-        // Deflate slowly constrained by the drone's maximum physical deceleration
-        smoothed_speed_ -= Drone::DECELERATE_MAX * dt;
-        if (smoothed_speed_ < target_speed) smoothed_speed_ = target_speed;
-    }
+    // Keep the push zone inside what the ESDF can represent
+    const float esdf_max = spatial_container::global_map.esdf_max_distance_m.load(std::memory_order_relaxed);
+    const float r_cap = (esdf_max > 0.0f) ? (esdf_max - ESDF_RANGE_MARGIN) : std::numeric_limits<float>::max();
+
+    Eigen::Vector3f repulsive_raw = Eigen::Vector3f::Zero();
 
     for (size_t i = 0; i < multi_sphere.size(); ++i) {
         const auto& sphere = multi_sphere[i];
-        
-        // Use the smoothed_speed_ instead of actual_speed for geometry scaling
-        float r_hazard = Drone::hazard_distance(sphere.radius); 
-        float r_brake = Drone::braking_distance(smoothed_speed_, r_hazard);
-        float r_push = Drone::pushing_distance(smoothed_speed_, r_brake);
+        auto& cache = sphere_cache[i];
+        float& vc = smoothed_close[i];
 
-        Eigen::Vector3f center_world = drone_pos + (drone_q * sphere.pos);
+        // Slow deflation of the closing speed (also applied when this sphere is skipped)
+        auto decay_close_speed = [&]() { vc = std::max(0.0f, vc - Drone::DECELERATE_MAX * dt); };
+
+        const Eigen::Vector3f center_world = drone_pos + (drone_q * sphere.pos);
         float distance = 0.0f;
         Eigen::Vector3f gradient_world = Eigen::Vector3f::Zero();
 
-        bool observed = global_map.getDistanceAndGradient(center_world, distance, gradient_world); 
+        // Non-blocking ESDF read with short-lived cache
+        switch (spatial_container::global_map.tryGetDistanceAndGradient(center_world, distance, gradient_world)) {
+            case spatial_container::QueryResult::Ok:
+                cache.valid = true;
+                cache.age_ticks = 0;
+                cache.distance = distance;
+                cache.gradient_world = gradient_world;
+                cache.center_at_read = center_world;
+                break;
 
-        if(!observed) continue;
+            case spatial_container::QueryResult::Unobserved:
+                cache.valid = false;      // no data here: an old value no longer describes this spot
+                decay_close_speed();
+                continue;
 
-        if (distance < r_push) {
-            float urgency = 0.0f;
-            if (distance > r_brake) {
-                urgency = (r_push - distance) / std::max(0.01f, r_push - r_brake);
-            } else if (distance > r_hazard) {
-                urgency = 1.0f + ((r_brake - distance) / std::max(0.01f, r_brake - r_hazard));
-            } else {
-                urgency = 3.0f; 
-            }
-
-            Eigen::Vector3f gradient_body = drone_q.inverse() * gradient_world.normalized();
-            
-            float v_in = std::max(0.0f, movement_vec.dot(-gradient_body));
-            float i_in = std::max(0.0f, control_vec.dot(-gradient_body));
-            float v_slip = std::sqrt(std::max(0.0f, movement_vec.squaredNorm() - std::pow(movement_vec.dot(gradient_body), 2.0f)));
-
-            constexpr float V_ESCAPE = 0.2f; 
-            constexpr float GAMMA = 0.3f;    
-            
-            float m_repel = urgency * (i_in + v_in + V_ESCAPE + (GAMMA * v_slip));
-            
-            repulsive_vec += gradient_body * m_repel;
-
-            const float n = repulsive_vec.norm();
-            if (n > 1.0f) repulsive_vec /= n;
-
-            #if DEBUG && 1
-            // Log exactly which sphere is triggering, its spatial boundaries, and the resulting urgency
-            RCLCPP_INFO(this->get_logger(),
-                YELLOW "Sphere %zu | Dist: %.2f | Bounds [Push: %.2f, Brake: %.2f, Haz: %.2f] | Urgency: %.2f | m_repel: %.2f" RESET,
-                i, distance, r_push, r_brake, r_hazard, urgency, m_repel);
-            #endif
+            case spatial_container::QueryResult::Busy:
+                if (!cache.valid || ++cache.age_ticks > MAX_CACHE_AGE_TICKS) {
+                    decay_close_speed();
+                    continue;             // nothing recent enough to trust
+                }
+                gradient_world = cache.gradient_world;
+                // Moving along the gradient since the read changes the distance accordingly
+                distance = cache.distance +
+                    (center_world - cache.center_at_read).dot(cache.gradient_world.normalized());
+                break;
         }
+
+        if (gradient_world.hasNaN() || gradient_world.norm() < 1e-4f || std::isnan(distance)) {
+            decay_close_speed();
+            continue;
+        }
+
+        // Unit vector pointing AWAY from the obstacle, in body frame
+        const Eigen::Vector3f gradient_body = drone_q_inv * gradient_world.normalized();
+
+        // Closing speed toward THIS obstacle (m/s): flying parallel to a surface gives ~0
+        const float v_close_target = std::max(0.0f, std::max(
+            movement_ms.dot(-gradient_body),   // actual motion
+            control_ms.dot(-gradient_body)     // pilot intent
+        ));
+
+        // Fast inflate, slow deflate
+        if (v_close_target > vc) vc = v_close_target;
+        else vc = std::max(v_close_target, vc - Drone::DECELERATE_MAX * dt);
+
+        // Zone radii, kept continuous and inside the ESDF range
+        const float r_hazard = Drone::hazard_distance(sphere.radius);
+        float r_brake = Drone::braking_distance(vc, r_hazard);
+        float r_push = Drone::pushing_distance(vc, r_brake);
+
+        r_brake = std::max(r_hazard, std::min(r_brake, r_cap - MIN_ZONE_GAP));
+        r_push = std::max(r_brake + MIN_ZONE_GAP, std::min(r_push, r_cap));
+
+        if (distance >= r_push) continue;
+
+        // Urgency: continuous 0 -> 1 -> 2 -> 3
+        float urgency = 0.0f;
+        if (distance > r_brake) {
+            urgency = (r_push - distance) / std::max(0.01f, r_push - r_brake);                 // 0..1
+        } else if (distance > r_hazard) {
+            urgency = 1.0f + ((r_brake - distance) / std::max(0.01f, r_brake - r_hazard));    // 1..2
+        } else {
+            urgency = std::min(URGENCY_MAX, 2.0f + ((r_hazard - distance) / std::max(0.01f, r_hazard))); // 2..3
+        }
+
+        const float v_in = std::max(0.0f, movement_vec.dot(-gradient_body));
+        const float i_in = std::max(0.0f, control_vec.dot(-gradient_body));
+        const float v_slip = std::sqrt(std::max(0.0f, movement_vec.squaredNorm() - std::pow(movement_vec.dot(gradient_body), 2.0f)));
+
+        const float m_repel = urgency * (i_in + v_in + V_ESCAPE + (GAMMA * v_slip));
+
+        repulsive_raw += gradient_body * m_repel;
+
+        #if DEBUG
+        RCLCPP_INFO(this->get_logger(),
+            YELLOW "Sphere %zu | Dist: %.2f | v_close: %.2f | Bounds [Push: %.2f, Brake: %.2f, Haz: %.2f] | Urgency: %.2f | m_repel: %.2f" RESET,
+            i, distance, vc, r_push, r_brake, r_hazard, urgency, m_repel);
+        #endif
     }
+
+    // Bound the magnitude without changing the direction
+    const float raw_norm = repulsive_raw.norm();
+    if (raw_norm > 1.0f) repulsive_raw /= raw_norm;
+
+    // Fast attack, slow release: react instantly to growing danger, relax gently
+    if (repulsive_raw.norm() >= repulsive_filter.norm()) {
+        repulsive_filter = repulsive_raw;
+    } else {
+        repulsive_filter += (dt / (TAU_RELEASE + dt)) * (repulsive_raw - repulsive_filter);
+    }
+    repulsive_vec = repulsive_filter;
 
     #if TIME_ANALYSE
         analyzer->stop_segment("Compute Repulsive Vector");
@@ -291,12 +349,15 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
 
 void spatial_container::ReactiveOANode::computeReactiveVector() {
     reactive_vec = control_vec + repulsive_vec;
-    
-    // Scale uniformly so no axis exceeds 1.0 -- direction is preserved
-    const float max_axis = reactive_vec.cwiseAbs().maxCoeff();
-    if (max_axis > 1.0f) {
-        reactive_vec /= max_axis;
+
+    if (reactive_vec.hasNaN()) {
+        reactive_vec.setZero();
+        return;
     }
+
+    // Scale uniformly so no axis exceeds 1.0 (clamping per axis would rotate the vector toward the obstacle)
+    const float max_axis = reactive_vec.cwiseAbs().maxCoeff();
+    if (max_axis > 1.0f) reactive_vec /= max_axis;
 
     #if DEBUG && 1
     RCLCPP_INFO(
@@ -311,7 +372,10 @@ void spatial_container::ReactiveOANode::computeReactiveVector() {
 
 void spatial_container::ReactiveOANode::resetVectors() {
     if(lost_control_signal) control_vec.setZero();
-    if(lost_perception) movement_vec.setZero();
+    if(lost_perception) {
+        movement_vec.setZero();
+        repulsive_filter.setZero();
+    }
     reactive_vec.setZero();
     repulsive_vec.setZero();
 }

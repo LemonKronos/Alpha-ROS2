@@ -141,8 +141,8 @@ namespace Drone {
 
     constexpr float SLEW_TIME = 1.0f; // s, Max time it takes enter max deceleration
     constexpr float LOOKAHEAD_TIME = 1.0f; // s
-    constexpr float DECELERATE_MAX = 4.0f; // m/s^2
-    constexpr float DECELERATE_SMOOTH = 2.0f; // m/s^2
+    constexpr float DECELERATE_MAX = 2.0f; // m/s^2
+    constexpr float DECELERATE_SMOOTH = 1.0f; // m/s^2
 
     // Braking_distance = radius + speed * SLEW_TIME + (speed_sq / (2 * DECELERATE_MAX));
     // About 2.65m at the speed of 1m/s with the current config

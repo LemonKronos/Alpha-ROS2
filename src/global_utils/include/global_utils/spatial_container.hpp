@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <shared_mutex>
 #include <Eigen/Dense>
@@ -13,6 +14,13 @@
 #include "global_utils/system_config.hpp"
 
 namespace spatial_container {
+
+// Result of a non-blocking ESDF query.
+//  Ok         : fresh value written to the output arguments.
+//  Unobserved : the map has no data at that position (or no map yet). Outputs untouched.
+//  Busy       : a writer (TSDF/ESDF update) holds the lock. No information was lost,
+//               the caller may reuse a recent cached value. Outputs untouched.
+enum class QueryResult { Ok, Unobserved, Busy };
 
 //! Only Low Spatial Node shall init and config this
 class MapManager {
@@ -30,6 +38,10 @@ public:
     voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
     voxblox::TsdfIntegratorBase::Config tsdf_sparse_config;
     voxblox::EsdfIntegrator::Config esdf_config;
+
+    // Lock-free copy of esdf_config.max_distance_m (0 until initialize() ran).
+    // Readers use it to keep their query ranges inside what the ESDF can represent.
+    std::atomic<float> esdf_max_distance_m{0.0f};
 
     // The 3D Voxel Memory Layers and Map Wrapper
     std::shared_ptr<voxblox::Layer<voxblox::TsdfVoxel>> tsdf_layer = nullptr;
@@ -58,83 +70,65 @@ public:
             this->tsdf_layer.get(), 
             this->esdf_layer.get()
         );
+
+        this->esdf_max_distance_m.store(static_cast<float>(this->esdf_config.max_distance_m));
     }
 
     void clear() {
         std::unique_lock<std::shared_mutex> lock(mutex);
         if (tsdf_layer) tsdf_layer->removeAllBlocks();
         if (esdf_layer) esdf_layer->removeAllBlocks();
+        if (esdf_integrator) esdf_integrator->clear();
     }
 
     void updateEsdf() {
         std::unique_lock<std::shared_mutex> lock(mutex);
-        if (!esdf_integrator) return;
-
-        esdf_integrator->updateFromTsdfLayer(true);
-
-        #if ALLOW_DEBUG && 0
-        // after esdf_integrator->updateFromTsdfLayer(true);
-        size_t n_pos_def = 0, n_neg_def = 0, n_other = 0, n_in_queue = 0, n_fixed = 0, n_halluc = 0;
-        float dmin = 1e9f, dmax = -1e9f;
-        int printed_occ = 0, printed_near = 0;
-
-        voxblox::BlockIndexList idx;
-        tsdf_layer->getAllAllocatedBlocks(&idx);
-        for (const auto& i : idx) {
-            const auto& tb = tsdf_layer->getBlockByIndex(i);
-            auto eb = esdf_layer->getBlockPtrByIndex(i);
-            if (!eb) continue;
-            for (size_t v = 0; v < tb.num_voxels(); ++v) {
-                const auto& t = tb.getVoxelByLinearIndex(v);
-                const auto& e = eb->getVoxelByLinearIndex(v);
-                if (t.weight <= 1e-6f || !e.observed) continue;
-
-                dmin = std::min(dmin, e.distance); dmax = std::max(dmax, e.distance);
-                if (e.in_queue) ++n_in_queue;
-                if (e.fixed) ++n_fixed;
-                if (e.hallucinated) ++n_halluc;
-                if (std::abs(e.distance - esdf_config.default_distance_m) < 1e-3f) ++n_pos_def;
-                else if (std::abs(e.distance + esdf_config.default_distance_m) < 1e-3f) ++n_neg_def;
-                else ++n_other;
-
-                if (t.distance <= esdf_config.min_distance_m && printed_occ < 5) {
-                    fprintf(stderr, "[occ ] tsdf d=%.3f w=%.1f | esdf d=%.3f fixed=%d inq=%d\n",
-                            t.distance, t.weight, e.distance, e.fixed, e.in_queue);
-                    ++printed_occ;
-                } else if (t.distance > 0.0f && t.distance < 0.5f && printed_near < 5) {
-                    fprintf(stderr, "[near] tsdf d=%.3f w=%.1f | esdf d=%.3f fixed=%d inq=%d\n",
-                            t.distance, t.weight, e.distance, e.fixed, e.in_queue);
-                    ++printed_near;
-                }
-            }
+        if (esdf_integrator) {
+            esdf_integrator->updateFromTsdfLayer(true); // true = clear updated flags
         }
-        fprintf(stderr, "[esdf] range=[%.2f, %.2f] +def=%zu -def=%zu other=%zu inqueue=%zu fixed=%zu halluc=%zu\n",
-                dmin, dmax, n_pos_def, n_neg_def, n_other, n_in_queue, n_fixed, n_halluc);
-        #endif
     }
 
-    // --- Clean Interface for Reactive OA ---
-    
+    // Blocking reads: wait for writers. Outputs are only written on success.
     bool getDistance(const Eigen::Vector3f& pos, float& distance) const {
         std::shared_lock<std::shared_mutex> lock(mutex);
         if (!esdf_map) return false;
-        
+
         double dist_d = 0.0;
-        bool obs = esdf_map->getDistanceAtPosition(pos.cast<double>(), &dist_d);
+        if (!esdf_map->getDistanceAtPosition(pos.cast<double>(), &dist_d)) return false;
+
         distance = static_cast<float>(dist_d);
-        return obs;
+        return true;
     }
 
-    bool getDistanceAndGradient(const Eigen::Vector3f &pos, float &distance, Eigen::Vector3f &gradient) const {
+    bool getDistanceAndGradient(const Eigen::Vector3f& pos, float& distance, Eigen::Vector3f& gradient) const {
         std::shared_lock<std::shared_mutex> lock(mutex);
         if (!esdf_map) return false;
 
-        double dist_d = 0.0; 
-        Eigen::Vector3d grad_d;
-        bool obs = esdf_map->getDistanceAndGradientAtPosition(pos.cast<double>(), &dist_d, &grad_d);
+        double dist_d = 0.0;
+        Eigen::Vector3d grad_d = Eigen::Vector3d::Zero();
+        if (!esdf_map->getDistanceAndGradientAtPosition(pos.cast<double>(), &dist_d, &grad_d)) return false;
+
         distance = static_cast<float>(dist_d);
         gradient = grad_d.cast<float>();
-        return obs;
+        return true;
+    }
+
+    // Non-blocking read for control loops: never waits for a writer.
+    // Outputs are only written when the result is QueryResult::Ok.
+    QueryResult tryGetDistanceAndGradient(const Eigen::Vector3f& pos, float& distance, Eigen::Vector3f& gradient) const {
+        std::shared_lock<std::shared_mutex> lock(mutex, std::try_to_lock);
+        if (!lock.owns_lock()) return QueryResult::Busy;
+        if (!esdf_map) return QueryResult::Unobserved;
+
+        double dist_d = 0.0;
+        Eigen::Vector3d grad_d = Eigen::Vector3d::Zero();
+        if (!esdf_map->getDistanceAndGradientAtPosition(pos.cast<double>(), &dist_d, &grad_d)) {
+            return QueryResult::Unobserved;
+        }
+
+        distance = static_cast<float>(dist_d);
+        gradient = grad_d.cast<float>();
+        return QueryResult::Ok;
     }
 };
 

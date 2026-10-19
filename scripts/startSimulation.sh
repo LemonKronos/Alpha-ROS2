@@ -69,7 +69,7 @@ echo "param set UXRCE_DDS_SYNCT 0" > build/px4_sitl_default/rootfs/fs/microsd/et
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
-# PX4_SIM_SPEED_FACTOR=0.25 \\
+PX4_SIM_SPEED_FACTOR=0.5 \\
 PX4_HOME_LAT=10.8776 \\
 PX4_HOME_LON=106.8071 \\
 PX4_HOME_ALT=0 \\
