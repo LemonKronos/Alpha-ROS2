@@ -1,14 +1,15 @@
 low_spatial:
   ros__parameters:
     voxel_resolution: 0.25
-    truncation_distance: 2.0 # the step size in sdf
+    truncation_distance: 1.0 # the step size in sdf
     max_weight: 100.0 # How much can a voxel get update
     voxel_carving_enabled: true
     use_weight_dropoff: true # Allow blends overlapping scans and smooths out the bumps
+    full_euclidean_distance: true
 
-    max_ray_length: 20.0
+    max_ray_length: 15.0
     sparsity_compensation_factor: 2.0 # help sparse ray to have more weight
 
-    esdf_min_distance: 0.0
-    esdf_max_distance: 10.0
-    esdf_default_distance: 10.0
+    esdf_min_distance: 0.1 #! This should never be 0, and it should be equal or smaller than `truncation_distance`
+    esdf_max_distance: 15.0
+    esdf_default_distance: 16.0 # This should be larger than `esdf_max_distance` to ensure unknow state

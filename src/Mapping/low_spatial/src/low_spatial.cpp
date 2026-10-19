@@ -11,14 +11,15 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
             {"truncation_distance", rclcpp::ParameterValue(Sensor::VOXEL_TRUNCATION_DISTANCE)},
             {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)},
             {"voxel_carving_enabled", rclcpp::ParameterValue(true)},
-            {"use_weight_dropoff", rclcpp::ParameterValue(false)},
+            {"use_weight_dropoff", rclcpp::ParameterValue(true)},
+            {"full_euclidean_distance", rclcpp::ParameterValue(true)},
 
             {"max_ray_length", rclcpp::ParameterValue(20.0)},
             {"sparsity_compensation_factor", rclcpp::ParameterValue(5.0)},
 
-            {"esdf_min_distance", rclcpp::ParameterValue(0.0)},
+            {"esdf_min_distance", rclcpp::ParameterValue(0.2)},
             {"esdf_max_distance", rclcpp::ParameterValue(10.0)},
-            {"esdf_default_distance", rclcpp::ParameterValue(10.0)}
+            {"esdf_default_distance", rclcpp::ParameterValue(11.0)}
         });
 
         // Check load params
@@ -45,6 +46,7 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
 
         //: ESDF
         voxblox::EsdfIntegrator::Config esdf_config;
+        esdf_config.full_euclidean_distance = this->get_parameter("full_euclidean_distance").as_bool();
         esdf_config.min_distance_m = this->get_parameter("esdf_min_distance").as_double();
         esdf_config.max_distance_m = this->get_parameter("esdf_max_distance").as_double();
         esdf_config.default_distance_m = this->get_parameter("esdf_default_distance").as_double();
@@ -60,7 +62,7 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
 
         //_ Timers
         esdf_update_TIME = this->create_timer(
-            std::chrono::nanoseconds(Clock::LOOP_CYCLE_NANOSEC),
+            std::chrono::nanoseconds(Clock::LOOP_CYCLE_SLOW_NANOSEC),
             std::bind(&spatial_container::LowSpatialNode::EsdfUpdateCallback, this)
         );
 }

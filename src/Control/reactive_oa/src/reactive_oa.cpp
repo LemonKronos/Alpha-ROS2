@@ -208,9 +208,19 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
 
     // 1. Anticipated Speed Blending
-    float physical_speed = movement_vec.norm();
-    float intent_speed = control_vec.norm(); // control_vec is already scaled to m/s
-    float target_speed = std::max(physical_speed, intent_speed);
+    Eigen::Vector3f vel_ms(
+        last_perception->velocity[0],
+        last_perception->velocity[1],
+        last_perception->velocity[2]
+    );
+
+    Eigen::Vector3f intent_ms(
+        control_vec.x() * Drone::SPEED_MAX_FORWARD,
+        control_vec.y() * Drone::SPEED_MAX_STRAFE,
+        control_vec.z() * Drone::SPEED_MAX_UP
+    );
+
+    float target_speed = std::max(vel_ms.norm(), intent_ms.norm());   // m/s
 
     // 2. Asymmetric Rate Limiting (Fast Inflate, Slow Deflate)
     float dt = Clock::LOOP_CYCLE_FAST; // Assuming this is defined as seconds (e.g., 0.01f)
@@ -235,17 +245,9 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
         float distance = 0.0f;
         Eigen::Vector3f gradient_world = Eigen::Vector3f::Zero();
 
-        bool observed = spatial_container::global_map.getDistanceAndGradient(center_world, distance, gradient_world); 
+        bool observed = global_map.getDistanceAndGradient(center_world, distance, gradient_world); 
 
         if(!observed) continue;
-
-        #if DEBUG
-        RCLCPP_INFO(
-            this->get_logger(),
-            BLUE "ESDF Distance = %.2f" RESET,
-            distance
-        );
-        #endif
 
         if (distance < r_push) {
             float urgency = 0.0f;
@@ -270,7 +272,10 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
             
             repulsive_vec += gradient_body * m_repel;
 
-            #if DEBUG
+            const float n = repulsive_vec.norm();
+            if (n > 1.0f) repulsive_vec /= n;
+
+            #if DEBUG && 1
             // Log exactly which sphere is triggering, its spatial boundaries, and the resulting urgency
             RCLCPP_INFO(this->get_logger(),
                 YELLOW "Sphere %zu | Dist: %.2f | Bounds [Push: %.2f, Brake: %.2f, Haz: %.2f] | Urgency: %.2f | m_repel: %.2f" RESET,
@@ -287,9 +292,21 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
 void spatial_container::ReactiveOANode::computeReactiveVector() {
     reactive_vec = control_vec + repulsive_vec;
     
-    reactive_vec.x() = std::clamp(reactive_vec.x(), -1.0f, 1.0f);
-    reactive_vec.y() = std::clamp(reactive_vec.y(), -1.0f, 1.0f);
-    reactive_vec.z() = std::clamp(reactive_vec.z(), -1.0f, 1.0f);
+    // Scale uniformly so no axis exceeds 1.0 -- direction is preserved
+    const float max_axis = reactive_vec.cwiseAbs().maxCoeff();
+    if (max_axis > 1.0f) {
+        reactive_vec /= max_axis;
+    }
+
+    #if DEBUG && 1
+    RCLCPP_INFO(
+        this->get_logger(),
+        BLUE
+        "intent= %.2f; movement= %.2f; repulsive= %.2f; reactive= %.2f"
+        RESET,
+        control_vec.norm(), movement_vec.norm(), repulsive_vec.norm(), reactive_vec.norm()
+    );
+    #endif
 }
 
 void spatial_container::ReactiveOANode::resetVectors() {

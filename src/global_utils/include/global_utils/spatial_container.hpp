@@ -68,9 +68,49 @@ public:
 
     void updateEsdf() {
         std::unique_lock<std::shared_mutex> lock(mutex);
-        if (esdf_integrator) {
-            esdf_integrator->updateFromTsdfLayer(true); // true = clear updated flags
+        if (!esdf_integrator) return;
+
+        esdf_integrator->updateFromTsdfLayer(true);
+
+        #if ALLOW_DEBUG && 0
+        // after esdf_integrator->updateFromTsdfLayer(true);
+        size_t n_pos_def = 0, n_neg_def = 0, n_other = 0, n_in_queue = 0, n_fixed = 0, n_halluc = 0;
+        float dmin = 1e9f, dmax = -1e9f;
+        int printed_occ = 0, printed_near = 0;
+
+        voxblox::BlockIndexList idx;
+        tsdf_layer->getAllAllocatedBlocks(&idx);
+        for (const auto& i : idx) {
+            const auto& tb = tsdf_layer->getBlockByIndex(i);
+            auto eb = esdf_layer->getBlockPtrByIndex(i);
+            if (!eb) continue;
+            for (size_t v = 0; v < tb.num_voxels(); ++v) {
+                const auto& t = tb.getVoxelByLinearIndex(v);
+                const auto& e = eb->getVoxelByLinearIndex(v);
+                if (t.weight <= 1e-6f || !e.observed) continue;
+
+                dmin = std::min(dmin, e.distance); dmax = std::max(dmax, e.distance);
+                if (e.in_queue) ++n_in_queue;
+                if (e.fixed) ++n_fixed;
+                if (e.hallucinated) ++n_halluc;
+                if (std::abs(e.distance - esdf_config.default_distance_m) < 1e-3f) ++n_pos_def;
+                else if (std::abs(e.distance + esdf_config.default_distance_m) < 1e-3f) ++n_neg_def;
+                else ++n_other;
+
+                if (t.distance <= esdf_config.min_distance_m && printed_occ < 5) {
+                    fprintf(stderr, "[occ ] tsdf d=%.3f w=%.1f | esdf d=%.3f fixed=%d inq=%d\n",
+                            t.distance, t.weight, e.distance, e.fixed, e.in_queue);
+                    ++printed_occ;
+                } else if (t.distance > 0.0f && t.distance < 0.5f && printed_near < 5) {
+                    fprintf(stderr, "[near] tsdf d=%.3f w=%.1f | esdf d=%.3f fixed=%d inq=%d\n",
+                            t.distance, t.weight, e.distance, e.fixed, e.in_queue);
+                    ++printed_near;
+                }
+            }
         }
+        fprintf(stderr, "[esdf] range=[%.2f, %.2f] +def=%zu -def=%zu other=%zu inqueue=%zu fixed=%zu halluc=%zu\n",
+                dmin, dmax, n_pos_def, n_neg_def, n_other, n_in_queue, n_fixed, n_halluc);
+        #endif
     }
 
     // --- Clean Interface for Reactive OA ---

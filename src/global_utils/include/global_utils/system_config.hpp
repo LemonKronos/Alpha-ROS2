@@ -23,8 +23,8 @@ namespace Clock {
     constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
     constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_FAST * 1e9);
 
-    constexpr float LOOP_CYCLE_SLOW = 0.1997f;
-    constexpr float LOOP_RATE_SLOW = 1.0f / LOOP_CYCLE_SLOW;
+    constexpr float LOOP_RATE_SLOW = 10.0f;
+    constexpr float LOOP_CYCLE_SLOW = 1.0f / LOOP_RATE_SLOW;
     constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_SLOW * 1e9);
 
     constexpr float LOOP_CYCLE_HEAVY = 4.001f;
@@ -139,10 +139,10 @@ namespace Drone {
         return radius + SAFE_BUFFER;
     }
 
-    constexpr float SLEW_TIME = 2.0f; // s, Max time it takes enter max deceleration
-    constexpr float LOOKAHEAD_TIME = 2.0f; // s
-    constexpr float DECELERATE_MAX = 2.0f; // m/s^2
-    constexpr float DECELERATE_SMOOTH = 0.5f; // m/s^2
+    constexpr float SLEW_TIME = 1.0f; // s, Max time it takes enter max deceleration
+    constexpr float LOOKAHEAD_TIME = 1.0f; // s
+    constexpr float DECELERATE_MAX = 4.0f; // m/s^2
+    constexpr float DECELERATE_SMOOTH = 2.0f; // m/s^2
 
     // Braking_distance = radius + speed * SLEW_TIME + (speed_sq / (2 * DECELERATE_MAX));
     // About 2.65m at the speed of 1m/s with the current config
