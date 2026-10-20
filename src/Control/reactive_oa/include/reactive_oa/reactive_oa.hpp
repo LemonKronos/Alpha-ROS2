@@ -105,10 +105,6 @@ private:
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
     void nodeLoopCallback();
-
-    // Constants for Extraction
-    static constexpr float UNIT_TO_METER = 0.5f;
-    static constexpr int BOX_DIM = 12;
 };
 
 } // namespace spatial_container

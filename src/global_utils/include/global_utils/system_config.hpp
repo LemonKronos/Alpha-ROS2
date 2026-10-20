@@ -116,6 +116,7 @@ namespace Service {
 }
 
 namespace Drone {
+    constexpr float UNIT_SIZE = 1.0f;
     constexpr float WIDTH = 2.15f;
     constexpr float LENGTH = 0.93f;
     constexpr float HEIGHT = 0.31f;
@@ -175,11 +176,13 @@ namespace Drone {
 }
 
 namespace Sensor {
+    //: LiDAR 1D down
     constexpr float LIDAR_DOWN_RANGE_MIN = 0.1f;
     constexpr float LIDAR_DOWN_RANGE_MIN_SQ = LIDAR_DOWN_RANGE_MIN * LIDAR_DOWN_RANGE_MIN;
     constexpr float LIDAR_DOWN_RANGE_MAX = 30.0f;
     constexpr float LIDAR_DOWN_RANGE_MAX_SQ = LIDAR_DOWN_RANGE_MAX * LIDAR_DOWN_RANGE_MAX;
 
+    //: LiDAR 2D circle
     constexpr uint8_t LIDAR_2D_SECTOR_NUM = 12;
     constexpr int LIDAR_2D_SIZE = 1440;
     constexpr float LIDAR_2D_RANGE_MIN = 0.1f;
@@ -187,8 +190,10 @@ namespace Sensor {
     constexpr float LIDAR_2D_RANGE_MAX = 30.0f;
     constexpr float LIDAR_2D_RANGE_MAX_SQ = LIDAR_2D_RANGE_MAX * LIDAR_2D_RANGE_MAX;
 
+    //: Depth Camera
     constexpr float DEPTH_CAM_RANGE = 30.0f;
 
+    //: Voxblox map default
     constexpr float VOXEL_RESOLUTION = 0.5f;
     constexpr size_t VOXEL_PER_SIDE = 8; // new voxel allocate to chunk of block 8x8x8 = 512 voxels, a 2 m^3 cube
     constexpr float VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0f;
@@ -196,6 +201,11 @@ namespace Sensor {
     constexpr float VOXEL_MAX_WEIGHT = 100.0f;
     // constexpr float VOXEL_DROPOFF_EPSILON_WEIGHT = 15.0f; // Not been put in Low Spatial config
 
+    //: Acrobatic OA
+    constexpr int SPATIAL_BOX_DIM = 12;
+
+    //: VFH
+    //* Soon to be deprecated
     constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
     constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
     constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);

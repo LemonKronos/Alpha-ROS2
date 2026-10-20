@@ -4,14 +4,19 @@
 #include <limits>
 
 namespace {
-    // --- Tuning (stability first) ---
-    constexpr float V_ESCAPE = 0.2f;            // constant outward push once inside the push zone
-    constexpr float GAMMA = 0.3f;               // weight of the sliding-along-obstacle speed
-    constexpr float URGENCY_MAX = 3.0f;
-    constexpr float ESDF_RANGE_MARGIN = 1.0f;   // push zone stays this far inside the ESDF max distance
-    constexpr float MIN_ZONE_GAP = 0.5f;        // min gap between brake and push radius
-    constexpr float TAU_RELEASE = 0.3f;         // s, release time constant of the repulsion filter (attack is instant)
-    constexpr int   MAX_CACHE_AGE_TICKS = 15;   // ~150 ms at 100 Hz: how long a cached ESDF read may replace a busy map
+    // --- Speed governor tuning (stability first) ---
+    constexpr float A_BRAKE = Drone::DECELERATE_MAX;   // m/s^2 deceleration the governor may rely on (be conservative)
+    constexpr float T_REACT = 0.4f;             // s, loop + latency + control lag
+    constexpr float K_BRAKE = 1.0f;             // extra braking per m/s of speed above the allowed closing speed
+    constexpr float V_BRAKE_MAX = 3.0f;         // m/s, strongest "reverse" the governor will command while braking
+    constexpr float V_ESCAPE_MAX = 1.5f;        // m/s, max outward speed when inside the hazard sphere
+    constexpr float K_ESCAPE = 1.5f;            // 1/s, outward speed per meter of penetration
+    constexpr float ESDF_RANGE_MARGIN = 1.0f;   // governor range stays this far inside the ESDF max distance
+    constexpr float EDGE_BLEND = 2.0f;          // m, fade-in of the governor at the edge of that range
+    constexpr float REPULSIVE_MAX = 1.5f;       // normalized magnitude limit (>1 so it can cancel a full command and still brake)
+    constexpr float TAU_RELEASE = 0.3f;         // s, release time constant of the output filter (attack is instant)
+    constexpr int   MAX_CACHE_AGE_TICKS = 30;   // ~300 ms at 100 Hz: cached read may replace a BUSY map this long
+    constexpr int   UNOBSERVED_GRACE_TICKS = 10;// ~100 ms: cached read may replace an UNOBSERVED query this long
 }
 
 spatial_container::ReactiveOANode::ReactiveOANode(const rclcpp::NodeOptions &options) :
@@ -108,9 +113,8 @@ void spatial_container::ReactiveOANode::loadFoamFromParams() {
     }
 
     sphere_cache.assign(multi_sphere.size(), SphereCache{});
-    smoothed_close.assign(multi_sphere.size(), 0.0f);
 
-    RCLCPP_INFO(this->get_logger(), GREEN "Loaded %d FOAM spheres" RESET, multi_sphere.size());
+    RCLCPP_INFO(this->get_logger(), GREEN "Loaded %zu FOAM spheres" RESET, multi_sphere.size());
 }
 
 void spatial_container::ReactiveOANode::computeControlVector() {
@@ -137,74 +141,114 @@ void spatial_container::ReactiveOANode::computeMovementVector() {
     movement_vec = q.inverse() * world_vel; 
 }
 
+//TODO Make this 30 Hz 
 void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
-#if TIME_ANALYSE
-    analyzer->start_segment("Extract Spatial Boxes");
-#endif
+    #if TIME_ANALYSE
+        analyzer->start_segment("Extract Spatial Boxes");
+    #endif
+
+    if(spatial_obs_PUB->get_subscription_count() == 0) return;
 
     auto obs_msg = alpha_msgs::msg::SpatialObservation();
     obs_msg.header.stamp = this->now();
-    obs_msg.header.frame_id = base_link.get();
+    obs_msg.header.frame_id = this->base_link.get();
 
     Eigen::Vector3f drone_pos(last_perception->position[0], last_perception->position[1], last_perception->position[2]);
     Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
     Eigen::Matrix3f body_rot = drone_q.toRotationMatrix();
 
-    // --- Coarse Box Setup ---
-    float coarse_stride = (10.0f * UNIT_TO_METER) / BOX_DIM;
-    float coarse_ref_dist = std::sqrt(3.0f * std::pow(5.0f * UNIT_TO_METER, 2));
+    // Coarse Box Physical Parameters
+    float coarse_stride = (10.0f * Drone::UNIT_SIZE) / Sensor::SPATIAL_BOX_DIM;
+    float coarse_ref_dist = std::sqrt(3.0f * std::pow(5.0f * Drone::UNIT_SIZE, 2));
 
-    // --- Detail Box Setup ---
+    // Detail Box Physical Parameters
     float intent_norm = std::clamp(control_vec.norm() / Drone::SPEED_MAX_FORWARD, 0.0f, 1.0f);
-    float l_v = (5.0f + 15.0f * intent_norm) * UNIT_TO_METER;
-    float detail_stride_x = l_v / BOX_DIM;
-    float detail_stride_yz = (5.0f * UNIT_TO_METER) / BOX_DIM;
-    float detail_ref_dist = std::sqrt(std::pow(l_v, 2) + 2.0f * std::pow(2.5f * UNIT_TO_METER, 2));
+    float l_v = (5.0f + 15.0f * intent_norm) * Drone::UNIT_SIZE;
+    float detail_stride_x = l_v / Sensor::SPATIAL_BOX_DIM;
+    float detail_stride_yz = (5.0f * Drone::UNIT_SIZE) / Sensor::SPATIAL_BOX_DIM;
+    float detail_ref_dist = std::sqrt(std::pow(l_v, 2) + 2.0f * std::pow(2.5f * Drone::UNIT_SIZE, 2));
 
-    //? Intent Rotation Matrix (Align X with control_vec, Z roughly up)
+    // Align X with control_vec, preserving the drone's body roll
     Eigen::Matrix3f intent_rot = body_rot; 
-    if (control_vec.norm() > 1e-3f) {
+    if (!control_vec.isZero(1e-3f)) {
         Eigen::Vector3f intent_x = body_rot * control_vec.normalized();
-        Eigen::Vector3f intent_y = Eigen::Vector3f::UnitZ().cross(intent_x).normalized();
-        if(intent_y.hasNaN()) intent_y = Eigen::Vector3f::UnitY();
+        
+        // Cross the drone's actual Body Z-axis with Intent X to get Intent Y
+        Eigen::Vector3f body_z = body_rot.col(2); 
+        Eigen::Vector3f intent_y = body_z.cross(intent_x).normalized();
+        
+        // Fallback if intent_x is perfectly aligned with body_z (e.g., commanding straight up/down relative to the deck)
+        if(intent_y.hasNaN() || !intent_y.isZero(1e-3f)) {
+            intent_y = body_rot.col(1); // Use body Y as fallback
+        }
+        
         Eigen::Vector3f intent_z = intent_x.cross(intent_y).normalized();
+        
         intent_rot.col(0) = intent_x;
         intent_rot.col(1) = intent_y;
         intent_rot.col(2) = intent_z;
     }
 
-    int coarse_idx = 0;
-    int detail_idx = 0;
+    int idx = 0;
+    
+    // Sub-sample offsets (-0.25 and +0.25 of the stride from the center of the cell)
+    const float sub_offsets[2] = {-0.25f, 0.25f};
 
     // Loop Z, Y, X (Channel-First flattening)
-    for (int z = 0; z < BOX_DIM; ++z) {
-        for (int y = 0; y < BOX_DIM; ++y) {
-            for (int x = 0; x < BOX_DIM; ++x) {
+    for (int z = 0; z < Sensor::SPATIAL_BOX_DIM; ++z) {
+        for (int y = 0; y < Sensor::SPATIAL_BOX_DIM; ++y) {
+            for (int x = 0; x < Sensor::SPATIAL_BOX_DIM; ++x) {
                 
-                // Coarse Cell (queries distance only)
-                Eigen::Vector3f c_local((x - BOX_DIM/2.0f + 0.5f) * coarse_stride, (y - BOX_DIM/2.0f + 0.5f) * coarse_stride, (z - BOX_DIM/2.0f + 0.5f) * coarse_stride);
-                Eigen::Vector3f c_world = drone_pos + body_rot * c_local;
+                // Aggregators for the 2x2x2 volumetric sampling
+                float c_sum = 0.0f, d_sum = 0.0f;
+                float d_min = std::numeric_limits<float>::max();
+                int c_valid = 0, d_valid = 0;
+
+                // 2x2x2 Sub-sampling Loop
+                for(float sz : sub_offsets) {
+                    for(float sy : sub_offsets) {
+                        for(float sx : sub_offsets) {
+                            
+                            // Coarse sub-point
+                            Eigen::Vector3f c_local(
+                                (x - Sensor::SPATIAL_BOX_DIM/2.0f + 0.5f + sx) * coarse_stride, 
+                                (y - Sensor::SPATIAL_BOX_DIM/2.0f + 0.5f + sy) * coarse_stride, 
+                                (z - Sensor::SPATIAL_BOX_DIM/2.0f + 0.5f + sz) * coarse_stride
+                            );
+                            Eigen::Vector3f c_world = drone_pos + body_rot * c_local;
+                            float c_dist = 0.0f;
+                            if(global_map.getDistance(c_world, c_dist)) {
+                                c_sum += c_dist;
+                                c_valid++;
+                            }
+
+                            // Detail sub-point
+                            Eigen::Vector3f d_local(
+                                (x + 0.5f + sx) * detail_stride_x, 
+                                (y - Sensor::SPATIAL_BOX_DIM/2.0f + 0.5f + sy) * detail_stride_yz, 
+                                (z - Sensor::SPATIAL_BOX_DIM/2.0f + 0.5f + sz) * detail_stride_yz
+                            );
+                            Eigen::Vector3f d_world = drone_pos + intent_rot * d_local;
+                            float d_dist = 0.0f;
+                            if(global_map.getDistance(d_world, d_dist)) {
+                                d_sum += d_dist;
+                                d_min = std::min(d_min, d_dist);
+                                d_valid++;
+                            }
+                        }
+                    }
+                }
+
+                // Channel 0: Coarse Mean ESDF | Channel 1: Coarse Mask
+                obs_msg.coarse_box[idx]        = (c_valid > 0) ? ((c_sum / c_valid) / coarse_ref_dist) : 1.0f;
+                obs_msg.coarse_box[1728 + idx] = (c_valid > 0) ? 1.0f : 0.0f;
                 
-                float c_dist = 0.0f;
-                bool c_obs = spatial_container::global_map.getDistance(c_world, c_dist);
+                // Channel 0: Detail Min ESDF | Channel 1: Detail Mean ESDF | Channel 2: Detail Mask
+                obs_msg.detail_box[idx]        = (d_valid > 0) ? (d_min / detail_ref_dist) : 1.0f;
+                obs_msg.detail_box[1728 + idx] = (d_valid > 0) ? ((d_sum / d_valid) / detail_ref_dist) : 1.0f;
+                obs_msg.detail_box[3456 + idx] = (d_valid > 0) ? 1.0f : 0.0f;
 
-                obs_msg.coarse_box[coarse_idx] = c_obs ? (c_dist / coarse_ref_dist) : 1.0f;
-                obs_msg.coarse_box[1728 + coarse_idx] = c_obs ? 1.0f : 0.0f;
-                
-                // Detail Cell (queries distance only)
-                Eigen::Vector3f d_local((x + 0.5f) * detail_stride_x, (y - BOX_DIM/2.0f + 0.5f) * detail_stride_yz, (z - BOX_DIM/2.0f + 0.5f) * detail_stride_yz);
-                Eigen::Vector3f d_world = drone_pos + intent_rot * d_local;
-
-                float d_dist = 0.0f;
-                bool d_obs = spatial_container::global_map.getDistance(d_world, d_dist);
-
-                float d_val = d_obs ? (d_dist / detail_ref_dist) : 1.0f;
-                obs_msg.detail_box[detail_idx] = d_val;         
-                obs_msg.detail_box[1728 + detail_idx] = d_val;  
-                obs_msg.detail_box[3456 + detail_idx] = d_obs ? 1.0f : 0.0f; 
-
-                coarse_idx++;
-                detail_idx++;
+                idx++;
             }
         }
     }
@@ -216,6 +260,7 @@ void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
     #endif
 }
 
+//TODO Make this 30 Hz
 void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     #if TIME_ANALYSE
         analyzer->start_segment("Compute Repulsive Vector");
@@ -227,30 +272,39 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     const Eigen::Quaternionf drone_q = frame_utils::arrayToQuaternion(last_perception->q);
     const Eigen::Quaternionf drone_q_inv = drone_q.inverse();
 
-    // Body-frame speeds in m/s (the geometry below needs real units; vectors elsewhere stay normalized)
+    // Body-frame speeds in m/s (the governor needs real units; vectors elsewhere stay normalized)
     const Eigen::Vector3f v_max(Drone::SPEED_MAX_FORWARD, Drone::SPEED_MAX_STRAFE, Drone::SPEED_MAX_UP);
     const Eigen::Vector3f movement_ms = movement_vec.cwiseProduct(v_max);
     const Eigen::Vector3f control_ms = control_vec.cwiseProduct(v_max);
 
-    // Keep the push zone inside what the ESDF can represent
+    // Range in which the ESDF is trustworthy
     const float esdf_max = spatial_container::global_map.esdf_max_distance_m.load(std::memory_order_relaxed);
     const float r_cap = (esdf_max > 0.0f) ? (esdf_max - ESDF_RANGE_MARGIN) : std::numeric_limits<float>::max();
+
+    #if DEBUG
+    static unsigned n_ok = 0, n_busy = 0, n_unobs = 0, n_skipped = 0;
+    #endif
 
     Eigen::Vector3f repulsive_raw = Eigen::Vector3f::Zero();
 
     for (size_t i = 0; i < multi_sphere.size(); ++i) {
         const auto& sphere = multi_sphere[i];
         auto& cache = sphere_cache[i];
-        float& vc = smoothed_close[i];
-
-        // Slow deflation of the closing speed (also applied when this sphere is skipped)
-        auto decay_close_speed = [&]() { vc = std::max(0.0f, vc - Drone::DECELERATE_MAX * dt); };
 
         const Eigen::Vector3f center_world = drone_pos + (drone_q * sphere.pos);
         float distance = 0.0f;
         Eigen::Vector3f gradient_world = Eigen::Vector3f::Zero();
+        bool have_data = false;
 
-        // Non-blocking ESDF read with short-lived cache
+        // Replace a missing read with the last good one, moved along its gradient by the drone's motion
+        auto use_cache = [&]() {
+            gradient_world = cache.gradient_world;
+            distance = cache.distance +
+                (center_world - cache.center_at_read).dot(cache.gradient_world.normalized());
+            have_data = true;
+        };
+
+        //_ Non-blocking ESDF read with short-lived cache
         switch (spatial_container::global_map.tryGetDistanceAndGradient(center_world, distance, gradient_world)) {
             case spatial_container::QueryResult::Ok:
                 cache.valid = true;
@@ -258,83 +312,85 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
                 cache.distance = distance;
                 cache.gradient_world = gradient_world;
                 cache.center_at_read = center_world;
+                have_data = true;
+                #if DEBUG
+                ++n_ok;
+                #endif
                 break;
 
             case spatial_container::QueryResult::Unobserved:
-                cache.valid = false;      // no data here: an old value no longer describes this spot
-                decay_close_speed();
-                continue;
+                #if DEBUG
+                ++n_unobs;
+                #endif
+                if (cache.valid && ++cache.age_ticks <= UNOBSERVED_GRACE_TICKS) use_cache();
+                else cache.valid = false;
+                break;
 
             case spatial_container::QueryResult::Busy:
-                if (!cache.valid || ++cache.age_ticks > MAX_CACHE_AGE_TICKS) {
-                    decay_close_speed();
-                    continue;             // nothing recent enough to trust
-                }
-                gradient_world = cache.gradient_world;
-                // Moving along the gradient since the read changes the distance accordingly
-                distance = cache.distance +
-                    (center_world - cache.center_at_read).dot(cache.gradient_world.normalized());
+                #if DEBUG
+                ++n_busy;
+                #endif
+                if (cache.valid && ++cache.age_ticks <= MAX_CACHE_AGE_TICKS) use_cache();
                 break;
         }
 
-        if (gradient_world.hasNaN() || gradient_world.norm() < 1e-4f || std::isnan(distance)) {
-            decay_close_speed();
+        if (!have_data || gradient_world.hasNaN() || gradient_world.norm() < 1e-4f || std::isnan(distance)) {
+            #if DEBUG
+            ++n_skipped;
+            #endif
             continue;
         }
+        if (distance >= r_cap) continue;   // beyond the range the ESDF represents
 
         // Unit vector pointing AWAY from the obstacle, in body frame
-        const Eigen::Vector3f gradient_body = drone_q_inv * gradient_world.normalized();
+        const Eigen::Vector3f g_body = drone_q_inv * gradient_world.normalized();
 
-        // Closing speed toward THIS obstacle (m/s): flying parallel to a surface gives ~0
-        const float v_close_target = std::max(0.0f, std::max(
-            movement_ms.dot(-gradient_body),   // actual motion
-            control_ms.dot(-gradient_body)     // pilot intent
-        ));
-
-        // Fast inflate, slow deflate
-        if (v_close_target > vc) vc = v_close_target;
-        else vc = std::max(v_close_target, vc - Drone::DECELERATE_MAX * dt);
-
-        // Zone radii, kept continuous and inside the ESDF range
         const float r_hazard = Drone::hazard_distance(sphere.radius);
-        float r_brake = Drone::braking_distance(vc, r_hazard);
-        float r_push = Drone::pushing_distance(vc, r_brake);
+        const float clearance = distance - r_hazard;   // m, negative = inside the hazard sphere
 
-        r_brake = std::max(r_hazard, std::min(r_brake, r_cap - MIN_ZONE_GAP));
-        r_push = std::max(r_brake + MIN_ZONE_GAP, std::min(r_push, r_cap));
-
-        if (distance >= r_push) continue;
-
-        // Urgency: continuous 0 -> 1 -> 2 -> 3
-        float urgency = 0.0f;
-        if (distance > r_brake) {
-            urgency = (r_push - distance) / std::max(0.01f, r_push - r_brake);                 // 0..1
-        } else if (distance > r_hazard) {
-            urgency = 1.0f + ((r_brake - distance) / std::max(0.01f, r_brake - r_hazard));    // 1..2
-        } else {
-            urgency = std::min(URGENCY_MAX, 2.0f + ((r_hazard - distance) / std::max(0.01f, r_hazard))); // 2..3
+        //_ Maximum closing speed from which we can still stop before the hazard sphere:
+        //   v_allow = -a*T + sqrt((a*T)^2 + 2*a*clearance). Depends only on distance, not on our own speed.
+        float v_allow = 0.0f;
+        if (clearance > 0.0f) {
+            const float at = A_BRAKE * T_REACT;
+            v_allow = std::sqrt(at * at + 2.0f * A_BRAKE * clearance) - at;
         }
+        v_allow = std::min(v_allow, Drone::SPEED_MAX_FORWARD);
 
-        const float v_in = std::max(0.0f, movement_vec.dot(-gradient_body));
-        const float i_in = std::max(0.0f, control_vec.dot(-gradient_body));
-        const float v_slip = std::sqrt(std::max(0.0f, movement_vec.squaredNorm() - std::pow(movement_vec.dot(gradient_body), 2.0f)));
+        // Closing speeds toward this obstacle (m/s): commanded and actual. Parallel motion gives ~0.
+        const float c = control_ms.dot(-g_body);
+        const float v = movement_ms.dot(-g_body);
 
-        const float m_repel = urgency * (i_in + v_in + V_ESCAPE + (GAMMA * v_slip));
+        //_ Closing speed we allow the command to have
+        float u = std::min(c, v_allow);
+        if (v > v_allow) u = std::min(u, v_allow - K_BRAKE * (v - v_allow));            // already too fast: brake
+        if (clearance < 0.0f) u = std::min(u, -std::min(V_ESCAPE_MAX, K_ESCAPE * -clearance)); // inside: ease out
+        u = std::max(u, -V_BRAKE_MAX);
 
-        repulsive_raw += gradient_body * m_repel;
+        // Fade the governor in over the last EDGE_BLEND meters of the ESDF range (no step at the edge)
+        const float edge = std::clamp((r_cap - distance) / EDGE_BLEND, 0.0f, 1.0f);
+
+        // Reduction of the closing component, applied along the outward gradient (never fights a retreating pilot)
+        const float delta = std::max(0.0f, c - u) * edge;
+        repulsive_raw += (g_body * delta).cwiseQuotient(v_max);    // back to normalized command units
 
         #if DEBUG
         RCLCPP_INFO(this->get_logger(),
-            YELLOW "Sphere %zu | Dist: %.2f | v_close: %.2f | Bounds [Push: %.2f, Brake: %.2f, Haz: %.2f] | Urgency: %.2f | m_repel: %.2f" RESET,
-            i, distance, vc, r_push, r_brake, r_hazard, urgency, m_repel);
+            YELLOW "Sphere %zu | Dist: %.2f | clear: %.2f | cmd_close: %.2f | act_close: %.2f | v_allow: %.2f | delta: %.2f" RESET,
+            i, distance, clearance, c, v, v_allow, delta);
         #endif
     }
 
-    // Bound the magnitude without changing the direction
-    const float raw_norm = repulsive_raw.norm();
-    if (raw_norm > 1.0f) repulsive_raw /= raw_norm;
+    #if DEBUG
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+        GRAY "ESDF reads ok=%u busy=%u unobserved=%u skipped=%u" RESET, n_ok, n_busy, n_unobs, n_skipped);
+    #endif
 
-    // Fast attack, slow release: react instantly to growing danger, relax gently
+    //_ Bound the magnitude without changing the direction
+    const float raw_norm = repulsive_raw.norm();
+    if (raw_norm > REPULSIVE_MAX) repulsive_raw *= (REPULSIVE_MAX / raw_norm);
+
+    //_ Fast attack, slow release
     if (repulsive_raw.norm() >= repulsive_filter.norm()) {
         repulsive_filter = repulsive_raw;
     } else {

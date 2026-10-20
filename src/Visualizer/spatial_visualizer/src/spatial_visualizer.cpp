@@ -13,20 +13,20 @@ spatial_container::SpatialVisualizerNode::SpatialVisualizerNode(const rclcpp::No
         current_position.setZero();
         frame_transform.setIdentity();
 
-        //_ Publishers
+        //: Publishers
         nearby_voxels_PUB = this->create_publisher<visualization_msgs::msg::Marker>(
             "/visualizer/nearby_voxel",
             10
         );
 
-        //_ Subscribers
+        //: Subscribers
         perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
             Topic::FUSE_PERCEPTION,
             rclcpp::SensorDataQoS(),
             std::bind(&spatial_container::SpatialVisualizerNode::FusePerceptionCallback, this, std::placeholders::_1)
         );
 
-        //_ Timers
+        //: Timers
         loop_TIME = this->create_timer(
             std::chrono::nanoseconds(Clock::LOOP_CYCLE_NANOSEC),
             std::bind(&spatial_container::SpatialVisualizerNode::TimerCallback, this)
@@ -35,6 +35,7 @@ spatial_container::SpatialVisualizerNode::SpatialVisualizerNode(const rclcpp::No
 
 spatial_container::SpatialVisualizerNode::~SpatialVisualizerNode() {}
 
+//TODO use tf instead 
 void spatial_container::SpatialVisualizerNode::FusePerceptionCallback(alpha_msgs::msg::FusePerception::SharedPtr msg) {
     perception_alive_counter = Threshold::ALLOW_MISSED_TOPIC;
 
