@@ -17,19 +17,19 @@
 namespace Clock {
     constexpr float LOOP_RATE  = 30.0f;
     constexpr float LOOP_CYCLE = 1.0f / LOOP_RATE;
-    constexpr int64_t LOOP_CYCLE_NANOSEC = static_cast<int64_t>(LOOP_CYCLE * 1e9);
+    constexpr uint64_t LOOP_CYCLE_NANOSEC = static_cast<uint64_t>(LOOP_CYCLE * 1e9);
 
     constexpr float LOOP_RATE_FAST = 100.0f;
     constexpr float LOOP_CYCLE_FAST = 1.0f / LOOP_RATE_FAST;
-    constexpr int64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_FAST * 1e9);
+    constexpr uint64_t LOOP_CYCLE_FAST_NANOSEC = static_cast<uint64_t>(LOOP_CYCLE_FAST * 1e9);
 
     constexpr float LOOP_RATE_SLOW = 10.0f;
     constexpr float LOOP_CYCLE_SLOW = 1.0f / LOOP_RATE_SLOW;
-    constexpr int64_t LOOP_CYCLE_SLOW_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_SLOW * 1e9);
+    constexpr uint64_t LOOP_CYCLE_SLOW_NANOSEC = static_cast<uint64_t>(LOOP_CYCLE_SLOW * 1e9);
 
     constexpr float LOOP_CYCLE_HEAVY = 4.001f;
     constexpr float LOOP_RATE_HEAVY = 1.0f / LOOP_CYCLE_HEAVY;
-    constexpr int64_t LOOP_CYCLE_HEAVY_NANOSEC = static_cast<int64_t>(LOOP_CYCLE_HEAVY * 1e9);
+    constexpr uint64_t LOOP_CYCLE_HEAVY_NANOSEC = static_cast<uint64_t>(LOOP_CYCLE_HEAVY * 1e9);
 
 }
 
@@ -64,6 +64,8 @@ namespace Threshold {
     constexpr uint8_t ALLOW_MISSED_TOPIC = std::ceil(Clock::LOOP_RATE / 10.0f);
     constexpr uint8_t ALLOW_MISSED_FAST_TOPIC = std::ceil(Clock::LOOP_RATE_FAST / 10.0f);
     constexpr uint8_t ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC;
+    constexpr uint64_t TF_TIMEOUT_ns = Clock::LOOP_CYCLE_NANOSEC * 3;
+    constexpr uint64_t TF_TIMEOUT_FAST_ns = Clock::LOOP_CYCLE_FAST_NANOSEC * 4;
 
 }
 

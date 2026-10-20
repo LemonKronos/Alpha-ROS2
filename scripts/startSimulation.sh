@@ -89,6 +89,12 @@ start_qgroundcontrol() {
   printf "\033[92m[QGroundControl] running...\033[0m\n"
 }
 
+#_ Web Socket Control
+start_web_control() {
+  brave-browser /home/mr_lemon/MyCode/Project/Drone/ROS2/src/Control/advance_control/resource/controller.html >/dev/null 2>&1 &
+  printf "\033[92m[Web Socket Control] opening...\033[0m\n"
+}
+
 #_ ROS2 TERMINAL
 start_ros2_terminal() {
   kitty zsh -c '
@@ -136,6 +142,8 @@ main() {
   # start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
+  sleep 1
+  start_web_control
   sleep 1
   start_gazebo_gui
   start_rviz2

@@ -20,7 +20,7 @@
     #define DO_REACTIVE_OA 1
 #endif
 
-#define DEBUG (ALLOW_DEBUG & 1)
+#define DEBUG (ALLOW_DEBUG & 0)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
 #define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
@@ -73,8 +73,6 @@ private:
     Eigen::Vector3f reactive_vec;
 
     std::vector<float> smoothed_close;
-    Eigen::Vector3f repulsive_filter;
-    std::vector<SphereCache> sphere_cache;
 
     std::vector<FoamSphere> multi_sphere;
 
@@ -99,12 +97,14 @@ private:
     #endif
 
     // Timer
-    rclcpp::TimerBase::SharedPtr node_loop_TIME;
+    rclcpp::TimerBase::SharedPtr TIME_control_loop;
+    rclcpp::TimerBase::SharedPtr TIME_map_read;
 
     // Callbacks
     void inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg);
-    void nodeLoopCallback();
+    void controlLoopCallback();
+    void mapReadCallback();
 };
 
 } // namespace spatial_container

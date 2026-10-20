@@ -15,13 +15,6 @@
 
 namespace spatial_container {
 
-// Result of a non-blocking ESDF query.
-//  Ok         : fresh value written to the output arguments.
-//  Unobserved : the map has no data at that position (or no map yet). Outputs untouched.
-//  Busy       : a writer (TSDF/ESDF update) holds the lock. No information was lost,
-//               the caller may reuse a recent cached value. Outputs untouched.
-enum class QueryResult { Ok, Unobserved, Busy };
-
 //! Only Low Spatial Node shall init and config this
 class MapManager {
 public:
@@ -88,9 +81,8 @@ public:
         }
     }
 
-    // Blocking reads: wait for writers. Outputs are only written on success.
-    bool getDistance(const Eigen::Vector3f& pos, float& distance) const {
-        std::shared_lock<std::shared_mutex> lock(mutex);
+    // Non-locking read: Caller MUST hold global_map.mutex
+    bool getDistanceUnsafe(const Eigen::Vector3f& pos, float& distance) const {
         if (!esdf_map) return false;
 
         double dist_d = 0.0;
@@ -100,8 +92,8 @@ public:
         return true;
     }
 
-    bool getDistanceAndGradient(const Eigen::Vector3f& pos, float& distance, Eigen::Vector3f& gradient) const {
-        std::shared_lock<std::shared_mutex> lock(mutex);
+    // Non-locking read and gradient: Caller MUST hold global_map.mutex
+    bool getDistanceAndGradientUnsafe(const Eigen::Vector3f& pos, float& distance, Eigen::Vector3f& gradient) const {
         if (!esdf_map) return false;
 
         double dist_d = 0.0;
@@ -111,24 +103,6 @@ public:
         distance = static_cast<float>(dist_d);
         gradient = grad_d.cast<float>();
         return true;
-    }
-
-    // Non-blocking read for control loops: never waits for a writer.
-    // Outputs are only written when the result is QueryResult::Ok.
-    QueryResult tryGetDistanceAndGradient(const Eigen::Vector3f& pos, float& distance, Eigen::Vector3f& gradient) const {
-        std::shared_lock<std::shared_mutex> lock(mutex, std::try_to_lock);
-        if (!lock.owns_lock()) return QueryResult::Busy;
-        if (!esdf_map) return QueryResult::Unobserved;
-
-        double dist_d = 0.0;
-        Eigen::Vector3d grad_d = Eigen::Vector3d::Zero();
-        if (!esdf_map->getDistanceAndGradientAtPosition(pos.cast<double>(), &dist_d, &grad_d)) {
-            return QueryResult::Unobserved;
-        }
-
-        distance = static_cast<float>(dist_d);
-        gradient = grad_d.cast<float>();
-        return QueryResult::Ok;
     }
 };
 

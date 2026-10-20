@@ -7,21 +7,28 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
 
         //_ ROS2 params
         this->declare_parameters("", std::map<std::string, rclcpp::ParameterValue>{
+            //: Base
             {"voxel_resolution", rclcpp::ParameterValue(-1.0)}, // use as kill pill
             {"truncation_distance", rclcpp::ParameterValue(Sensor::VOXEL_TRUNCATION_DISTANCE)},
             {"max_weight", rclcpp::ParameterValue(Sensor::VOXEL_MAX_WEIGHT)},
             {"voxel_carving_enabled", rclcpp::ParameterValue(true)},
-            {"use_weight_dropoff", rclcpp::ParameterValue(false)},
             {"integrator_threads", rclcpp::ParameterValue(4)},
 
-            {"dense_max_ray_length", rclcpp::ParameterValue(10.0)},  // depth camera (dense config)
-            {"max_ray_length", rclcpp::ParameterValue(20.0)},        // LiDAR (sparse config)
-            {"sparsity_compensation_factor", rclcpp::ParameterValue(5.0)},
+            //: Dense
+            {"dense_use_weight_dropoff", rclcpp::ParameterValue(true)},
+            {"dense_use_compensate", rclcpp::ParameterValue(false)},
+            {"dense_compensation_factor", rclcpp::ParameterValue(10.0f)},
+            {"dense_max_ray_length", rclcpp::ParameterValue(20.0)},
 
+            //: Sparse
+            {"sparse_max_ray_length", rclcpp::ParameterValue(20.0)},
+            {"sparse_compensation_factor", rclcpp::ParameterValue(5.0)},
+
+            //: ESDF
             {"esdf_full_euclidean", rclcpp::ParameterValue(true)},
             {"esdf_min_distance", rclcpp::ParameterValue(0.2)},
             {"esdf_max_distance", rclcpp::ParameterValue(8.0)},
-            {"esdf_default_distance", rclcpp::ParameterValue(9.0)}
+            {"esdf_default_distance", rclcpp::ParameterValue(10.0)}
         });
 
         // Check load params
@@ -32,21 +39,25 @@ spatial_container::LowSpatialNode::LowSpatialNode(const rclcpp::NodeOptions& opt
         }
 
         //_ Init variables
-        //: TSDF Dense
+        //: TSDF Base
         voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
         tsdf_dense_config.default_truncation_distance = static_cast<float>(this->get_parameter("truncation_distance").as_double());
         tsdf_dense_config.max_weight = static_cast<float>(this->get_parameter("max_weight").as_double());
         tsdf_dense_config.voxel_carving_enabled = this->get_parameter("voxel_carving_enabled").as_bool();
-        tsdf_dense_config.use_weight_dropoff = this->get_parameter("use_weight_dropoff").as_bool();
-        tsdf_dense_config.max_ray_length_m = this->get_parameter("dense_max_ray_length").as_double();
         tsdf_dense_config.integrator_threads = std::max<int>(1, static_cast<int>(this->get_parameter("integrator_threads").as_int()));
+        
+        //: TSDF Dense
+        tsdf_dense_config.use_weight_dropoff = this->get_parameter("dense_use_weight_dropoff").as_bool();
+        tsdf_dense_config.use_sparsity_compensation_factor = this->get_parameter("dense_use_compensate").as_bool();
+        tsdf_dense_config.sparsity_compensation_factor = static_cast<float>(this->get_parameter("dense_compensation_factor").as_double());
+        tsdf_dense_config.max_ray_length_m = static_cast<float>(this->get_parameter("dense_max_ray_length").as_double());
 
         //: TSDF Sparse - modify from the Dense
         voxblox::TsdfIntegratorBase::Config tsdf_sparse_config = tsdf_dense_config;
         tsdf_sparse_config.use_const_weight = true;
         tsdf_sparse_config.use_sparsity_compensation_factor = true;
-        tsdf_sparse_config.max_ray_length_m = this->get_parameter("max_ray_length").as_double();
-        tsdf_sparse_config.sparsity_compensation_factor = this->get_parameter("sparsity_compensation_factor").as_double();
+        tsdf_sparse_config.sparsity_compensation_factor = static_cast<float>(this->get_parameter("sparse_compensation_factor").as_double());
+        tsdf_sparse_config.max_ray_length_m = static_cast<float>(this->get_parameter("sparse_max_ray_length").as_double());
 
         //: ESDF
         voxblox::EsdfIntegrator::Config esdf_config;

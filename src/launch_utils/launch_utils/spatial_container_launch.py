@@ -41,7 +41,7 @@ def generate_launch_description():
         package='reactive_oa',
         plugin='spatial_container::ReactiveOANode',
         name='reactive_oa',
-        # parameters=[reactive_oa_params]
+        parameters=[reactive_oa_params]
     )
 
     #DEV Acrobatic brain go here

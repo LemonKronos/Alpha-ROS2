@@ -79,7 +79,7 @@ void spatial_container::ProcessingThread::ProducerLoop() {
                 "world",
                 msg->header.frame_id, // Current frame: depth camera
                 msg->header.stamp, // Time stamp of the scan
-                rclcpp::Duration::from_nanoseconds(Clock::LOOP_CYCLE_NANOSEC * 2)
+                rclcpp::Duration::from_nanoseconds(Threshold::TF_TIMEOUT_ns)
             );
             
             // Directly convert to voxblox Transformation
