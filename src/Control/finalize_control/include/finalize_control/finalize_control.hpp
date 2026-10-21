@@ -31,21 +31,6 @@ constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 8;
 constexpr uint8_t OFFBOARD_STREAM_THRESHOLD = 20;
 constexpr uint8_t OFFBOARD_MODE_CHANGE_THRESHOLD = OFFBOARD_STREAM_THRESHOLD / 2;
 
-using std::placeholders::_1;
-using std::mutex;
-using std::lock_guard;
-using std::atomic;
-
-using px4_msgs::msg::VehicleCommand;
-using px4_msgs::msg::VehicleStatus;
-using px4_msgs::msg::VehicleLandDetected;
-using px4_msgs::msg::VehicleOdometry;
-// using px4_msgs::msg::VehicleCommandAck;
-using px4_msgs::msg::OffboardControlMode;
-using px4_msgs::msg::VehicleAttitudeSetpoint;
-using px4_msgs::msg::TrajectorySetpoint;
-using alpha_msgs::msg::ControlInterface;
-
 class FinalizeControlNode : public rclcpp::Node {
 public:
     FinalizeControlNode();
@@ -57,36 +42,36 @@ private:
     rclcpp::CallbackGroup::SharedPtr msg_group;
 
     //: Publisher
-    rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_cmd_PUB;
-    rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_ctrl_PUB;
-    rclcpp::Publisher<VehicleAttitudeSetpoint>::SharedPtr attitude_set_PUB;
-    rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_set_PUB;
+    rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_cmd_PUB;
+    rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_ctrl_PUB;
+    rclcpp::Publisher<px4_msgs::msg::VehicleAttitudeSetpoint>::SharedPtr attitude_set_PUB;
+    rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr trajectory_set_PUB;
 
     //: Subcriber
-    rclcpp::Subscription<ControlInterface>::SharedPtr input_control_SUB;
-    rclcpp::Subscription<VehicleStatus>::SharedPtr vehicle_status_SUB;
-    rclcpp::Subscription<VehicleLandDetected>::SharedPtr vehicle_land_SUB;
-    rclcpp::Subscription<VehicleOdometry>::SharedPtr odometry_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_SUB;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odometry_SUB;
     // rclcpp::Subscription<VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
 
     //: Stored SharedPtr
-    mutex mx_control;
-    ControlInterface::SharedPtr latest_input_control;
-    ControlInterface::SharedPtr input_control;
+    std::mutex mx_control;
+    alpha_msgs::msg::ControlInterface::SharedPtr latest_input_control;
+    alpha_msgs::msg::ControlInterface::SharedPtr input_control;
 
     //: Variables
     uint8_t loss_final_control_count;
     uint8_t offboard_stream_counter;
     uint8_t offboard_attitude_counter;
-    atomic<bool> arming_state;
-    atomic<bool> offboard_state;
-    atomic<bool> in_failure;
-    atomic<bool> landed;
-    atomic<uint8_t> last_nav_state;
+    std::atomic<bool> arming_state;
+    std::atomic<bool> offboard_state;
+    std::atomic<bool> in_failure;
+    std::atomic<bool> landed;
+    std::atomic<uint8_t> last_nav_state;
     bool control_state;
-    atomic<bool> in_hover;
+    std::atomic<bool> in_hover;
     
-    mutex mx_spatial;
+    std::mutex mx_spatial;
     std::array<float, 3> latest_position_NED;
     std::array<float, 3> position_NED;
     Eigen::Quaternionf latest_quaternion;
@@ -103,7 +88,7 @@ private:
         THRUST,
         ACTUATOR
     };
-    atomic<OffboardMode> offboard_mode{OffboardMode::VELOCITY};
+    std::atomic<OffboardMode> offboard_mode{OffboardMode::VELOCITY};
 
     enum class NodeLoopState {
         INIT, // Make stable stream of offboard topics
@@ -119,10 +104,10 @@ private:
     rclcpp::TimerBase::SharedPtr node_loop_TIME;
 
     //: Callbacks
-    void InputControlCallback(const ControlInterface::SharedPtr msg);
-    void VehicleStatusCallback(const VehicleStatus::SharedPtr msg);
-    void VehicleLandedCallback(const VehicleLandDetected::SharedPtr msg);
-    void OdometryCallback(const VehicleOdometry::SharedPtr msg);
+    void InputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
+    void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
+    void VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
+    void OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
     void NodeLoopCallback();
 
     //: Methods

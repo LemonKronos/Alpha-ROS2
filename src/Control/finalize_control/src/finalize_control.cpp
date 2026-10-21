@@ -1,5 +1,20 @@
 #include "finalize_control/finalize_control.hpp"
 
+using std::placeholders::_1;
+using std::mutex;
+using std::lock_guard;
+using std::atomic;
+
+using px4_msgs::msg::VehicleCommand;
+using px4_msgs::msg::VehicleStatus;
+using px4_msgs::msg::VehicleLandDetected;
+using px4_msgs::msg::VehicleOdometry;
+// using px4_msgs::msg::VehicleCommandAck;
+using px4_msgs::msg::OffboardControlMode;
+using px4_msgs::msg::VehicleAttitudeSetpoint;
+using px4_msgs::msg::TrajectorySetpoint;
+using alpha_msgs::msg::ControlInterface;
+
 FinalizeControlNode::FinalizeControlNode() :
     rclcpp::Node("finalize_control")
 {
@@ -313,7 +328,7 @@ void FinalizeControlNode::PublishOffboardControlMode() {
             break;
     }
 
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000ull;
     offboard_ctrl_PUB->publish(msg);
 }
 
@@ -350,7 +365,10 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         msg.yawspeed = 0.0f;
     }
 
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    msg.timestamp =
+        latest_input_control->header.stamp.sec * 1000000ull + 
+        latest_input_control->header.stamp.nanosec / 1000ull
+    ;
     trajectory_set_PUB->publish(msg);
     // RCLCPP_INFO(this->get_logger(), GREEN "Published Trajectory setpoint." RESET);
 }
@@ -404,7 +422,10 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         msg.yaw_sp_move_rate = 0.0f;
     }
 
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    msg.timestamp =
+        latest_input_control->header.stamp.sec * 1000000ull + 
+        latest_input_control->header.stamp.nanosec / 1000ull
+    ;
     attitude_set_PUB->publish(msg);
 }
 
@@ -419,7 +440,7 @@ void FinalizeControlNode::PublishVehicleCmd(uint16_t command, float param1, floa
 	msg.source_system = 1;
 	msg.source_component = 1;
 	msg.from_external = true;
-	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000ull;
 	vehicle_cmd_PUB->publish(msg);
 }
 

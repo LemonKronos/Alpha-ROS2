@@ -20,7 +20,7 @@
     #define DO_REACTIVE_OA 1
 #endif
 
-#define DEBUG (ALLOW_DEBUG & 0)
+#define DEBUG (ALLOW_DEBUG & 1)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
 #define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
@@ -28,8 +28,6 @@
     #include <visualization_msgs/msg/marker_array.hpp>
     #include <visualization_msgs/msg/marker.hpp>
 #endif
-
-using std::placeholders::_1;
 
 namespace spatial_container {
 
@@ -86,6 +84,10 @@ private:
     void loadFoamFromParams();
     void extractAndPublishSpatialBoxes();
     void computeMultiSphereGradient();
+
+    #if DEBUG
+    bool last_reactive_enable = true;
+    #endif
 
     #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;

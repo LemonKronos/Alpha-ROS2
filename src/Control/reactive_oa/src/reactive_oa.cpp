@@ -3,6 +3,15 @@
 #include <cmath>
 #include <limits>
 
+using std::placeholders::_1;
+using alpha_msgs::msg::ControlInterface;
+using alpha_msgs::msg::FusePerception;
+using alpha_msgs::msg::SpatialObservation;
+
+#if VISUALIZE
+using visualization_msgs::msg::Marker;
+#endif
+
 namespace {
     // --- Speed governor tuning (stability first) ---
     constexpr float T_REACT = 0.4f;             // s, loop + latency + control lag
@@ -25,24 +34,24 @@ Node("reactive_oa_node", options)
     loadFoamFromParams();
     
     //: Publishers
-    final_control_PUB = this->create_publisher<alpha_msgs::msg::ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
-    spatial_obs_PUB = this->create_publisher<alpha_msgs::msg::SpatialObservation>(Topic::OBSERVATION_BOXES, rclcpp::SensorDataQoS());
+    final_control_PUB = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
+    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::OBSERVATION_BOXES, rclcpp::SensorDataQoS());
 
     #if VISUALIZE
-        control_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/control_vector", 10);
-        movement_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/movement_vector", 10);
-        repulsive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/repulsive_vector", 10);
-        reactive_vec_PUB = this->create_publisher<visualization_msgs::msg::Marker>("/visualizer/correction_vector", 10);
+        control_vec_PUB = this->create_publisher<Marker>("/visualizer/control_vector", 10);
+        movement_vec_PUB = this->create_publisher<Marker>("/visualizer/movement_vector", 10);
+        repulsive_vec_PUB = this->create_publisher<Marker>("/visualizer/repulsive_vector", 10);
+        reactive_vec_PUB = this->create_publisher<Marker>("/visualizer/correction_vector", 10);
     #endif
 
     //: Subscribers
-    input_control_SUB = this->create_subscription<alpha_msgs::msg::ControlInterface>(
+    input_control_SUB = this->create_subscription<ControlInterface>(
         Topic::CONTROL_INPUT,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::inputControlCallback, this, _1)
     );
 
-    perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
+    perception_SUB = this->create_subscription<FusePerception>(
         Topic::FUSE_PERCEPTION,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::perceptionCallback, this, _1)
@@ -147,7 +156,7 @@ void spatial_container::ReactiveOANode::extractAndPublishSpatialBoxes() {
 
     if(spatial_obs_PUB->get_subscription_count() == 0) return;
 
-    auto obs_msg = alpha_msgs::msg::SpatialObservation();
+    auto obs_msg = SpatialObservation();
     obs_msg.header.stamp = this->now();
     obs_msg.header.frame_id = this->base_link.get();
 
@@ -278,7 +287,7 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
     const float esdf_max = global_map.esdf_max_distance_m.load(std::memory_order_relaxed);
     const float repulsive_cap = (esdf_max > 0.0f) ? (esdf_max - ESDF_RANGE_MARGIN) : std::numeric_limits<float>::max();
 
-    #if DEBUG
+    #if DEBUG && 0
     static unsigned n_ok = 0, n_busy = 0, n_unobs = 0, n_skipped = 0;
     #endif
 
@@ -293,7 +302,7 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
         bool have_data = global_map.getDistanceAndGradientUnsafe(sphere_center, distance, gradient_world);
         
         if (!have_data || gradient_world.hasNaN() || gradient_world.norm() < 1e-4f || std::isnan(distance)) {
-            #if DEBUG
+            #if DEBUG && 0
             ++n_skipped;
             #endif
             continue;
@@ -332,14 +341,14 @@ void spatial_container::ReactiveOANode::computeMultiSphereGradient() {
         const float delta = std::max(0.0f, c - urgent) * edge;
         repulsive_raw += (gradient_body * delta).cwiseQuotient(vel_max);    // back to normalized command units
 
-        #if DEBUG
+        #if DEBUG && 0
         RCLCPP_INFO(this->get_logger(),
             YELLOW "Sphere %zu | Dist: %.2f | clear: %.2f | cmd_close: %.2f | act_close: %.2f | vel_allow: %.2f | delta: %.2f" RESET,
             i, distance, clearance, c, v, vel_allow, delta);
         #endif
     }
 
-    #if DEBUG
+    #if DEBUG && 0
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
         GRAY "ESDF reads ok=%urgent busy=%urgent unobserved=%urgent skipped=%urgent" RESET, n_ok, n_busy, n_unobs, n_skipped);
     #endif
@@ -372,7 +381,7 @@ void spatial_container::ReactiveOANode::computeReactiveVector() {
     const float max_axis = reactive_vec.cwiseAbs().maxCoeff();
     if (max_axis > 1.0f) reactive_vec /= max_axis;
 
-    #if DEBUG && 1
+    #if DEBUG && 0
     RCLCPP_INFO(
         this->get_logger(),
         BLUE
@@ -403,35 +412,65 @@ void spatial_container::ReactiveOANode::controlLoopCallback() {
     if(lost_control_signal_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) lost_control_signal_counter++;
     lost_control_signal = (lost_control_signal_counter >= Threshold::ALLOW_MISSED_FAST_TOPIC);
 
-    #if DO_REACTIVE_OA
-    computeReactiveVector();
+    // Publish Final Control
+    auto msg = ControlInterface();
+    
+    bool reactive_enable = 
+        last_control_signal->control_support >= ControlInterface::REACTIVE_OA &&
+        last_control_signal->wings_mode == ControlInterface::MULTICOPTER
+    ;
+
+    #if DEBUG && 1
+    if(last_reactive_enable != reactive_enable) {
+        RCLCPP_WARN(
+            this->get_logger(),
+            "Reactive OA support " "%s" RESET,
+            reactive_enable ? GREEN "enable ✔️" : RED "disable ❌"
+        );
+        last_reactive_enable = reactive_enable;
+    }
     #endif
 
-    // Publish Final Control
-    auto msg = alpha_msgs::msg::ControlInterface();
-    msg.header.stamp = this->now();
-    
     if(!lost_control_signal) {
-        #if DO_REACTIVE_OA
-        msg.forward = reactive_vec.x();
-        msg.left = reactive_vec.y();
-        msg.up = reactive_vec.z();
-        #else
-        msg.forward = last_control_signal->forward;
-        msg.left = last_control_signal->left;
-        msg.up = last_control_signal->up;
-        #endif
+        if(reactive_enable) {
+            computeReactiveVector();
 
+            msg.forward = reactive_vec.x();
+            msg.left = reactive_vec.y();
+            msg.up = reactive_vec.z();
+            msg.roll = 0; // No roll control
+            msg.pitch = 0; // No pitch control
+        }
+        else {
+            msg.forward = last_control_signal->forward;
+            msg.left = last_control_signal->left;
+            msg.up = last_control_signal->up;
+            msg.roll = last_control_signal->roll;
+            msg.pitch = last_control_signal->pitch;
+        }
+
+        msg.header.stamp = last_control_signal->header.stamp;
         msg.control_state = last_control_signal->control_state;
-        msg.roll = last_control_signal->roll;
-        msg.pitch = last_control_signal->pitch;
         msg.yaw = last_control_signal->yaw;
-        msg.control_by = last_control_signal->control_by;
+        msg.pilot = last_control_signal->pilot;
         msg.wings_mode = last_control_signal->wings_mode;
     } else {
-        msg.control_state = alpha_msgs::msg::ControlInterface::ARM;
-        msg.control_by = alpha_msgs::msg::ControlInterface::REACTIVE_OA;
+        if(reactive_enable) {
+            computeReactiveVector();
+
+            msg.forward = reactive_vec.x();
+            msg.left = reactive_vec.y();
+            msg.up = reactive_vec.z();
+        }
+
+        // msg ofther field is 0 on init
+        msg.header.stamp = this->now();
+        msg.control_state = ControlInterface::ARM;
+        msg.pilot = ControlInterface::SAFETY;
+        msg.wings_mode = ControlInterface::MULTICOPTER; // Change to hover
     }
+
+    msg.control_support = last_control_signal->control_support;
 
     final_control_PUB->publish(msg);
 
@@ -463,14 +502,14 @@ void spatial_container::ReactiveOANode::mapReadCallback() {
     }
 }
 
-void spatial_container::ReactiveOANode::inputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg) {
+void spatial_container::ReactiveOANode::inputControlCallback(const ControlInterface::SharedPtr msg) {
     lost_control_signal = false;
     lost_control_signal_counter = 0;
     last_control_signal = msg;
     computeControlVector();
 }
 
-void spatial_container::ReactiveOANode::perceptionCallback(const alpha_msgs::msg::FusePerception::SharedPtr msg) {
+void spatial_container::ReactiveOANode::perceptionCallback(const FusePerception::SharedPtr msg) {
     lost_perception = false;
     lost_perception_counter = 0;
     last_perception = msg;
@@ -479,7 +518,7 @@ void spatial_container::ReactiveOANode::perceptionCallback(const alpha_msgs::msg
 
 #if VISUALIZE
 void spatial_container::ReactiveOANode::publishVectorArrow(
-    const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub,
+    const rclcpp::Publisher<Marker>::SharedPtr& pub,
     const Eigen::Vector3f& vec,
     float r, float g, float b
 ) {
@@ -490,13 +529,13 @@ void spatial_container::ReactiveOANode::publishVectorArrow(
     real_value.z() = vec.z() * Drone::SPEED_MAX_UP;
 
     // Make marker
-    visualization_msgs::msg::Marker arrow;
+    Marker arrow;
     arrow.header.frame_id = this->base_link.get();
     arrow.header.stamp = this->now();
     arrow.ns = "oa_vectors";
     arrow.id = 0;
-    arrow.type = visualization_msgs::msg::Marker::ARROW;
-    arrow.action = visualization_msgs::msg::Marker::ADD;
+    arrow.type = Marker::ARROW;
+    arrow.action = Marker::ADD;
     arrow.scale.x = 0.2;  
     arrow.scale.y = 0.2;   
     arrow.scale.z = 0.2;   

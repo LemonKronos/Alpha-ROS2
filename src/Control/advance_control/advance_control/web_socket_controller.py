@@ -11,7 +11,10 @@ DEFAULT_PORT = 8765
 DEFAULT_CONTROL = {
     'control_state': False,
     'x': 0.0, 'y': 0.0, 'z': 0.0, 
-    'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0
+    'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0,
+    'pilot': 1,
+    'wings_mode': 1,
+    'control_support': 1
 }
 
 DEFAULT_RECORD = {
