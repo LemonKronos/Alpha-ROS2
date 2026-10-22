@@ -95,7 +95,7 @@ void spatial_container::OmniLidarNode::SyncedLidarCallback(
     //: Put both batch into Voxblox map sequentially
     {
         // Mutex lock
-        std::unique_lock lock(spatial_container::global_map.mutex);
+        std::unique_lock lock(spatial_container::global_map.mutex_tsdf);
 
         // Check if map exist
         if(spatial_container::global_map.tsdf_layer) {

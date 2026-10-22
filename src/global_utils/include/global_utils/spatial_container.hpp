@@ -24,8 +24,9 @@ public:
     MapManager(const MapManager&) = delete;
     MapManager& operator=(const MapManager&) = delete;
 
-    // The shared lock for all nodes to use manually if needed
-    mutable std::shared_mutex mutex;
+    // Independent lock per layer
+    mutable std::shared_mutex mutex_tsdf;
+    mutable std::shared_mutex mutex_esdf;
 
     // Intergrator config
     voxblox::TsdfIntegratorBase::Config tsdf_dense_config;
@@ -48,7 +49,8 @@ public:
         voxblox::TsdfIntegratorBase::Config tsdf_sparse_config,
         voxblox::EsdfIntegrator::Config esdf_config
     ) {
-        std::unique_lock<std::shared_mutex> lock(mutex);
+        std::unique_lock<std::shared_mutex> lock_tsdf(mutex_tsdf);
+        std::unique_lock<std::shared_mutex> lock_esdf(mutex_esdf);
         this->tsdf_dense_config = tsdf_dense_config;
         this->tsdf_sparse_config = tsdf_sparse_config;
         this->tsdf_layer = std::make_shared<voxblox::Layer<voxblox::TsdfVoxel>>(voxel_resolution, Sensor::VOXEL_PER_SIDE);
@@ -68,14 +70,16 @@ public:
     }
 
     void clear() {
-        std::unique_lock<std::shared_mutex> lock(mutex);
+        std::unique_lock<std::shared_mutex> lock_tsdf(mutex_tsdf);
+        std::unique_lock<std::shared_mutex> lock_esdf(mutex_esdf);
         if (tsdf_layer) tsdf_layer->removeAllBlocks();
         if (esdf_layer) esdf_layer->removeAllBlocks();
         if (esdf_integrator) esdf_integrator->clear();
     }
 
     void updateEsdf() {
-        std::unique_lock<std::shared_mutex> lock(mutex);
+        std::unique_lock<std::shared_mutex> lock_tsdf(mutex_tsdf);
+        std::unique_lock<std::shared_mutex> lock_esdf(mutex_esdf);
         if (esdf_integrator) {
             esdf_integrator->updateFromTsdfLayer(true); // true = clear updated flags
         }

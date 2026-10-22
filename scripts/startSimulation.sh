@@ -142,7 +142,6 @@ main() {
   # start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
-  sleep 1
   start_web_control
   sleep 1
   start_gazebo_gui

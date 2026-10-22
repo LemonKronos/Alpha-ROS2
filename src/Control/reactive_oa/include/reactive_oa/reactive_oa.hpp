@@ -48,7 +48,7 @@ private:
     #endif
 
     // Subscribers
-    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_reactive_control;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
 
     // Objects

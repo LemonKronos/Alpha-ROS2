@@ -65,7 +65,7 @@ void spatial_container::SpatialVisualizerNode::TimerCallback() {
 
     {
         // Global map mutex space
-        std::shared_lock lock(spatial_container::global_map.mutex);
+        std::shared_lock lock(spatial_container::global_map.mutex_tsdf);
         if(!tsdf_layer) return;
 
         const float NEARBY_DISTANCE = Drone::RADIUS * 20.0f;

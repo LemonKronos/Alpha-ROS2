@@ -34,8 +34,8 @@ Node("reactive_oa_node", options)
     loadFoamFromParams();
     
     //: Publishers
-    final_control_PUB = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
-    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::OBSERVATION_BOXES, rclcpp::SensorDataQoS());
+    final_control_PUB = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, 10);
+    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::OBSERVATION_BOXES, 10);
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<Marker>("/visualizer/control_vector", 10);
@@ -45,7 +45,7 @@ Node("reactive_oa_node", options)
     #endif
 
     //: Subscribers
-    input_control_SUB = this->create_subscription<ControlInterface>(
+    SUB_reactive_control = this->create_subscription<ControlInterface>(
         Topic::CONTROL_INPUT,
         rclcpp::SensorDataQoS(),
         std::bind(&ReactiveOANode::inputControlCallback, this, _1)
@@ -493,7 +493,7 @@ void spatial_container::ReactiveOANode::mapReadCallback() {
         repulsive_vec.setZero();
     } else {
         //! Lock map for unsafe read - max cache speed
-        std::shared_lock<std::shared_mutex> lock(global_map.mutex);
+        std::shared_lock<std::shared_mutex> lock(global_map.mutex_esdf);
         extractAndPublishSpatialBoxes();
         
         #if DO_REACTIVE_OA
