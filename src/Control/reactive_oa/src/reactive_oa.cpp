@@ -34,7 +34,7 @@ Node("reactive_oa_node", options)
     loadFoamFromParams();
     
     //: Publishers
-    final_control_PUB = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, 10);
+    PUB_reactive_control = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, 10);
     spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::OBSERVATION_BOXES, 10);
 
     #if VISUALIZE
@@ -472,7 +472,7 @@ void spatial_container::ReactiveOANode::controlLoopCallback() {
 
     msg.control_support = last_control_signal->control_support;
 
-    final_control_PUB->publish(msg);
+    PUB_reactive_control->publish(msg);
 
     #if VISUALIZE
     publishVectorArrow(control_vec_PUB, control_vec, 0.0f, 1.0f, 0.0f); // Green

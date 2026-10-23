@@ -37,7 +37,7 @@ public:
     ~ReactiveOANode();
 private:
     // Publishers
-    rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr PUB_reactive_control;
     rclcpp::Publisher<alpha_msgs::msg::SpatialObservation>::SharedPtr spatial_obs_PUB;
     
     #if VISUALIZE
