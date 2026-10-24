@@ -91,7 +91,7 @@ start_qgroundcontrol() {
 
 #_ Web Socket Control
 start_web_control() {
-  brave-browser /home/mr_lemon/MyCode/Project/Drone/ROS2/src/Control/advance_control/resource/controller.html >/dev/null 2>&1 &
+  brave-browser /home/mr_lemon/MyCode/Project/Drone/ROS2/src/Control/html_controller/resource/controller.html >/dev/null 2>&1 &
   printf "\033[92m[Web Socket Control] opening...\033[0m\n"
 }
 
