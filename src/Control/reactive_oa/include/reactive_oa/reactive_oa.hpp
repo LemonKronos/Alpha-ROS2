@@ -47,6 +47,9 @@ private:
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr reactive_vec_PUB;
     #endif
 
+    //: Callback groups
+    rclcpp::CallbackGroup::SharedPtr map_group;
+
     // Subscribers
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_reactive_control;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
@@ -59,10 +62,14 @@ private:
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+
+    std::atomic<bool> enable_reactive = true;
+    std::mutex mutex_state;
+    std::mutex mutex_repulsive;
     
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
-    bool lost_perception = true;
+    std::atomic<bool> lost_perception = true;
     uint8_t lost_perception_counter = 0;
 
     Eigen::Vector3f control_vec;
@@ -82,11 +89,18 @@ private:
     
     // Helpers
     void loadFoamFromParams();
-    void extractAndPublishSpatialBoxes();
-    void computeMultiSphereGradient();
+    void extractAndPublishSpatialBoxes(
+        alpha_msgs::msg::FusePerception::SharedPtr cached_perception, 
+        Eigen::Vector3f cached_control_vec
+    );
+    void computeMultiSphereGradient(
+        alpha_msgs::msg::FusePerception::SharedPtr cached_perception, 
+        Eigen::Vector3f cached_control_vec,
+        Eigen::Vector3f cached_movement_vec
+    );
 
     #if DEBUG
-    bool last_reactive_enable = true;
+    bool last_enable_reactive = true;
     #endif
 
     #if VISUALIZE

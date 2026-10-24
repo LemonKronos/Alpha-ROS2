@@ -29,7 +29,6 @@
 
 //: Local dev config
 #define TIME_ANALYSE (ALLOW_DEBUG & 0)
-#define MISSED_TOPIC (ALLOW_DEBUG & 1)
 #define FLOW (ALLOW_DEBUG & 0)
 
 class FinalizeControlNode : public rclcpp::Node {
@@ -81,10 +80,11 @@ private:
     std::mutex mutex_pose;
     std::array<float, 3> latest_position_NED;
     std::array<float, 3> position_NED;
-    Eigen::Quaternionf latest_quaternion;
-    Eigen::Quaternionf quaternion;
+    Eigen::Quaternionf latest_quaternion_NED;
+    Eigen::Quaternionf quaternion_ENU;
 
-    float yaw_W;
+    float heading_NED;
+    float heading_ENU;
 
     enum class OffboardMode {
         POSITION,

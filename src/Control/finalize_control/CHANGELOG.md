@@ -14,3 +14,6 @@ Last ROS2 node to bring signal to PX4
 - Added time analyzer
 - Optimizing Eigen math
 - Still contain unstable offboard control bug
+## 0.1.2
+- Some structural changes
+- Added actuator Motors and Servos control

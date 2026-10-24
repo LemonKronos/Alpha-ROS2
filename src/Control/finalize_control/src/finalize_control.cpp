@@ -97,9 +97,9 @@ FinalizeControlNode::FinalizeControlNode() :
     in_hover = false;
     latest_position_NED = {0.0f, 0.0f, 0.0f};
     position_NED = latest_position_NED;
-    latest_quaternion = {1.0f, 0.0f, 0.0f, 0.0f};
-    quaternion = latest_quaternion;
-    yaw_W = 0.0f;
+    latest_quaternion_NED = {1.0f, 0.0f, 0.0f, 0.0f};
+    quaternion_ENU = {1.0f, 0.0f, 0.0f, 0.0f};
+    heading_ENU = 0.0f;
     current_loop_state = NodeLoopState::INIT;
     just_change_loop_state = true;
 
@@ -144,7 +144,7 @@ void FinalizeControlNode::VehicleLandedCallback(const VehicleLandDetected::Share
 void FinalizeControlNode::OdometryCallback(const VehicleOdometry::SharedPtr msg) {
     lock_guard lock(mutex_pose);
     latest_position_NED = msg->position;
-    latest_quaternion = frame_utils::quaternionNEDtoENU(frame_utils::arrayToQuaternion(msg->q));
+    latest_quaternion_NED = frame_utils::arrayToQuaternion(msg->q);
 }
 
 //* Node loop 
@@ -159,23 +159,20 @@ void FinalizeControlNode::NodeLoopCallback() {
         reactive_control = last_reactive_control;
     }
     if(reactive_control != nullptr) {
-        auto msg_time = rclcpp::Time(reactive_control->header.stamp);
-        auto rn = this->now();
-        auto delay_ns = (rn - msg_time).nanoseconds();
-
-        if(delay_ns > Threshold::ALLOW_MISSED_FAST_TOPIC_ns) {
+        auto time_now = this->now();
+        auto time_msg = reactive_control->header.stamp;
+        auto delay = (time_now - time_msg).nanoseconds();
+        
+        if(delay > Threshold::TF_TIMEOUT_FAST_ns) {
             reactive_control = nullptr;
 
-            #if MISSED_TOPIC
-            double delay_ms = delay_ns / 1'000'000.0;
-            RCLCPP_WARN(
-                this->get_logger(), 
-                YELLOW "Missed Reactive Topic! Delay: %.2f ms. Msg time: %lld ns, Now is: %lld ns" RESET, 
-                delay_ms, 
-                static_cast<long long>(msg_time.nanoseconds()),
-                static_cast<long long>(rn.nanoseconds())
+            RCLCPP_WARN_THROTTLE(
+                this->get_logger(),
+                *this->get_clock(),
+                1000,
+                YELLOW "Reactive Control signal delay too much (%d us)" RESET,
+                delay / 1'000ll
             );
-            #endif
         }
     }
 
@@ -183,30 +180,40 @@ void FinalizeControlNode::NodeLoopCallback() {
         lock_guard lock(mutex_acrobatic);
         acrobatic_control = last_acrobatic_control;
     }
-    if (acrobatic_control != nullptr) {
-        auto msg_time(acrobatic_control->header.stamp);
-        if((this->now() - msg_time).nanoseconds() > Threshold::ALLOW_MISSED_FAST_TOPIC_ns) {
+    if(acrobatic_control != nullptr) {
+        auto time_now = this->now();
+        auto time_msg = acrobatic_control->header.stamp;
+        auto delay = (time_now - time_msg).nanoseconds();
+        
+        if(delay > Threshold::TF_TIMEOUT_FAST_ns) {
             acrobatic_control = nullptr;
-            
-            #if MISSED_TOPIC
-            RCLCPP_WARN(this->get_logger(), YELLOW "Missed Acrobatic Topic" RESET);
-            #endif
+
+            RCLCPP_WARN_THROTTLE(
+                this->get_logger(),
+                *this->get_clock(),
+                1000,
+                YELLOW "Acrobatic Control signal delay too much (%dllus)" RESET,
+                delay / 1'000ll
+            );
         }
     }
 
     {
         lock_guard lock(mutex_pose);
         position_NED = latest_position_NED;
-        quaternion = latest_quaternion;
+        heading_NED = frame_utils::quaternionToHeading(latest_quaternion_NED);
+        quaternion_ENU = frame_utils::quaternionNEDtoENU(latest_quaternion_NED);
     }
+    heading_ENU = frame_utils::quaternionToHeading(quaternion_ENU);
 
     //_ Update drone data 
     if(acrobatic_control != nullptr) { //* No safety critic yet
-        if(offboard_mode != OffboardMode::ACTUATOR)
+        if(offboard_mode != OffboardMode::ACTUATOR) {
             RCLCPP_WARN(this->get_logger(), PINK "Changed mode to ACTUATOR" RESET);
-        
-        offboard_mode = OffboardMode::ACTUATOR;
-        control_state = true; // Always in ARM
+            
+            offboard_mode = OffboardMode::ACTUATOR;
+            control_state = true; // Always in ARM
+        }
     }
     else if(reactive_control != nullptr) {
         control_state = reactive_control->control_state;
@@ -240,8 +247,6 @@ void FinalizeControlNode::NodeLoopCallback() {
         offboard_mode = OffboardMode::VELOCITY;
         offboard_attitude_counter = 0;
     }
-
-    yaw_W = frame_utils::quaternionToYaw(quaternion);
 
     //_ Main FSM loop 
     switch(current_loop_state) {
@@ -288,9 +293,15 @@ void FinalizeControlNode::NodeLoopCallback() {
         case NodeLoopState::OFFBOARD:
             if(just_change_loop_state) {
                 PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-                RCLCPP_INFO(this->get_logger(), YELLOW "System try to enter offboard" RESET);
+
                 just_change_loop_state = false;
                 offboard_stream_counter = 0; // Repurposed to lost offboard counter
+
+                RCLCPP_WARN_THROTTLE(
+                    this->get_logger(), 
+                    *this->get_clock(), 1000, 
+                    YELLOW "System try to enter offboard" RESET
+                );
             }
 
             if(control_state) {
@@ -299,7 +310,12 @@ void FinalizeControlNode::NodeLoopCallback() {
                 if(!arming_state) { // Lost arm
                     current_loop_state = NodeLoopState::INIT;
                     just_change_loop_state = true;
-                    RCLCPP_WARN(this->get_logger(), RED "System have been disarmed, rearm" RESET);
+
+                    RCLCPP_WARN_THROTTLE(
+                        this->get_logger(), 
+                        *this->get_clock(), 1000, 
+                        YELLOW "System have been disarmed, rearm" RESET
+                    );
                 }
                 else if(last_nav_state != VehicleStatus::NAVIGATION_STATE_OFFBOARD) {
                     if(offboard_stream_counter < Threshold::ALLOW_MISSED_FAST_TOPIC) offboard_stream_counter++;
@@ -308,7 +324,12 @@ void FinalizeControlNode::NodeLoopCallback() {
                         current_loop_state = NodeLoopState::INIT;
                         offboard_stream_counter = 0;
                         just_change_loop_state = true;
-                        RCLCPP_INFO(this->get_logger(), RED "System have leave offboard, restart offboard" RESET);
+
+                        RCLCPP_WARN_THROTTLE(
+                            this->get_logger(), 
+                            *this->get_clock(), 1000, 
+                            YELLOW "System have leave offboard, restart offboard" RESET
+                        );
                     }
                 }
             }
@@ -392,24 +413,35 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
         float vx = 0;
         if(reactive_control->forward > 0) vx = reactive_control->forward * Drone::SPEED_MAX_FORWARD;
         else vx = reactive_control->forward * Drone::SPEED_MAX_BACKWARD;
+        
         float vy = reactive_control->left * Drone::SPEED_MAX_STRAFE;
+
         float vz = 0;
         if(reactive_control->up > 0) vz = reactive_control->up * Drone::SPEED_MAX_UP;
         else vz = reactive_control->up * Drone::SPEED_MAX_DOWN;
 
-        // Hover, keep last positon to avoid drip
-        if(vx == 0 && vy == 0 && vz == 0) {
+        if(vx == 0 && vy == 0 && vz == 0) { 
+            // Hover, keep last positon to avoid drip
             in_hover = true;
             msg.position = position_NED;
             msg.velocity = {0.0f, 0.0f, 0.0f};
         }
         else {
+            // Set velocity
             in_hover = false;
             msg.position.fill(NO_DATA_f);
-            msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, yaw_W));
+            msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, heading_ENU));
         }
-        msg.yaw = NO_DATA_f;
-        msg.yawspeed = -reactive_control->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
+
+        if(reactive_control->yaw == 0) {
+            // Keep heading, avoid drip
+            msg.yaw = this->heading_NED;
+            msg.yawspeed = NO_DATA_f;
+        } else { 
+            // Change heading according to yaw speed
+            msg.yaw = NO_DATA_f;
+            msg.yawspeed = -reactive_control->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
+        }
 
         msg.timestamp =
             reactive_control->header.stamp.sec * 1'000'000ull + 
@@ -427,7 +459,7 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
     
     PUB_trajectory_set->publish(msg);
     
-    #if FLOW
+    #if FLOW && 0
     RCLCPP_INFO_THROTTLE(
         this->get_logger(), 
         *this->get_clock(), 1000, 
@@ -451,7 +483,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         Eigen::Quaternionf dq;
         if(angle > 1e-6f) dq = Eigen::AngleAxisf(angle, omega.normalized());
         else dq = Eigen::Quaternionf::Identity();
-        Eigen::Quaternionf q_new = quaternion * dq;
+        Eigen::Quaternionf q_new = quaternion_ENU * dq;
         q_new.normalize();
         
         // Compute thrust maintaining world hover
@@ -480,7 +512,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
     }
     else { // Hover still, but actually will not happen, will be cachec by hover
         // Set body rate to flat, respect current yaw
-        Eigen::Quaternionf flat_q = frame_utils::eulerToQuaternion(0.0f, 0.0f, yaw_W);
+        Eigen::Quaternionf flat_q = frame_utils::eulerToQuaternion(0.0f, 0.0f, heading_ENU);
 
         // Hover thrust, respect current body rate
         Eigen::Vector3f hover_body(0.0f, 0.0f, Drone::HOVER_THRUST);
@@ -495,7 +527,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
     
     PUB_attitude_set->publish(msg);
 
-    #if FLOW
+    #if FLOW && 0
     RCLCPP_INFO_THROTTLE(
         this->get_logger(), 
         *this->get_clock(), 1000, 
@@ -515,7 +547,7 @@ void FinalizeControlNode::PublishActuatorMotors() {
 
     PUB_motors->publish(msg);
 
-    #if FLOW
+    #if FLOW && 0
     RCLCPP_INFO_THROTTLE(
         this->get_logger(), 
         *this->get_clock(), 1000, 
@@ -535,7 +567,7 @@ void FinalizeControlNode::PublishActuatorServos() {
 
     PUB_servos->publish(msg);
 
-    #if FLOW
+    #if FLOW && 0
     RCLCPP_INFO_THROTTLE(
         this->get_logger(), 
         *this->get_clock(), 1000, 

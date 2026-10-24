@@ -62,17 +62,15 @@ namespace Name {
 // System thesholds
 namespace Threshold {
     constexpr uint8_t ALLOW_MISSED_TOPIC = 3ul;
-
-    //TODO This is ass, don't use this, just count the missing msg 
     constexpr int64_t ALLOW_MISSED_TOPIC_ns = ALLOW_MISSED_TOPIC * Clock::LOOP_CYCLE_NANOSEC;
+    constexpr int64_t ALLOW_MISSED_FAST_TOPIC_ns = ALLOW_MISSED_FAST_TOPIC * Clock::LOOP_CYCLE_FAST_NANOSEC;
 
     constexpr uint8_t ALLOW_MISSED_FAST_TOPIC = std::ceil(Clock::LOOP_RATE_FAST / 10.0f); //* Soon to be deprecated
     constexpr uint8_t ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC; //* Soon to be deprecated
-    constexpr int64_t ALLOW_MISSED_FAST_TOPIC_ns = ALLOW_MISSED_FAST_TOPIC * Clock::LOOP_CYCLE_FAST_NANOSEC;
 
 
-    constexpr uint64_t TF_TIMEOUT_ns = Clock::LOOP_CYCLE_NANOSEC * 3;
-    constexpr uint64_t TF_TIMEOUT_FAST_ns = Clock::LOOP_CYCLE_FAST_NANOSEC * 4;
+    constexpr int64_t TF_TIMEOUT_ns = Clock::LOOP_CYCLE_NANOSEC * 6;
+    constexpr int64_t TF_TIMEOUT_FAST_ns = Clock::LOOP_CYCLE_FAST_NANOSEC * 8;
 
     constexpr float ENTER_ATTIUDE_MODE = 0.01f;
     
@@ -135,11 +133,11 @@ namespace Drone {
     constexpr float HEIGHT = 0.31f;
     
     constexpr float SPEED_MAX_FORWARD = 10.0f;
-    constexpr float SPEED_MAX_BACKWARD = 10.0f;
+    constexpr float SPEED_MAX_BACKWARD = 6.0f;
     constexpr float SPEED_MAX_STRAFE = 10.0f;
     constexpr float SPEED_MAX_ANGLE = M_PI_2f;
     constexpr float SPEED_MAX_UP = 8.0f;
-    constexpr float SPEED_MAX_DOWN = 4.0f;
+    constexpr float SPEED_MAX_DOWN = 6.0f;
     constexpr float THRUST_SAFE_LIMIT = 1.0f;
     constexpr float HOVER_THRUST = 0.51f;
 
