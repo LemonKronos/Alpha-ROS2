@@ -215,6 +215,38 @@
         box-shadow: 0 0 15px rgba(0, 255, 65, 0.1) inset;
     }
 
+    /* === DROP-DOWNS === */
+    #config-panel {
+        position: absolute;
+        top: 100px; /* Sits below the IP bar */
+        left: 15px;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        color: rgba(0, 255, 65, 0.8);
+        font-size: 13px;
+    }
+    
+    #config-panel select {
+        background: transparent;
+        border: none;
+        color: #00ffff;
+        text-shadow: 0 0 10px #00fbff;
+        font-weight: bold;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 13px;
+        outline: none;
+        cursor: pointer;
+        appearance: none; /* Hides default dropdown arrow for cleaner look */
+        -webkit-appearance: none;
+    }
+    
+    #config-panel select option {
+        background: #050505; /* Black background for dropdown list items */
+        color: #00ff41;
+    }
+
     @keyframes pulse { 0% { opacity: 1; box-shadow: 0 0 10px #ff3333; } 50% { opacity: 0.6; box-shadow: 0 0 2px #ff3333; } 100% { opacity: 1; box-shadow: 0 0 10px #ff3333; } }
 </style>
 </head>
@@ -255,6 +287,27 @@
     </button>
 </div>
 
+<div id="config-panel">
+    <div>control pilot: <select id="pilot-select">
+        <option value="0" selected>DEV</option>
+        <option value="1">HUMAN</option>
+        <option value="2">LEADER</option>
+        <option value="3">PLANNER</option>
+        <option value="4">SAFETY</option>
+    </select></div>
+    <div>wings mode: <select id="wings-select">
+        <option value="0">UNCHANGE</option>
+        <option value="1" selected>MULTICOPTER</option>
+        <option value="2">FIXWINGS</option>
+    </select></div>
+    <div>flight support: <select id="support-select">
+        <option value="0">NONE</option>
+        <option value="1" selected>AUTOPILOT</option>
+        <option value="2">REACTIVE_OA</option>
+        <option value="3">ACROBATIC_OA</option>
+    </select></div>
+</div>
+
 <div id="zone-left" class="joy-container"><canvas id="canvasLeft" class="joy-canvas"></canvas></div>
 <div id="zone-right" class="joy-container"><canvas id="canvasRight" class="joy-canvas"></canvas></div>
 
@@ -275,7 +328,7 @@ const CONFIG = {
     GYRO_ACTIVE_RANGE: 45,
     JOY_THUMB_RADIUS: 30,
     JOY_DEADZONE_RADIUS: 40,
-    KEY_INPUT_MAGNITUDE: 0.75,
+    KEY_INPUT_MAGNITUDE: 1.0,
     HUD_COLOR: "rgba(0, 255, 65, 0.8)", 
     HUD_COLOR_FADE: "rgba(0, 255, 65, 0.3)",
     RETICLE_COLOR: "#ffffff",
@@ -628,7 +681,10 @@ const CommsController = {
                 pitch: MathUtil.round(State.output.pitch),
                 record: State.flags.record,
                 pause: State.flags.pause,
-                control_state: State.flags.control_state
+                control_state: State.flags.control_state,
+                pilot: parseInt(document.getElementById('pilot-select').value),
+                wings_mode: parseInt(document.getElementById('wings-select').value),
+                control_support: parseInt(document.getElementById('support-select').value)
             }));
         }
     }

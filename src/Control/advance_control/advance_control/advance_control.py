@@ -63,16 +63,20 @@ class AdvanceControlNode(Node):
         commands = self.web_controller.get_latest_control_cmd()
 
         control_msg = ControlInterface()
-        control_msg.control_by = ControlInterface.OPERATOR
+        control_msg.header.stamp = self.get_clock().now().to_msg()
+        
+        control_msg.pilot = int(commands.get('pilot', 1))
+        control_msg.wings_mode = int(commands.get('wings_mode', 1))
+        control_msg.control_support = int(commands.get('control_support', 1))
         control_msg.control_state = bool(commands.get('control_state', False))
+
         control_msg.forward = float(commands.get('x', 0.0))
         control_msg.left    = float(commands.get('y', 0.0))
         control_msg.up      = float(commands.get('z', 0.0))
+
         control_msg.roll    = float(commands.get('roll', 0.0))
         control_msg.pitch   = float(commands.get('pitch', 0.0))
         control_msg.yaw     = float(commands.get('yaw', 0.0))
-        control_msg.wings_mode = ControlInterface.UNCHANGE
-        control_msg.header.stamp = self.get_clock().now().to_msg()
 
         self.control_interface_PUB.publish(control_msg)
 

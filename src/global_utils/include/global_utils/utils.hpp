@@ -100,8 +100,8 @@ namespace frame_utils {
         float N = forward * s + left * c;
         return {E, N, up};
     }
-    inline std::array<float, 3> frameFLUtoENU(const std::array<float, 3> body, const float yaw_W) {
-        return frameFLUtoENU(body[0], body[1], body[2], yaw_W);
+    inline std::array<float, 3> frameFLUtoENU(const std::array<float, 3> body, const float yaw_world) {
+        return frameFLUtoENU(body[0], body[1], body[2], yaw_world);
     }
 
     // From PX4 NED frame to ROS2 ENU frame
@@ -152,15 +152,15 @@ namespace frame_utils {
         return q_tf_world * q * q_tf_body;
     }
 
-    inline float quaternionToYaw(const float w, const float x, const float y, const float z) {
+    inline float quaternionToHeading(const float w, const float x, const float y, const float z) {
         float yaw = static_cast<float>(std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z)));
         return angleInWrapped(yaw);
     }
-    inline float quaternionToYaw(const std::array<float, 4> q) {
-        return quaternionToYaw(q[0], q[1], q[2], q[3]);
+    inline float quaternionToHeading(const std::array<float, 4> q) {
+        return quaternionToHeading(q[0], q[1], q[2], q[3]);
     }
-    inline float quaternionToYaw(const Eigen::Quaternionf& q) {
-        return quaternionToYaw(q.w(), q.x(), q.y(), q.z());
+    inline float quaternionToHeading(const Eigen::Quaternionf& q) {
+        return quaternionToHeading(q.w(), q.x(), q.y(), q.z());
     }
 
     inline Eigen::Quaternionf arrayToQuaternion(const std::array<float, 4>& qA) {

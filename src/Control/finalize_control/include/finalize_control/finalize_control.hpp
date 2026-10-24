@@ -4,9 +4,6 @@
 #include <atomic>
 
 #include "rclcpp/rclcpp.hpp"
-#include "global_utils/utils.hpp"
-#include "global_utils/system_config.hpp"
-#include "alpha_msgs/msg/control_interface.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "px4_msgs/msg/vehicle_land_detected.hpp"
@@ -15,6 +12,13 @@
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/vehicle_attitude_setpoint.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "px4_msgs/msg/actuator_motors.hpp"
+#include "px4_msgs/msg/actuator_servos.hpp"
+
+#include "global_utils/utils.hpp"
+#include "global_utils/system_config.hpp"
+#include "alpha_msgs/msg/control_interface.hpp"
+#include "alpha_msgs/msg/normalized_motors_servos.hpp"
 
 //: Local config
 #define ALLOW_ATTITUDE true
@@ -25,26 +29,7 @@
 
 //: Local dev config
 #define TIME_ANALYSE (ALLOW_DEBUG & 0)
-
-constexpr float ATTITUDE_THRESHOLD = 0.01f;
-constexpr uint8_t LOSS_FINAL_CONTROL_THRESHOLD = 8;
-constexpr uint8_t OFFBOARD_STREAM_THRESHOLD = 20;
-constexpr uint8_t OFFBOARD_MODE_CHANGE_THRESHOLD = OFFBOARD_STREAM_THRESHOLD / 2;
-
-using std::placeholders::_1;
-using std::mutex;
-using std::lock_guard;
-using std::atomic;
-
-using px4_msgs::msg::VehicleCommand;
-using px4_msgs::msg::VehicleStatus;
-using px4_msgs::msg::VehicleLandDetected;
-using px4_msgs::msg::VehicleOdometry;
-// using px4_msgs::msg::VehicleCommandAck;
-using px4_msgs::msg::OffboardControlMode;
-using px4_msgs::msg::VehicleAttitudeSetpoint;
-using px4_msgs::msg::TrajectorySetpoint;
-using alpha_msgs::msg::ControlInterface;
+#define FLOW (ALLOW_DEBUG & 0)
 
 class FinalizeControlNode : public rclcpp::Node {
 public:
@@ -57,53 +42,59 @@ private:
     rclcpp::CallbackGroup::SharedPtr msg_group;
 
     //: Publisher
-    rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_cmd_PUB;
-    rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_ctrl_PUB;
-    rclcpp::Publisher<VehicleAttitudeSetpoint>::SharedPtr attitude_set_PUB;
-    rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_set_PUB;
+    rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr PUB_vehicle_cmd;
+    rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr PUB_offboard_ctrl;
+    rclcpp::Publisher<px4_msgs::msg::VehicleAttitudeSetpoint>::SharedPtr PUB_attitude_set;
+    rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr PUB_trajectory_set;
+    rclcpp::Publisher<px4_msgs::msg::ActuatorMotors>::SharedPtr PUB_motors;
+    rclcpp::Publisher<px4_msgs::msg::ActuatorServos>::SharedPtr PUB_servos;
 
     //: Subcriber
-    rclcpp::Subscription<ControlInterface>::SharedPtr input_control_SUB;
-    rclcpp::Subscription<VehicleStatus>::SharedPtr vehicle_status_SUB;
-    rclcpp::Subscription<VehicleLandDetected>::SharedPtr vehicle_land_SUB;
-    rclcpp::Subscription<VehicleOdometry>::SharedPtr odometry_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_reactive_control;
+    rclcpp::Subscription<alpha_msgs::msg::NormalizedMotorsServos>::SharedPtr SUB_acrobatic_control;
+    rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr SUB_vehicle_status;
+    rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr SUB_vehicle_land;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr SUB_odometry;
     // rclcpp::Subscription<VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
 
     //: Stored SharedPtr
-    mutex mx_control;
-    ControlInterface::SharedPtr latest_input_control;
-    ControlInterface::SharedPtr input_control;
+    std::mutex mutex_reactive;
+    alpha_msgs::msg::ControlInterface::SharedPtr last_reactive_control;
+    alpha_msgs::msg::ControlInterface::SharedPtr reactive_control;
+
+    std::mutex mutex_acrobatic;
+    alpha_msgs::msg::NormalizedMotorsServos::SharedPtr last_acrobatic_control;
+    alpha_msgs::msg::NormalizedMotorsServos::SharedPtr acrobatic_control;
 
     //: Variables
-    uint8_t loss_final_control_count;
     uint8_t offboard_stream_counter;
     uint8_t offboard_attitude_counter;
-    atomic<bool> arming_state;
-    atomic<bool> offboard_state;
-    atomic<bool> in_failure;
-    atomic<bool> landed;
-    atomic<uint8_t> last_nav_state;
+    std::atomic<bool> arming_state;
+    std::atomic<bool> offboard_state;
+    std::atomic<bool> in_failure;
+    std::atomic<bool> landed;
+    std::atomic<uint8_t> last_nav_state;
     bool control_state;
-    atomic<bool> in_hover;
+    std::atomic<bool> in_hover;
     
-    mutex mx_spatial;
+    std::mutex mutex_pose;
     std::array<float, 3> latest_position_NED;
     std::array<float, 3> position_NED;
-    Eigen::Quaternionf latest_quaternion;
-    Eigen::Quaternionf quaternion;
+    Eigen::Quaternionf latest_quaternion_NED;
+    Eigen::Quaternionf quaternion_ENU;
 
-    float yaw_W;
+    float heading_NED;
+    float heading_ENU;
 
     enum class OffboardMode {
         POSITION,
         VELOCITY,
-        ACCELERATION,
         ATTITUDE,
         RATE,
         THRUST,
         ACTUATOR
     };
-    atomic<OffboardMode> offboard_mode{OffboardMode::VELOCITY};
+    std::atomic<OffboardMode> offboard_mode{OffboardMode::VELOCITY};
 
     enum class NodeLoopState {
         INIT, // Make stable stream of offboard topics
@@ -116,13 +107,14 @@ private:
     bool just_change_loop_state;
 
     //: Timer
-    rclcpp::TimerBase::SharedPtr node_loop_TIME;
+    rclcpp::TimerBase::SharedPtr TIME_node_loop;
 
     //: Callbacks
-    void InputControlCallback(const ControlInterface::SharedPtr msg);
-    void VehicleStatusCallback(const VehicleStatus::SharedPtr msg);
-    void VehicleLandedCallback(const VehicleLandDetected::SharedPtr msg);
-    void OdometryCallback(const VehicleOdometry::SharedPtr msg);
+    void ReactiveControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
+    void AcrobaticControlCallback(const alpha_msgs::msg::NormalizedMotorsServos::SharedPtr msg);
+    void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
+    void VehicleLandedCallback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
+    void OdometryCallback(const px4_msgs::msg::VehicleOdometry::SharedPtr msg);
     void NodeLoopCallback();
 
     //: Methods
@@ -130,15 +122,15 @@ private:
     bool SendArmCmd();
     bool SendDisarmCmd();
     bool SendForceDisarmCmd();
+    
     void SendOffboardCmd();
-    void PublishOffboardControlMode();
     void PublishTrajectorySetpoint();
     void PublishAttitudeSetPoint();
+    void PublishActuatorMotors();
+    void PublishActuatorServos();
 
     //: Test
-#if ALLOW_DEBUG
     #if TIME_ANALYSE
     std::unique_ptr<time_utils::TimeAnalyzer> analyzer;
     #endif
-#endif
 };

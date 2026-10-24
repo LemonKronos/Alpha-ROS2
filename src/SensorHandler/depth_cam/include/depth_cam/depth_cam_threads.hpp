@@ -33,7 +33,7 @@
 
 namespace spatial_container {
 
-constexpr int WORLD_BATCH_SIZE = 4800;
+constexpr int WORLD_BATCH_SIZE = 9600;
 
 using std::placeholders::_1;
 

@@ -194,7 +194,7 @@ void spatial_container::WorldUpdateThread::ConsumerLoop() {
         // Put new scan to voxblox map
         {
             // Mutex lock
-            std::unique_lock lock(spatial_container::global_map.mutex);
+            std::unique_lock lock(spatial_container::global_map.mutex_tsdf);
 
             // Check if map exist
             if(spatial_container::global_map.tsdf_layer) {

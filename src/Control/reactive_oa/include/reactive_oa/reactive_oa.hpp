@@ -20,7 +20,7 @@
     #define DO_REACTIVE_OA 1
 #endif
 
-#define DEBUG (ALLOW_DEBUG & 0)
+#define DEBUG (ALLOW_DEBUG & 1)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
 #define TIME_ANALYSE (ALLOW_DEBUG & 1)
 
@@ -28,8 +28,6 @@
     #include <visualization_msgs/msg/marker_array.hpp>
     #include <visualization_msgs/msg/marker.hpp>
 #endif
-
-using std::placeholders::_1;
 
 namespace spatial_container {
 
@@ -39,7 +37,7 @@ public:
     ~ReactiveOANode();
 private:
     // Publishers
-    rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr final_control_PUB;
+    rclcpp::Publisher<alpha_msgs::msg::ControlInterface>::SharedPtr PUB_reactive_control;
     rclcpp::Publisher<alpha_msgs::msg::SpatialObservation>::SharedPtr spatial_obs_PUB;
     
     #if VISUALIZE
@@ -49,8 +47,11 @@ private:
         rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr reactive_vec_PUB;
     #endif
 
+    //: Callback groups
+    rclcpp::CallbackGroup::SharedPtr map_group;
+
     // Subscribers
-    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr input_control_SUB;
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_reactive_control;
     rclcpp::Subscription<alpha_msgs::msg::FusePerception>::SharedPtr perception_SUB;
 
     // Objects
@@ -61,10 +62,14 @@ private:
     // Stored data
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
+
+    std::atomic<bool> enable_reactive = true;
+    std::mutex mutex_state;
+    std::mutex mutex_repulsive;
     
     bool lost_control_signal = true;
     uint8_t lost_control_signal_counter = 0;
-    bool lost_perception = true;
+    std::atomic<bool> lost_perception = true;
     uint8_t lost_perception_counter = 0;
 
     Eigen::Vector3f control_vec;
@@ -84,8 +89,19 @@ private:
     
     // Helpers
     void loadFoamFromParams();
-    void extractAndPublishSpatialBoxes();
-    void computeMultiSphereGradient();
+    void extractAndPublishSpatialBoxes(
+        alpha_msgs::msg::FusePerception::SharedPtr cached_perception, 
+        Eigen::Vector3f cached_control_vec
+    );
+    void computeMultiSphereGradient(
+        alpha_msgs::msg::FusePerception::SharedPtr cached_perception, 
+        Eigen::Vector3f cached_control_vec,
+        Eigen::Vector3f cached_movement_vec
+    );
+
+    #if DEBUG
+    bool last_enable_reactive = true;
+    #endif
 
     #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;
