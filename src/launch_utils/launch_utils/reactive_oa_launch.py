@@ -19,9 +19,9 @@ def generate_launch_description():
         IncludeLaunchDescription(PythonLaunchDescriptionSource(static_tf_path)),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(spatial_container_path)),
         Node(
-            package='advance_control',
-            executable='advance_control',
-            name='advance_control',
+            package='html_controller',
+            executable='html_controller',
+            name='html_controller',
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
@@ -46,13 +46,6 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='reactive_oa',
-        #     executable='reactive_oa',
-        #     name='reactive_oa',
-        #     output='screen',
-        #     # arguments=['--ros-args', '--log-level', 'warn']
-        # ),
         Node(
             package='fuse_perception',
             executable='fuse_perception',
@@ -60,13 +53,6 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='lidar_2d_handler',
-        #     executable='lidar_2d_handler',
-        #     name='lidar_2d_handler',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
          Node(
             package='contact_parser',
             executable='contact_parser',
@@ -74,38 +60,11 @@ def generate_launch_description():
             output='screen',
             arguments=['--ros-args', '--log-level', 'warn']
         ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour',
-        #     name='rviz_contour',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='rviz_contour',
-        #     executable='rviz_contour_points',
-        #     name='rviz_contour_points',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='hazard_voxels',
-        #     executable='hazard_voxels',
-        #     name='hazard_voxels',
-        #     output='screen',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # ),
-        # Node(
-        #     package='vfh_sphere',
-        #     executable='vfh_sphere',
-        #     name='vfh_sphere',
-        #     arguments=['--ros-args', '--log-level', 'warn']
-        # )
         Node(
             package='foam_visualizer',
             executable='foam_visualizer',
             name='foam_visualizer',
-            # arguments=['--ros-args', '--log-level', 'warn'],
+            arguments=['--ros-args', '--log-level', 'warn'],
             parameters=[foam_visualizer_params]
         )
     ])

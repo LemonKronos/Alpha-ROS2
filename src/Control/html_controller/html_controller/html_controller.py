@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# --- Example ROS2 Node Integration ---
 """
-advance_control.py
-ROS2 node for advance 6 DoF input from a phone through web socket
+html_controller.py
+ROS2 node for advance 6 DoF input from a single HTML file through web socket
 """
 import rclpy
 import argparse
@@ -13,7 +12,7 @@ from rclpy.clock import Clock
 from rclpy.qos import qos_profile_sensor_data
 import rclpy.clock 
 
-from advance_control.web_socket_controller import WebSocketController
+from html_controller.web_socket_controller import WebSocketController
 from alpha_msgs.msg import RecordControl
 from alpha_msgs.msg import ControlInterface
 from python_utils.utils import *
@@ -26,9 +25,9 @@ s.close()
 
 DEFAULT_PORT = 8765
 
-class AdvanceControlNode(Node):
+class HtmlControllerNode(Node):
     def __init__(self, debug = False, ip = DEFAULT_IP, port = DEFAULT_PORT):
-        super().__init__('advance_control_node')
+        super().__init__('html_controller_node')
 
         Global.setup_for_simulation(self)
         self.do_debug = debug
@@ -137,13 +136,13 @@ def main(args=None):
     rclpy.init(args=args)
     passed_args = rclpy.utilities.remove_ros_args(args=sys.argv)
 
-    parser = argparse.ArgumentParser(description='Advance Control Node')
+    parser = argparse.ArgumentParser(description='Html Controller Node')
     parser.add_argument('--debug', action='store_true', help='Enable debug print')
     parser.add_argument('--ip', type=str, default=DEFAULT_IP, help='Target IPv4')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Target port number')
     parser, _ = parser.parse_known_args(passed_args[1:])
 
-    node = AdvanceControlNode(debug=parser.debug, ip=parser.ip, port=parser.port)
+    node = HtmlControllerNode(debug=parser.debug, ip=parser.ip, port=parser.port)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

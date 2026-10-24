@@ -79,7 +79,7 @@ def generate_launch_description():
         #     'omni_lidar_node:=warn'
         # ],
         output='screen',
-        # prefix=['gdb -ex run --args'], #DEBUG
+        # prefix=['gdb -ex run --args'], #: DEBUG
     )
 
     return LaunchDescription([spatial_container])

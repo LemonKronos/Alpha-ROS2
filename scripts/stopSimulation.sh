@@ -37,6 +37,6 @@ pkill -x rviz2 >/dev/null
 pgrep -x QGroundControl >/dev/null && pkill -9 -x QGroundControl >/dev/null
 
 #_ 6. Close web control emulator
-hyprctl clients -j | jq -r '.[] | select(.class == "brave-browser" and .title == "Alpha Control Minus 2 [V15 Startfield] - Brave") | .address' | xargs -r -I {} hyprctl dispatch closewindow address:{}
+hyprctl clients -j | jq -r '.[] | select(.class == "brave-browser" and .title == "Alpha HTML Controller - Brave") | .address' | xargs -r -I {} hyprctl dispatch closewindow address:{}
 
 echo "[STOP SIM] Cleanup completed safely!"

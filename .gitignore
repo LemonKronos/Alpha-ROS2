@@ -12,3 +12,4 @@ COLCON_IGNORE
 # Keep
 !pyvenv/
 !pyvenv/requirements.txt
+!pyvenv/manual_requirements.txt
