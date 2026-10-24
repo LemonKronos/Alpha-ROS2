@@ -1,40 +1,50 @@
-# Alpha Drone: Acrobatic Obstacle Avoidance & Flight Planning
+# Alpha Drone: Enhance VTOL Flight Stack
 
-Alpha Drone is an experimental drone flight control architecture focused on agile, sub-human level acrobatic flight and reactive obstacle avoidance. The system is designed to bridge the gap between high-level path planning and low-level instinctive flight maneuvers.
-
-Currently, the project is deployed as a fully simulated proof-of-concept, serving as a foundation for future physical hardware integration.
+This repository contains the ROS2 harness and flight control stack for the Alpha Drone project. The architecture blends a deterministic spatial filter with a probabilistic AI neural network to push the dynamic flight envelope of VTOL (Vertical Take-Off and Landing) UAVs.
 
 ## System Architecture
 
-The control system is divided into a two-layer hierarchy to manage complex flight dynamics:
+The flight stack is divided into a multi-level hierarchy, running as optimized ROS2 nodes designed for low-latency, high-frequency execution.
 
-*   **The Brain (High-Level Planning):** Utilizes **Latent Diffusion Planning** to generate sophisticated, predictive flight paths through complex environments.
-*   **The Spine (Low-Level Reflexes):** Acts as the reactive layer, handling immediate, short-latency obstacle avoidance and executing the "instinctive" acrobatic maneuvers required to stay airborne in tight spaces.
+### Level 3: Mission Planning & Intent
 
-## Tech Stack & Environment
+* Outputs simple velocity control to indicate human or mission movement intention, operating independently of underlying vehicle physics.
 
-This project is built using modern robotics middleware and simulation tools. The current development environment runs locally and consists of:
 
-*   **Middleware:** ROS 2 (Jazzy)
-*   **Flight Controller:** PX4 Autopilot (SITL)
-*   **Simulation:** Gazebo (Harmonic)
 
-## Current Status
+### Level 2: Twin Obstacle Avoidance (OA) Nodes
 
-*   **Simulation Only:** The project is currently running entirely in simulation to safely train and validate the Latent Diffusion Planning models and the Spine reflex integration.
-*   **Active Development:** Focus is currently on optimizing the latency and communication between the Brain and Spine layers to ensure seamless acrobatic responsiveness.
-*   **Hardware:** No physical drone hardware is currently implemented. Hardware-in-the-loop (HITL) and real-world deployment are planned for future phases.
+This layer houses the core flight intelligence, multiplexing between two distinct control paradigms.
 
-## Future Roadmap
-*   [ ] Improve avoidance effectiveness and environment awareness for both Brain and Spine layers
-*   [ ] Finalize integration structure and latency optimization between th two layers.
-*   [ ] Expand simulated environments to include more complex, dynamic obstacles.
-*   [ ] Deploy onto physical edge computing hardware onboard a real drone.
+* **Reactive OA Node (Deterministic):** A pure math spatial filter utilizing a 3D Voxblox Euclidean Signed Distance Field (ESDF). It models the drone as a safe collision geometry that scales dynamically with speed. This node calculates a conservative obstacle avoidance vector (velocity + yaw) based on ESDF gradients. Crucially, it also handles spatial extraction, providing two canonical spatial observation boxes (a body-aligned Coarse box and an intent-aligned Detail box) directly to the AI.
+
+
+* **Acrobatic OA Node (Learned AI):** A Reinforcement Learning policy designed to fully exploit the vehicle's aerodynamic capabilities. It evaluates spatial tensors, current vehicle state, and flight intent to output normalized, direct actuator commands (motors and servos) at $\ge$ 100 Hz. During active flight, this node bypasses standard autopilot auto-leveling and static mixers to enable true acrobatic maneuvers.
+
+
+
+### Level 1: Finalize Control Node (Sandbox & Fallback)
+
+* Operates strictly on internal proprioceptive data (IMU, actuator states, velocity) without any reliance on the external spatial map.
+
+
+* Acts as a probabilistic safety switch: if the AI generates an impossible physical command, this node drops the Acrobatic AI input and instantly triggers the safe Reactive vector fallback to stabilize the vehicle.
+
+
+
+### Level 0: PX4 Autopilot Base
+
+* Serves as the trusted foundation for state estimation (via EKF), sensor acquisition, and hardware interfacing.
+
+
+* The conventional high-level trajectory tracking and rigid mixer logic are completely bypassed during Acrobatic OA operation, allowing the learned controller direct access to the VTOL's actuators.
+
 ## Demo
-Free environment fly:
 
-<img src="doc/media/GrassLandDemo.png" alt="Grassland Environment Demo" width="600">
+Implement architecture:
 
-Training loop environment:
+<img src="doc/media/Implement architecture.png" alt="Implement architecture" width="600">
 
-<img src="doc/media/ObstacleTunnelDemo.png" alt="Obstacle Tunnel Environment Demo" width="600">
+Development screenshot:
+
+<img src="doc/media/Screenshot_17-Oct_10-48-19_8026.png" alt="Developement screenshot" width="600">
