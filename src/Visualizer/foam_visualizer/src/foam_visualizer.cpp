@@ -6,10 +6,6 @@ FoamVisualizerNode::FoamVisualizerNode(const rclcpp::NodeOptions& options) :
 {
     Global::setup_for_simulation(this);
 
-    // Setup TF buffer and listener
-    tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
-
     // Subcribers
     perception_SUB = this->create_subscription<alpha_msgs::msg::FusePerception>(
         Topic::FUSE_PERCEPTION,
@@ -73,16 +69,6 @@ void FoamVisualizerNode::loadFoamFromParams() {
 }
 
 void FoamVisualizerNode::TimerCallback() {
-    // Verify drone is alive and TF is available
-    if (!tf_buffer->canTransform("world", base_link.get(), tf2::TimePointZero, tf2::durationFromSec(0.1))) {
-        RCLCPP_WARN_THROTTLE(
-            this->get_logger(),
-            *this->get_clock(), 1000,
-            YELLOW "Unable to transform FOAM to world frame" RESET
-        );
-        return;
-    }
-
     auto stamp = this->get_clock()->now();
 
     // Static foam

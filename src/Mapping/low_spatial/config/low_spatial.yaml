@@ -1,8 +1,8 @@
 low_spatial:
   ros__parameters:
     #: Base
-    voxel_resolution: 0.25
-    truncation_distance: 1.0 # the step size in sdf
+    voxel_resolution: 0.5
+    truncation_distance: 2.0 # the step size in sdf
     max_weight: 100.0 # How much can a voxel get update
     voxel_carving_enabled: true
     integrator_threads: 4 # threads inside each integratePointCloud; fewer = shorter write-lock holds
@@ -18,7 +18,7 @@ low_spatial:
     sparse_compensation_factor: 2.0 # help sparse ray to have more weight
 
     #: ESDF
-    esdf_full_euclidean: true
+    esdf_full_euclidean: false
     esdf_min_distance: 0.2 # MUST be > 0 and <= truncation_distance: TSDF voxels with |d| < this seed the ESDF wavefront
     esdf_max_distance: 8.0 # keep a bit above the OA push distance; larger = much more expensive updates
     esdf_default_distance: 10.0 # must be > esdf_max_distance

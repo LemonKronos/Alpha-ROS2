@@ -6,9 +6,6 @@
 #include "alpha_msgs/msg/fuse_perception.hpp"
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
-#include <Eigen/Dense>
 #include <vector>
 #include <string>
 
@@ -24,10 +21,6 @@ private:
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr static_foam_PUB;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr inflated_foam_PUB;
     rclcpp::TimerBase::SharedPtr loop_TIME;
-
-    // Frame transform
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener;
 
     // Variales
     std::vector<FoamSphere> foam;
