@@ -44,16 +44,21 @@ std::string DynamicInfoHelper::updateENV(const char* env_name) {
 }
 
 Name::Dynamic::DRONE::DRONE() : DynamicInfo([]() -> std::string {
-    return DynamicInfoHelper::updateENV("DRONE_NAME") + "_0";
+    return DynamicInfoHelper::updateENV("DRONE_NAME");
+}) {}
+
+Name::Dynamic::DRONE_ID::DRONE_ID() : DynamicInfo([]() -> std::string {
+    Name::Dynamic::DRONE drone_name;
+    return std::string(drone_name.get()) + "_0";
 }) {}
 
 Name::Dynamic::BASE_LINK::BASE_LINK() : DynamicInfo([]() -> std::string {
-    Name::Dynamic::DRONE drone_name;
-    return std::string(drone_name.get()) + "/base_link";
+    Name::Dynamic::DRONE_ID drone_ID;
+    return std::string(drone_ID.get()) + "/base_link";
 }) {}
 
 Name::Dynamic::WORLD::WORLD() : DynamicInfo([]() -> std::string {
-    return DynamicInfoHelper::updateENV("WOLRD_NAME");
+    return DynamicInfoHelper::updateENV("WORLD_NAME");
 }) {}
 
 Name::Dynamic::RECORDED_MANUEVER::RECORDED_MANUEVER() : DynamicInfo([]() -> std::string {

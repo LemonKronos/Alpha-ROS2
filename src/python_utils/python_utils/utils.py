@@ -1,7 +1,11 @@
+
+#! MAKE SURE TO SYNC THIS WITH GLOBAL UTILS
+
 import time
 import os
 import math
 from rclpy.parameter import Parameter
+from collections.abc import Callable
 
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -13,18 +17,18 @@ RESET   = "\033[0m"
 
 DEGREE = 0.017453292
 
-# ################################################ Parameter
+#_                                   SYSTEM CONFIG 
 class Clock:
-    LOOP_CYCLE = 0.031
-    LOOP_RATE  = 1.0 / LOOP_CYCLE
+    LOOP_RATE  = 30.0 # Hz
+    LOOP_CYCLE = 1.0 / LOOP_RATE
     LOOP_CYCLE_NANOSEC = LOOP_CYCLE * 1e9
 
-    LOOP_CYCLE_FAST = 0.013
-    LOOP_RATE_FAST = 1.0 / LOOP_CYCLE_FAST
+    LOOP_RATE_FAST = 100.0 # Hz
+    LOOP_CYCLE_FAST = 1.0 / LOOP_RATE_FAST
     LOOP_CYCLE_FAST_NANOSEC = LOOP_CYCLE_FAST * 1e9
 
-    LOOP_CYCLE_SLOW = 1.997
-    LOOP_RATE_SLOW = 1.0 / LOOP_CYCLE_SLOW
+    LOOP_RATE_SLOW = 10.0
+    LOOP_CYCLE_SLOW = 1.0 / LOOP_RATE_SLOW
     LOOP_CYCLE_SLOW_NANOSEC = LOOP_CYCLE_SLOW * 1e9
 
     LOOP_CYCLE_HEAVY = 4.001
@@ -33,91 +37,153 @@ class Clock:
 
 
 class Threshold:
-    ALLOW_MISSED_TOPIC = math.ceil(Clock.LOOP_RATE / 10.0)
+    ALLOW_MISSED_TOPIC = 3
+    ALLOW_MISSED_TOPIC_ns = ALLOW_MISSED_TOPIC * Clock.LOOP_CYCLE_NANOSEC
+
     ALLOW_MISSED_FAST_TOPIC = math.ceil(Clock.LOOP_RATE_FAST / 10.0)
+    ALLOW_MISSED_FAST_TOPIC_ns = ALLOW_MISSED_FAST_TOPIC * Clock.LOOP_CYCLE_FAST_NANOSEC
+
     ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC
 
 
 class Path:
+    #* Deprecated
     RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel"
     RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo"
 
 
 class Topic:
-    DEPTH_CAM_FRONT_PL = "/sensor/depth_cam/front/points"
-    DEPTH_CAM_LEFT_PL = "/sensor/depth_cam/left/points"
-    DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points"
     RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
     OVERVIEW_CAM = "/sensor/overview_cam/camera/image"
-    LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan"
-    LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan"
-    BODY_CONTACT = "/sensor/contact_body/contact"
-    ROTOR_0_CONTACT = "/sensor/contact_rotor0/contact"
-    ROTOR_1_CONTACT = "/sensor/contact_rotor1/contact"
-    ROTOR_2_CONTACT = "/sensor/contact_rotor2/contact"
-    ROTOR_3_CONTACT = "/sensor/contact_rotor3/contact"
 
     CONTROL_INPUT = "/internal/drone_control/input/control"
     CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"
     CONTROL_REACTIVE = "/internal/drone_control/reactive/control"
     FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
-    CONTACT_PARSER = "/internal/sensor/contacts"
-    LOGGER_RECORD = "/internal/logger/record_control"
-    LIDAR_2D_CONTOUR_CLOSE = "/internal/sensor/lidar2d/close/contour"
-    LIDAR_2D_CONTOUR_FAR = "/internal/sensor/lidar2d/far/contour"
 
+    LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
 
 class Service:
-    CONTROL_WORLD_GRASSLAND = "/world/grasslands/control"
-    CONTROL_WOLRD_OBSTACLE_TUNNEL = "/world/obstacle_tunnel/control"
-    CONTROL_WORLD_NAME = CONTROL_WOLRD_OBSTACLE_TUNNEL
+    WORLD_CONTROL = "/world/control"
+    WORLD_SPAWN = "/world/create"
+    WORLD_KILL = "/world/remove"
+    WORLD_SET_POSE = "/world/set_pose"
 
 
 class Drone:
-    NAME = "alpha_minus_2_0"
     WIDTH = 2.15
     LENGTH = 0.93
     HEIGHT = 0.31
 
     SPEED_MAX_FORWARD = 10.0
-    SPEED_MAX_BACKWARD = 10.0
+    SPEED_MAX_BACKWARD = 6.0
     SPEED_MAX_STRAFE = 10.0
     SPEED_MAX_ANGLE = math.pi/2
     SPEED_MAX_UP = 8.0
-    SPEED_MAX_DOWN = 4.0
-    THRUST_SAFE_LIMIT = 0.9
-    HOVER_THRUST = -0.51
+    SPEED_MAX_DOWN = 6.0
+    THRUST_SAFE_LIMIT = 1.0
+    HOVER_THRUST = 0.51
 
     # Safety
     RADIUS = 1.2
-    UNCERTAINTY = 0.05
-    SAFE_BUFFER = 0.15
-    HAZARD_DISTANCE = RADIUS + SAFE_BUFFER + UNCERTAINTY
-    REACT_TIME = Clock.LOOP_CYCLE_FAST # s
-    DECELERATE_MAX = 4.0 # m/s^2
+    SAFE_BUFFER = 0.1
+    HAZARD_DISTANCE = RADIUS + SAFE_BUFFER
+
 
 class Sensor:
-    LIDAR_2D_SECTOR_NUM = 12
-    LIDAR_2D_RANGE_MAX = 30.0
-    LIDAR_2D_RANGE_MIN = 0.1
-    DEPTH_MAX_DIST = 30.0
-    VOXEL_RESOLUTION = 0.25;
-    VOXEL_PER_SIDE = 8
-    VOXEL_TRUNCATION_DISTANCE = VOXEL_RESOLUTION * 4.0;
-    VOXEL_MIN_WEIGHT = 1e-3;
-    VOXEL_MAX_WEIGHT = 10000.0;
-    VFH_RESOLUTION = 5 * DEGREE;
-    VFH_AZIMUTH_BINS = 2 * math.pi / VFH_RESOLUTION;
-    VFH_LATITUDE_BINS = math.pi / VFH_RESOLUTION;
-    VFH_TOTAL_BINS = VFH_AZIMUTH_BINS * VFH_LATITUDE_BINS;
-    VFH_MSG_BIT_SIZE = 32;
-    VFH_MSG_CHUNK_SIZE = math.ceil(VFH_TOTAL_BINS / VFH_MSG_BIT_SIZE);
+    SPATIAL_BOX_DIM = 12
 
-# Others
-WINDOW_OVERVIEW_FPV = "Alpha FPV"
 
-# ################################################ Function
+class Physics:
+    STEP_SIZE = 0.001
 
+
+#_                                   DYNAMIC NAME
+class DynamicInfo:
+    """Base class for information resolved dynamically from external sources."""
+
+    def __init__(self, logic: Callable[[], str] | None = None) -> None:
+        self._update_logic = logic
+        self._info: str = "UNSET"
+
+        # Match C++ behavior: evaluate the logic during construction.
+        if self._update_logic is not None:
+            self.update()
+
+    def get(self) -> str:
+        """Return the current stored value."""
+        return self._info
+
+    def update(self) -> None:
+        """Refresh the stored value from its source."""
+        if self._update_logic is not None:
+            self._info = self._update_logic()
+
+
+class DynamicInfoHelper:
+    """Helpers for resolving dynamic information."""
+
+    @staticmethod
+    def updateENV(env_name: str) -> str:
+        """Read an environment variable, returning UNSET if missing."""
+        env_info = os.getenv(env_name)
+
+        if env_info is not None:
+            return env_info
+
+        print(f"Get ENV error {env_name}")
+        return "UNSET"
+
+
+class Name:
+    """Dynamic and static naming utilities."""
+
+    class Dynamic:
+        class DRONE(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("DRONE_NAME")
+                )
+
+        class DRONE_ID(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: f"{Name.Dynamic.DRONE().get()}_0"
+                )
+
+        class BASE_LINK(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: f"{Name.Dynamic.DRONE_ID().get()}/base_link"
+                )
+
+        class WORLD(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("WORLD_NAME")
+                )
+
+        class RECORDED_MANUEVER(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV(
+                        "RECORDED_MANUEVER_NAME"
+                    )
+                )
+
+
+class Path:
+    """Dynamic and static path utilities."""
+
+    class Dynamic:
+        class RECORD_STORAGE(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("RECORD_STORAGE_PATH")
+                )
+
+
+#_                                   FUNCTION 
 class Global:
     def setup_for_simulation(node):
         """
@@ -164,19 +230,3 @@ class Global:
             node.get_logger().info(f"{PINK}No simulation clock found, run in realtime.{RESET}")
             if not node.has_parameter("use_sim_time"):
                 node.declare_parameter("use_sim_time", False)
-
-    class Info:
-        drone_name = "error_drone_name"
-        world_name = "error_world_name"
-
-        def __init__(self):
-            self.drone_name = os.getenv('DRONE_NAME', 'error_drone_name')
-            self.world_name = os.getenv('WORLD_NAME', 'error_world_name')
-            
-            # print(f"Loaded - World: {self.world_name}, Drone: {self.drone_name}")
-
-        def getDroneName(self):
-            return self.drone_name
-        
-        def getWorldName(self):
-            return self.world_name

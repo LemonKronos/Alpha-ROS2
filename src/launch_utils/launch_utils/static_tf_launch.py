@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from python_utils.utils import *
+from python_utils.utils import Name
 
 
 DRONE_TF_CONFIGS = {
@@ -75,8 +75,8 @@ DRONE_TF_CONFIGS = {
 }
 
 def generate_launch_description():
-    info = Global.Info()
-    drone_name = info.getDroneName()
+    drone_name = Name.Dynamic.DRONE().get()
+    drone_base_link = Name.Dynamic.BASE_LINK().get()
 
     tf_data_list = DRONE_TF_CONFIGS.get(drone_name, [])
     tf_nodes = []
@@ -84,7 +84,7 @@ def generate_launch_description():
     for tf_data in tf_data_list:
         
         # Dynamically build the frame strings so they always match the swarm
-        parent_frame = f"{drone_name + "_0"}{tf_data['suffix']}"
+        parent_frame = drone_base_link
         child_frame = f"{parent_frame}{tf_data['child_suffix']}"
 
         node = Node(

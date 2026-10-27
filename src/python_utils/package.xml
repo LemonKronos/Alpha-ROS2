@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>python_utils</name>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <description>Global resource for python node</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Propietary</license>

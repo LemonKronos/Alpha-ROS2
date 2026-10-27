@@ -52,6 +52,7 @@ namespace DynamicInfoHelper {
 namespace Name {
     namespace Dynamic {
         class DRONE : public DynamicInfo { public: DRONE(); };
+        class DRONE_ID : public DynamicInfo { public : DRONE_ID(); };
         class BASE_LINK : public DynamicInfo { public: BASE_LINK(); };
         class WORLD : public DynamicInfo { public: WORLD(); };
         class RECORDED_MANUEVER : public DynamicInfo { public: RECORDED_MANUEVER(); };
