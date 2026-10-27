@@ -13,13 +13,11 @@ def generate_launch_description():
         {"gz_topic": "/clock", "gz_type": "gz.msgs.Clock", "ros_topic": "/clock", "ros_type": "rosgraph_msgs/msg/Clock"},
         
         #_ DYNAMIC TRANSFORMS
+        # TF_static check
         # {"gz_topic": f"/model/{drone_id}/pose", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf", "ros_type": "tf2_msgs/msg/TFMessage"},
         # {"gz_topic": f"/model/{drone_id}/pose_static", "gz_type": "gz.msgs.Pose_V", "ros_topic": "/tf_static", "ros_type": "tf2_msgs/msg/TFMessage"},
 
-        # Lidar 1d & 2d as ranges
-        {"gz_topic": "/alpha_lidar_down/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_1d_down/scan", "ros_type": "sensor_msgs/msg/LaserScan"}, #TODO Soon to be deprecated
-        {"gz_topic": "/alpha_lidar_2d/scan", "gz_type": "gz.msgs.LaserScan", "ros_topic": "/sensor/lidar_2d/scan", "ros_type": "sensor_msgs/msg/LaserScan"}, #TODO Soon to be deprecated
-        # As point clouds
+        # Lidar 1d & 2d as point clouds
         {"gz_topic": "/alpha_lidar_down/scan/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/lidar_1d_down/scan/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
         {"gz_topic": "/alpha_lidar_2d/scan/points", "gz_type": "gz.msgs.PointCloudPacked", "ros_topic": "/sensor/lidar_2d/scan/points", "ros_type": "sensor_msgs/msg/PointCloud2"},
         
@@ -31,7 +29,7 @@ def generate_launch_description():
         #_ EXTRA CAMERAS
         # {"gz_topic": "/alpha_cam_front/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "/sensor/rgb_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
         # {"gz_topic": "/gimbal/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "sensor/gimbal_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
-        {"gz_topic": "/alpha_cam_overview/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "/sensor/overview_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
+        # {"gz_topic": "/alpha_cam_overview/camera/image", "gz_type": "gz.msgs.Image", "ros_topic": "/sensor/overview_cam/camera/image", "ros_type": "sensor_msgs/msg/Image"},
         
         #_ DYNAMIC CONTACT SENSORS
         {"gz_topic": f"/world/{world_name}/model/{drone_id}/link/base_link/sensor/alpha_body_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_body/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},

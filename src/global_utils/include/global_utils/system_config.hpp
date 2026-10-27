@@ -96,8 +96,6 @@ namespace Topic {
     constexpr const char* DEPTH_CAM_RIGHT_PL = "/sensor/depth_cam/right/points";
     constexpr const char* RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image";
     constexpr const char* OVERVIEW_CAM = "/sensor/overview_cam/camera/image";
-    constexpr const char* LIDAR_2D_AROUND_SCAN = "/sensor/lidar_2d/scan"; // Soon to be deprecated
-    constexpr const char* LIDAR_1D_DOWN_SCAN = "/sensor/lidar_1d_down/scan"; // Soon to be deprecated
     constexpr const char* LIDAR_2D_AROUND_PL = "/sensor/lidar_2d/scan/points";
     constexpr const char* LIDAR_1D_DOWN_PL = "/sensor/lidar_1d_down/scan/points";
     constexpr const char* BODY_CONTACT = "/sensor/contact_body/contact";
@@ -179,7 +177,7 @@ namespace Drone {
     };
 
     // Body box anti clipping, independent with sensor mount point, sensor data have to be body frame transformed
-    //* Soon to be deprecated
+    // Currently unuse, but should be kept
     constexpr float MAX_X = 0.53f + 0.05f;
     constexpr float MIN_X = -0.4f - 0.05f;
     constexpr float MAX_Y = 1.075f + 0.05f;
@@ -217,23 +215,10 @@ namespace Sensor {
     //: Acrobatic OA
     constexpr int SPATIAL_BOX_DIM = 12;
 
-    //: VFH
-    //* Soon to be deprecated
-    constexpr float VFH_RESOLUTION = 5.0f * DEGREE;
-    constexpr int VFH_AZIMUTH_BINS = static_cast<int>(2.0f * M_PI / VFH_RESOLUTION);
-    constexpr int VFH_LATITUDE_BINS = static_cast<int>(M_PI / VFH_RESOLUTION);
-    constexpr int VFH_TOTAL_BINS = VFH_AZIMUTH_BINS * VFH_LATITUDE_BINS;
-    constexpr int VFH_MSG_BIT_SIZE = 32;
-    constexpr int VFH_MSG_CHUNK_SIZE = std::ceil(static_cast<float>(VFH_TOTAL_BINS) / VFH_MSG_BIT_SIZE);
-
 }
 
 namespace Physics {
     constexpr float STEP_SIZE = 0.001f;
-}
-
-namespace Window {
-    constexpr const char* OVERVIEW_FPV = "Alpha FPV";
 }
 
 //_                                   FUNCTION

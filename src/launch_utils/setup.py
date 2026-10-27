@@ -4,7 +4,7 @@ package_name = 'launch_utils'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.1.1',
     packages=find_packages(include=[package_name]),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -14,7 +14,7 @@ setup(
             'launch_utils/ros_gz_bridge_launch.py',
             'launch_utils/static_tf_launch.py',
             'launch_utils/spatial_container_launch.py',
-            'launch_utils/reactive_oa_launch.py',
+            'launch_utils/full_launch.py',
         ]),
     ],
     install_requires=['setuptools'],
