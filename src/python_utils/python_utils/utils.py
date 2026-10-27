@@ -46,12 +46,6 @@ class Threshold:
     ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC
 
 
-class Path:
-    #* Deprecated
-    RECORD_ACROBATIC = "/home/mr_lemon/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel"
-    RECORD_ACROBATIC_MANUEVER_NAME = "obstacle_tunnel_demo"
-
-
 class Topic:
     RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
     OVERVIEW_CAM = "/sensor/overview_cam/camera/image"
@@ -62,6 +56,8 @@ class Topic:
     FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
 
     LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
+
+    SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
 
 class Service:
     WORLD_CONTROL = "/world/control"

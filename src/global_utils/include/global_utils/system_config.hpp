@@ -113,7 +113,7 @@ namespace Topic {
 
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
     
-    constexpr const char* OBSERVATION_BOXES = "internal/observation_boxes"; // For Acrobatic OA 
+    constexpr const char* SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"; // For Acrobatic OA 
     
 }
 

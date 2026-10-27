@@ -1,66 +1,85 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+
+import numpy as np
 
 from python_utils.utils import *
-from alpha_msgs.msg import ControlInterface, FusePerception
+from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
 
 
 class AcrobaticOANode(Node):
     def __init__(self):
         super().__init__('acrobatic_oa')
 
+        #: Set up to use simulation clock
         Global.setup_for_simulation(self)
         
         #: Subscribers
-        #DEV We will use message filter - synchronizer for this
-        #DEV coarse and detail box SUB
+        self.SUB_spatial = self.create_subscription(
+            SpatialObservation,
+            Topic.OBSERVATION_BOXES,
+            self.spatial_callback,
+            10
+        )
 
-        self.intent_SUB = self.create_subscription(ControlInterface, Topic.CONTROL_INPUT, self.intent_cb, 10)
+        self.SUB_intent = self.create_subscription(
+            ControlInterface,
+            Topic.CONTROL_INPUT,
+            self.intent_callback,
+            10
+        )
 
-        self.state_SUB = self.create_subscription(FusePerception, Topic.FUSE_PERCEPTION, self.state_cb, 10)
-
+        self.SUB_state = self.create_subscription(
+            FusePerception,
+            Topic.FUSE_PERCEPTION,
+            self.state_callback,
+            10
+        )
 
         #: Publishers
-        self.acrobatic_control_PUB = self.create_publisher(Float32MultiArray, Topic.CONTROL_ACROBATIC, 10)
+        self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, 10)
 
         #: Data Buffers
         
         
         #: Timers
-        self.timer = self.create_timer(0.01, self.inference_loop)
+        self.TIME_inference = self.create_timer(0.01, self.inference_loop)
 
 
-    def coarse_cb(self, msg):
-        self.latest_coarse = msg
+    def spatial_callback(self, msg):
+        self.latest_spatial = msg
 
-    def detail_cb(self, msg):
-        self.latest_detail = msg
 
-    def intent_cb(self, msg):
+    def intent_callback(self, msg):
         self.latest_intent = msg
 
-    def state_cb(self, msg):
+
+    def state_callback(self, msg):
         self.latest_state = msg
 
-    def inference_loop(self):
-        # Require state and intent to proceed
-        if self.latest_state is None or self.latest_intent is None:
-            return
 
-        # TODO: Import and call your external AI workspace here
+    def inference_loop(self):
+        #: Lost input check
+        #TODO 
+
+        #: Inference
+        # TODO Import and call AI core module 
         # Example: 
         # action = my_ai_core.infer(
-        #     self.latest_coarse, 
-        #     self.latest_detail, 
+        #     self.latest_spatial,  
         #     self.latest_state, 
         #     self.latest_intent
         # )
 
-        # Dummy action for vertical slice pipeline testing (4 motors, 2 servos neutral)
-        msg = Float32MultiArray()
-        msg.data = [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0]
-        self.acrobatic_control_PUB.publish(msg)
+        dummy_action = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+        
+        msg = NormalizedMotorsServos()
+        msg.header.stamp = self.get_clock().now().to_msg()
+
+        msg.motors_control = dummy_action[:4]
+        msg.servos_control = dummy_action[4:]
+
+        self.PUB_acrobatic.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

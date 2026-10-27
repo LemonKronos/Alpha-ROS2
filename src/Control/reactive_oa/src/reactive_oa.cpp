@@ -35,7 +35,7 @@ Node("reactive_oa_node", options)
     
     //: Publishers
     PUB_reactive_control = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, 10);
-    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::OBSERVATION_BOXES, 10);
+    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::SPATIAL_OBSERVATION, 10);
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<Marker>("/visualizer/control_vector", 10);
