@@ -16,10 +16,6 @@
     #define ALLOW_DEBUG 0
 #endif
 
-#ifndef DO_REACTIVE_OA
-    #define DO_REACTIVE_OA 1
-#endif
-
 #define DEBUG (ALLOW_DEBUG & 1)
 #define VISUALIZE (ALLOW_DEBUG & 1) 
 #define TIME_ANALYSE (ALLOW_DEBUG & 1)
@@ -63,7 +59,6 @@ private:
     alpha_msgs::msg::ControlInterface::SharedPtr last_control_signal = nullptr;
     alpha_msgs::msg::FusePerception::SharedPtr last_perception = nullptr;
 
-    std::atomic<bool> enable_reactive = true;
     std::mutex mutex_state;
     std::mutex mutex_repulsive;
     
@@ -98,10 +93,6 @@ private:
         Eigen::Vector3f cached_control_vec,
         Eigen::Vector3f cached_movement_vec
     );
-
-    #if DEBUG
-    bool last_enable_reactive = true;
-    #endif
 
     #if VISUALIZE
         Name::Dynamic::BASE_LINK base_link;

@@ -11,7 +11,6 @@
 //_                                   SYSTEM CONFIG
 
 #define ALLOW_DEBUG true
-#define DO_REACTIVE_OA true
 
 // Time related settings
 namespace Clock {

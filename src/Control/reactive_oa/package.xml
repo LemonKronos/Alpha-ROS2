@@ -2,8 +2,8 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>reactive_oa</name>
-  <version>0.1.2</version>
-  <description>AI reactive obstacle avoidance</description>
+  <version>0.1.3</version>
+  <description>Reactive obstacle avoidance node</description>
   <maintainer email="trongdat4work@gmail.com">mr_lemon</maintainer>
   <license>Proprietary</license>
 

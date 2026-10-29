@@ -34,8 +34,8 @@ Node("reactive_oa_node", options)
     loadFoamFromParams();
     
     //: Publishers
-    PUB_reactive_control = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, 10);
-    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::SPATIAL_OBSERVATION, 10);
+    PUB_reactive_control = this->create_publisher<ControlInterface>(Topic::CONTROL_REACTIVE, rclcpp::SensorDataQoS());
+    spatial_obs_PUB = this->create_publisher<SpatialObservation>(Topic::SPATIAL_OBSERVATION, rclcpp::SensorDataQoS());
 
     #if VISUALIZE
         control_vec_PUB = this->create_publisher<Marker>("/visualizer/control_vector", 10);
@@ -428,69 +428,34 @@ void spatial_container::ReactiveOANode::controlLoopCallback() {
     }
 
     if(cached_control_signal == nullptr) return;
-
-    // Check if Reactive mode is enabled
-    this->enable_reactive = 
-        cached_control_signal->control_support >= ControlInterface::REACTIVE_OA &&
-        cached_control_signal->wings_mode == ControlInterface::MULTICOPTER
-    ;
-
-    bool cached_enable_reactive = enable_reactive;
-
-    #if DEBUG && 1
-    if(last_enable_reactive != cached_enable_reactive) {
-        RCLCPP_WARN(
-            this->get_logger(),
-            "Reactive OA support " "%s" RESET,
-            cached_enable_reactive ? GREEN "enable ✔️" : RED "disable ❌"
-        );
-        last_enable_reactive = cached_enable_reactive;
-    }
-    #endif
     
     // Publish Final Control
     auto msg = ControlInterface();
 
+    computeReactiveVector();
+
+    msg.forward = reactive_vec.x();
+    msg.left = reactive_vec.y();
+    msg.up = reactive_vec.z();
+    msg.roll = 0.0f; // No roll control
+    msg.pitch = 0.0f; // No pitch control
+    msg.wings_mode = ControlInterface::MULTICOPTER;
+
     if(!lost_control_signal) {
-        if(cached_enable_reactive) {
-            computeReactiveVector();
-
-            msg.forward = reactive_vec.x();
-            msg.left = reactive_vec.y();
-            msg.up = reactive_vec.z();
-            msg.roll = 0; // No roll control
-            msg.pitch = 0; // No pitch control
-        }
-        else {
-            msg.forward = cached_control_signal->forward;
-            msg.left = cached_control_signal->left;
-            msg.up = cached_control_signal->up;
-            msg.roll = cached_control_signal->roll;
-            msg.pitch = cached_control_signal->pitch;
-        }
-
+        //: Have control signal 
         msg.header.stamp = cached_control_signal->header.stamp;
         msg.control_state = cached_control_signal->control_state;
         msg.yaw = cached_control_signal->yaw;
         msg.pilot = cached_control_signal->pilot;
-        msg.wings_mode = cached_control_signal->wings_mode;
     } else {
-        if(cached_enable_reactive) {
-            computeReactiveVector();
-
-            msg.forward = reactive_vec.x();
-            msg.left = reactive_vec.y();
-            msg.up = reactive_vec.z();
-        }
-
-        // msg ofther field is 0 on init
+        //: Lost control signal 
         msg.header.stamp = this->now();
         msg.control_state = ControlInterface::ARM;
+        msg.yaw = 0.0f;
         msg.pilot = ControlInterface::SAFETY;
-        msg.wings_mode = ControlInterface::MULTICOPTER; // Change to hover
     }
 
-    msg.control_support = cached_control_signal->control_support;
+    msg.control_support = cached_control_signal->control_support; // Redundancy
 
     PUB_reactive_control->publish(msg);
 
@@ -539,8 +504,7 @@ void spatial_container::ReactiveOANode::mapReadCallback() {
         #endif
         
         extractAndPublishSpatialBoxes(cached_perception, cached_control_vec);
-        
-        if(this->enable_reactive) computeMultiSphereGradient(cached_perception, cached_control_vec, cached_movement_vec);
+        computeMultiSphereGradient(cached_perception, cached_control_vec, cached_movement_vec);
     }
 }
 

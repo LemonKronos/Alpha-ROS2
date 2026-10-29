@@ -20,9 +20,6 @@
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/normalized_motors_servos.hpp"
 
-//: Local config
-#define ALLOW_ATTITUDE true
-
 #ifndef ALLOW_DEBUG
     #define ALLOW_DEBUG 0
 #endif
@@ -38,8 +35,8 @@ public:
 
 private:
     //: Callback Group
-    rclcpp::CallbackGroup::SharedPtr timer_group;
-    rclcpp::CallbackGroup::SharedPtr msg_group;
+    rclcpp::CallbackGroup::SharedPtr control_signal_group;
+    rclcpp::CallbackGroup::SharedPtr msg_callback_group;
 
     //: Publisher
     rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr PUB_vehicle_cmd;
@@ -50,6 +47,7 @@ private:
     rclcpp::Publisher<px4_msgs::msg::ActuatorServos>::SharedPtr PUB_servos;
 
     //: Subcriber
+    rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_raw_input_control;
     rclcpp::Subscription<alpha_msgs::msg::ControlInterface>::SharedPtr SUB_reactive_control;
     rclcpp::Subscription<alpha_msgs::msg::NormalizedMotorsServos>::SharedPtr SUB_acrobatic_control;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr SUB_vehicle_status;
@@ -58,6 +56,10 @@ private:
     // rclcpp::Subscription<VehicleCommandAck>::SharedPtr vehicle_cmd_ack_SUB;
 
     //: Stored SharedPtr
+    std::mutex mutex_raw_input;
+    alpha_msgs::msg::ControlInterface::SharedPtr last_raw_input_control;
+    alpha_msgs::msg::ControlInterface::SharedPtr raw_input_control;
+
     std::mutex mutex_reactive;
     alpha_msgs::msg::ControlInterface::SharedPtr last_reactive_control;
     alpha_msgs::msg::ControlInterface::SharedPtr reactive_control;
@@ -67,6 +69,8 @@ private:
     alpha_msgs::msg::NormalizedMotorsServos::SharedPtr acrobatic_control;
 
     //: Variables
+    alpha_msgs::msg::ControlInterface::SharedPtr final_control;
+
     uint8_t offboard_stream_counter;
     uint8_t offboard_attitude_counter;
     std::atomic<bool> arming_state;
@@ -86,6 +90,8 @@ private:
     float heading_NED;
     float heading_ENU;
 
+    uint8_t control_support = alpha_msgs::msg::ControlInterface::NONE;
+
     enum class OffboardMode {
         POSITION,
         VELOCITY,
@@ -94,7 +100,7 @@ private:
         THRUST,
         ACTUATOR
     };
-    std::atomic<OffboardMode> offboard_mode{OffboardMode::VELOCITY};
+    OffboardMode offboard_mode = OffboardMode::VELOCITY;
 
     enum class NodeLoopState {
         INIT, // Make stable stream of offboard topics
@@ -110,6 +116,7 @@ private:
     rclcpp::TimerBase::SharedPtr TIME_node_loop;
 
     //: Callbacks
+    void RawInputControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void ReactiveControlCallback(const alpha_msgs::msg::ControlInterface::SharedPtr msg);
     void AcrobaticControlCallback(const alpha_msgs::msg::NormalizedMotorsServos::SharedPtr msg);
     void VehicleStatusCallback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);

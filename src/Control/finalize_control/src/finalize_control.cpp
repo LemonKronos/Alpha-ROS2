@@ -24,23 +24,30 @@ FinalizeControlNode::FinalizeControlNode() :
     Global::setup_for_simulation(this);
 
     //: Callback group
-    timer_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-    msg_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    control_signal_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    msg_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
     auto msg_group_option = rclcpp::SubscriptionOptions();
-    msg_group_option.callback_group = msg_group;
+    msg_group_option.callback_group = msg_callback_group;
     
     //: Create Subscriber
+    SUB_raw_input_control = this->create_subscription<ControlInterface>(
+        Topic::CONTROL_INPUT,
+        rclcpp::SensorDataQoS(),
+        std::bind(&FinalizeControlNode::RawInputControlCallback, this, _1),
+        msg_group_option
+    );
+
     SUB_reactive_control = this->create_subscription<ControlInterface>(
         Topic::CONTROL_REACTIVE,
-        10,
+        rclcpp::SensorDataQoS(),
         std::bind(&FinalizeControlNode::ReactiveControlCallback, this, _1),
         msg_group_option
     );
 
     SUB_acrobatic_control = this->create_subscription<NormalizedMotorsServos>(
         Topic::CONTROL_ACROBATIC,
-        10,
+        rclcpp::SensorDataQoS(),
         std::bind(&FinalizeControlNode::AcrobaticControlCallback, this, _1),
         msg_group_option
     );
@@ -78,16 +85,24 @@ FinalizeControlNode::FinalizeControlNode() :
     TIME_node_loop = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FinalizeControlNode::NodeLoopCallback, this),
-        timer_group
+        control_signal_group
     );
 
     //: Set variables
+    last_raw_input_control = nullptr;
+    raw_input_control = nullptr;
+
     last_reactive_control = nullptr;
     reactive_control = nullptr;
+
     last_acrobatic_control = nullptr;
     acrobatic_control = nullptr;
+
     offboard_stream_counter = 0;
     offboard_attitude_counter = 0;
+
+    final_control = nullptr;
+
     arming_state = false;
     offboard_state = false;
     in_failure = false;
@@ -95,11 +110,13 @@ FinalizeControlNode::FinalizeControlNode() :
     last_nav_state = VehicleStatus::NAVIGATION_STATE_OFFBOARD;
     control_state = false;
     in_hover = false;
+
     latest_position_NED = {0.0f, 0.0f, 0.0f};
     position_NED = latest_position_NED;
     latest_quaternion_NED = {1.0f, 0.0f, 0.0f, 0.0f};
     quaternion_ENU = {1.0f, 0.0f, 0.0f, 0.0f};
     heading_ENU = 0.0f;
+
     current_loop_state = NodeLoopState::INIT;
     just_change_loop_state = true;
 
@@ -117,6 +134,11 @@ FinalizeControlNode::~FinalizeControlNode() {
 #if TIME_ANALYSE
     analyzer->printSummary();
 #endif
+}
+
+void FinalizeControlNode::RawInputControlCallback(const ControlInterface::SharedPtr msg) {
+    lock_guard lock(mutex_raw_input);
+    last_raw_input_control = msg;
 }
 
 void FinalizeControlNode::ReactiveControlCallback(const ControlInterface::SharedPtr msg) {
@@ -147,56 +169,30 @@ void FinalizeControlNode::OdometryCallback(const VehicleOdometry::SharedPtr msg)
     latest_quaternion_NED = frame_utils::arrayToQuaternion(msg->q);
 }
 
-//* Node loop 
+//_ Node loop 
 void FinalizeControlNode::NodeLoopCallback() {
     #if TIME_ANALYSE
         analyzer->start_segment("Node loop");
     #endif
 
-    //_ Cache data 
+    //: Cache data 
+    {
+        lock_guard lock(mutex_raw_input);
+        raw_input_control = last_raw_input_control;
+    }
+    //TODO handle lost signal here 
+
     {
         lock_guard lock(mutex_reactive);
         reactive_control = last_reactive_control;
     }
-    if(reactive_control != nullptr) {
-        auto time_now = this->now();
-        auto time_msg = reactive_control->header.stamp;
-        auto delay = (time_now - time_msg).nanoseconds();
-        
-        if(delay > Threshold::TF_TIMEOUT_FAST_ns) {
-            reactive_control = nullptr;
-
-            RCLCPP_WARN_THROTTLE(
-                this->get_logger(),
-                *this->get_clock(),
-                1000,
-                YELLOW "Reactive Control signal delay too much (%d us)" RESET,
-                delay / 1'000ll
-            );
-        }
-    }
+    //TODO handle lost signal here 
 
     {
         lock_guard lock(mutex_acrobatic);
         acrobatic_control = last_acrobatic_control;
     }
-    if(acrobatic_control != nullptr) {
-        auto time_now = this->now();
-        auto time_msg = acrobatic_control->header.stamp;
-        auto delay = (time_now - time_msg).nanoseconds();
-        
-        if(delay > Threshold::TF_TIMEOUT_FAST_ns) {
-            acrobatic_control = nullptr;
-
-            RCLCPP_WARN_THROTTLE(
-                this->get_logger(),
-                *this->get_clock(),
-                1000,
-                YELLOW "Acrobatic Control signal delay too much (%dllus)" RESET,
-                delay / 1'000ll
-            );
-        }
-    }
+    //TODO handle lost signal here 
 
     {
         lock_guard lock(mutex_pose);
@@ -206,8 +202,30 @@ void FinalizeControlNode::NodeLoopCallback() {
     }
     heading_ENU = frame_utils::quaternionToHeading(quaternion_ENU);
 
-    //_ Update drone data 
-    if(acrobatic_control != nullptr) { //* No safety critic yet
+    //: Set Control Support mode 
+    if(raw_input_control) {
+        this->control_support = raw_input_control->control_support;
+    } else if (reactive_control) {
+        this->control_support = reactive_control->control_support;
+    } // else keep last mode
+
+    //: Set final control signal (meaningful for non-actuator control only) 
+    if(this->control_support == ControlInterface::NONE || this->control_support == ControlInterface::AUTOPILOT) {
+        this->final_control = raw_input_control;
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(),
+            *this->get_clock(), 1000,
+            GREEN "In raw input, final_control is null = %b" RESET,
+            this->final_control == nullptr
+        );
+    } else if(this->control_support == ControlInterface::REACTIVE_OA) {
+        this->final_control = reactive_control;
+    } else {
+        this->final_control = nullptr;
+    }
+
+    //: Set Offboard mode 
+    if(acrobatic_control && this->control_support == ControlInterface::ACROBATIC_OA) {
         if(offboard_mode != OffboardMode::ACTUATOR) {
             RCLCPP_WARN(this->get_logger(), PINK "Changed mode to ACTUATOR" RESET);
             
@@ -215,14 +233,10 @@ void FinalizeControlNode::NodeLoopCallback() {
             control_state = true; // Always in ARM
         }
     }
-    else if(reactive_control != nullptr) {
-        control_state = reactive_control->control_state;
+    else if(final_control != nullptr) {
+        control_state = final_control->control_state;
 
-        if(
-            ALLOW_ATTITUDE && 
-            (abs(reactive_control->roll) > Threshold::ENTER_ATTIUDE_MODE || 
-            abs(reactive_control->pitch) > Threshold::ENTER_ATTIUDE_MODE)
-        ) {
+        if((abs(final_control->roll) > Threshold::ENTER_ATTIUDE_MODE || abs(final_control->pitch) > Threshold::ENTER_ATTIUDE_MODE)) {
             if(offboard_attitude_counter < Threshold::OFFBOARD_STREAM) offboard_attitude_counter++;
         }
         else {
@@ -248,7 +262,7 @@ void FinalizeControlNode::NodeLoopCallback() {
         offboard_attitude_counter = 0;
     }
 
-    //_ Main FSM loop 
+    //: Main FSM loop 
     switch(current_loop_state) {
         case NodeLoopState::INIT:
             if(just_change_loop_state) {
@@ -409,16 +423,16 @@ void FinalizeControlNode::SendOffboardCmd() {
 void FinalizeControlNode::PublishTrajectorySetpoint() {
     auto msg = TrajectorySetpoint();
 
-    if(reactive_control != nullptr) {
+    if(final_control != nullptr) {
         float vx = 0;
-        if(reactive_control->forward > 0) vx = reactive_control->forward * Drone::SPEED_MAX_FORWARD;
-        else vx = reactive_control->forward * Drone::SPEED_MAX_BACKWARD;
+        if(final_control->forward > 0) vx = final_control->forward * Drone::SPEED_MAX_FORWARD;
+        else vx = final_control->forward * Drone::SPEED_MAX_BACKWARD;
         
-        float vy = reactive_control->left * Drone::SPEED_MAX_STRAFE;
+        float vy = final_control->left * Drone::SPEED_MAX_STRAFE;
 
         float vz = 0;
-        if(reactive_control->up > 0) vz = reactive_control->up * Drone::SPEED_MAX_UP;
-        else vz = reactive_control->up * Drone::SPEED_MAX_DOWN;
+        if(final_control->up > 0) vz = final_control->up * Drone::SPEED_MAX_UP;
+        else vz = final_control->up * Drone::SPEED_MAX_DOWN;
 
         if(vx == 0 && vy == 0 && vz == 0) { 
             // Hover, keep last positon to avoid drip
@@ -433,19 +447,19 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
             msg.velocity = frame_utils::frameENUtoNED(frame_utils::frameFLUtoENU(vx, vy, vz, heading_ENU));
         }
 
-        if(reactive_control->yaw == 0) {
+        if(final_control->yaw == 0) {
             // Keep heading, avoid drip
             msg.yaw = this->heading_NED;
             msg.yawspeed = NO_DATA_f;
         } else { 
             // Change heading according to yaw speed
             msg.yaw = NO_DATA_f;
-            msg.yawspeed = -reactive_control->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
+            msg.yawspeed = -final_control->yaw * Drone::SPEED_MAX_ANGLE; // frame FLU to FRD
         }
 
         msg.timestamp =
-            reactive_control->header.stamp.sec * 1'000'000ull + 
-            reactive_control->header.stamp.nanosec / 1'000ull
+            final_control->header.stamp.sec * 1'000'000ull + 
+            final_control->header.stamp.nanosec / 1'000ull
         ;
     }
     else { // Hover, keep last position to avoid drip
@@ -472,12 +486,12 @@ void FinalizeControlNode::PublishTrajectorySetpoint() {
 void FinalizeControlNode::PublishAttitudeSetPoint() {
     auto msg = VehicleAttitudeSetpoint();
 
-    if(reactive_control != nullptr) {
+    if(final_control != nullptr) {
         // Body velocity rate to world quaternion
         Eigen::Vector3f omega( // in velocity
-            reactive_control->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
-            reactive_control->pitch * Drone::SPEED_MAX_ANGLE * 8,
-            reactive_control->yaw * Drone::SPEED_MAX_ANGLE * 8
+            final_control->roll * Drone::SPEED_MAX_ANGLE * 8, // max 9 degree per fast cycle
+            final_control->pitch * Drone::SPEED_MAX_ANGLE * 8,
+            final_control->yaw * Drone::SPEED_MAX_ANGLE * 8
         );
         float angle = omega.norm() * Clock::LOOP_CYCLE_FAST;
         Eigen::Quaternionf dq;
@@ -496,7 +510,7 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         Eigen::Vector3f move_body(
             0.0f, // Do not matter in acrobatic control for multicopter
             0.0f,  // Do not matter in acrobatic control for multicopter
-            reactive_control->up // See as throttle in acrobatic control for multicopter
+            final_control->up // See as throttle in acrobatic control for multicopter
         );
         
         Eigen::Vector3f total_thurst = hover_body + move_body;
@@ -504,10 +518,10 @@ void FinalizeControlNode::PublishAttitudeSetPoint() {
         
         msg.q_d = frame_utils::quaternionToArray(frame_utils::quaternionENUtoNED(q_new));
         msg.thrust_body = frame_utils::frameFLUtoFRD(total_thurst); // Thrust x and y do nothing
-        msg.yaw_sp_move_rate = -reactive_control->yaw * Drone::SPEED_MAX_ANGLE; // Frame FLU to FRD
+        msg.yaw_sp_move_rate = -final_control->yaw * Drone::SPEED_MAX_ANGLE; // Frame FLU to FRD
         msg.timestamp =
-            reactive_control->header.stamp.sec * 1'000'000ull + 
-            reactive_control->header.stamp.nanosec / 1'000ull
+            final_control->header.stamp.sec * 1'000'000ull + 
+            final_control->header.stamp.nanosec / 1'000ull
         ;
     }
     else { // Hover still, but actually will not happen, will be cachec by hover
