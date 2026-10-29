@@ -19,3 +19,4 @@ export RECORDED_MANUEVER_NAME="obstacle_tunnel_demo"
 
 #: PATH
 export RECORD_STORAGE_PATH="$HOME/MyCode/Project/Drone/AIBrain/datasets/acrobatic_oa_dataset/obstacle_tunnel"
+export DRONE_MODEL_SDF_PATH="$HOME/MyCode/Project/Drone/Gazebo/models/alpha_minus_1/model.sdf"
