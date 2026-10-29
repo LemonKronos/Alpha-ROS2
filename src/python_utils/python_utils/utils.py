@@ -59,6 +59,11 @@ class Topic:
 
     SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
 
+    WORLD_STATS = "/world/stats"
+
+    class PX4:
+        VEHICLE_COMMAND = "/fmu/in/vehicle_command"
+
 class Service:
     WORLD_CONTROL = "/world/control"
     WORLD_SPAWN = "/world/create"
@@ -92,6 +97,7 @@ class Sensor:
 
 class Physics:
     STEP_SIZE = 0.001
+    ONE_STEP_FAST = Clock.LOOP_CYCLE_FAST / STEP_SIZE
 
 
 #_                                   DYNAMIC NAME
@@ -177,6 +183,12 @@ class Path:
                 super().__init__(
                     lambda: DynamicInfoHelper.updateENV("RECORD_STORAGE_PATH")
                 )
+
+        class DRONE_MODEL_SDF(DynamicInfo):
+                    def __init__(self) -> None:
+                        super().__init__(
+                            lambda: DynamicInfoHelper.updateENV("DRONE_MODEL_SDF_PATH")
+                        )
 
 
 #_                                   FUNCTION 

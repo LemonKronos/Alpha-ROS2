@@ -37,6 +37,9 @@ def generate_launch_description():
         {"gz_topic": f"/world/{world_name}/model/{drone_id}/link/rotor_1/sensor/alpha_rotor_1_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor1/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
         {"gz_topic": f"/world/{world_name}/model/{drone_id}/link/rotor_2/sensor/alpha_rotor_2_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor2/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
         {"gz_topic": f"/world/{world_name}/model/{drone_id}/link/rotor_3/sensor/alpha_rotor_3_contact/contact", "gz_type": "gz.msgs.Contacts", "ros_topic": "/sensor/contact_rotor3/contact", "ros_type": "ros_gz_interfaces/msg/Contacts"},
+
+        #_ WORLD HANDLING
+        {"gz_topic": f"/world/{world_name}/stats", "gz_type": "gz.msgs.WorldStatistics", "ros_topic": "/world/stats", "ros_type": "ros_gz_interfaces/msg/WorldStatistics"},
     ]
 
     # 3. Define the Services using a dictionary for auto-remapping
@@ -45,7 +48,6 @@ def generate_launch_description():
         {"base_name": "create", "type": "ros_gz_interfaces/srv/SpawnEntity"},
         {"base_name": "remove", "type": "ros_gz_interfaces/srv/DeleteEntity"},
         {"base_name": "set_pose", "type": "ros_gz_interfaces/srv/SetEntityPose"},
-        #DEV ADD Twist service here
     ]
 
     bridge_args = []
@@ -53,8 +55,10 @@ def generate_launch_description():
 
     # 4. Parse our topics into the bridge argument strings
     for topic in topics_to_bridge:
-        # Format: gz_topic@ros_type[gz_type  (The '[' means GZ to ROS)
-        arg_string = f"{topic['gz_topic']}@{topic['ros_type']}[{topic['gz_type']}"
+        # Format: gz_topic@ros_type<direction>gz_type
+        # Default to Gazebo->ROS '[' if no direction is specified
+        direction = topic.get('direction', '[')
+        arg_string = f"{topic['gz_topic']}@{topic['ros_type']}{direction}{topic['gz_type']}"
         bridge_args.append(arg_string)
         
         # Remap if Gazebo and ROS topic names differ
