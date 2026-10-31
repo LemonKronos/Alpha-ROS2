@@ -2,8 +2,12 @@
 Handle simulation world related task: pause/play/step/reset, drone teleportation and goal points, obstacle generation.
 """
 from rclpy.node import Node
+from rclpy.qos import qos_profile_system_default
 
-from ros_gz_interfaces.msg import WorldStatistics
+from ros_gz_interfaces.msg import (
+    WorldStatistics,
+    EntityWrench
+)
 from ros_gz_interfaces.srv import (
     ControlWorld,
     DeleteEntity,
@@ -50,14 +54,20 @@ class WorldHandling:
             WorldStatistics,
             Topic.WORLD_STATS,
             self.stats_callback,
-            10
+            2
         )
 
         #: Publishers
         self.PUB_vehicle_cmd = self.the_node.create_publisher(
             VehicleCommand,
             Topic.PX4.VEHICLE_COMMAND,
-            10
+            qos_profile_system_default
+        )
+
+        self.PUB_world_wrench = self.the_node.create_publisher(
+            EntityWrench,
+            Topic.WORLD_WRENCH,
+            2
         )
 
         #: Data
@@ -91,13 +101,11 @@ class WorldHandling:
         self.SRV_control_world.call_async(req)
         self.the_node.get_logger().info(f"{GREEN} Forward {step} step {RESET}")
 
-    def reset_time_in_pause(self, seed: int):
+    def reset_time(self, seed: int): #BUG 
         req = ControlWorld.Request()
         req.world_control.seed = seed
-        # req.world_control.reset.time_only = True
-        # req.world_control.reset.model_only = True
-        req.world_control.reset.all = True
-        # req.world_control.pause = True
+        req.world_control.reset.time_only = True
+        req.world_control.pause = True
         self.SRV_control_world.call_async(req)
         self.the_node.get_logger().info(f"{YELLOW} Reset simulation time {RESET}")
 
@@ -114,11 +122,7 @@ class WorldHandling:
         self.SRV_spawn.call_async(req_spawn)
         self.the_node.get_logger().info(f"{PINK} Spawn the drone {RESET}")
 
-    def teleport_drone_and_reset_time(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float, seed: int):
-        #: Pause the simulation
-        self.pause()
-
-        #: Teleport the drone
+    def teleport_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float):
         req_pose = SetEntityPose.Request()
         req_pose.entity.name = self.drone_id
         req_pose.entity.type = req_pose.entity.MODEL
@@ -130,13 +134,20 @@ class WorldHandling:
         
         self.SRV_set_pose.call_async(req_pose)
 
-        #: Reset time == clear velocity and acceleration
-        # self.reset_time_in_pause(seed)
+        self.the_node.get_logger().info(
+            f"{TEAL} Teleported drone to "
+            f"xyz= ({x},{y},{z}), "
+            f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
+        )
 
-        #: Reset PX4 EKF2
+    def reset_px4_ekf(self): #BUG 
         msg = VehicleCommand()
+        """
+        uint16 VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN = 246 # Request the reboot or shutdown of system components. |0: Do nothing for autopilot, 1: Reboot autopilot, 2: Shutdown autopilot.|0: Do nothing for onboard computer, 1: Reboot onboard computer, 2: Shutdown onboard computer.|Unused|Unused|Unused|Unused|Unused|
+        """
         msg.command = VehicleCommand.VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN
-        msg.param1 = 3.0 # param1 = 3 tells PX4 to restart the autopilot process/EKF softly
+        msg.param1 = 1.0
+        msg.param2 = 0.0
     
         # Target the main system (usually 1 for SITL)
         msg.target_system = 1
@@ -144,17 +155,32 @@ class WorldHandling:
         msg.source_system = 1
         msg.source_component = 1
         msg.from_external = True
-
         msg.timestamp = int(self.the_node.get_clock().now().nanoseconds / 1000)
 
         self.PUB_vehicle_cmd.publish(msg)
 
-        #: Info log
         self.the_node.get_logger().info(
-            f"{TEAL} Teleported drone to "
-            f"xyz= ({x},{y},{z}), "
-            f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
+            f"{PINK} Sended reset PX4 EKF cmd {RESET}"
         )
+
+    def set_drone_wrench(self, force_x: float, force_y: float, force_z: float, torque_x: float, torque_y: float, torque_z: float):
+        msg = EntityWrench()
+
+        msg.wrench.force.x = force_x
+        msg.wrench.force.y = force_y
+        msg.wrench.force.z = force_z
+
+        msg.wrench.torque.x = torque_x
+        msg.wrench.torque.y = torque_y
+        msg.wrench.torque.z = torque_z
+
+        msg.entity.name = self.drone_id
+        msg.entity.type = msg.entity.MODEL
+
+        msg.header.stamp = self.the_node.get_clock().now().to_msg()
+
+        self.PUB_world_wrench.publish(msg)
+
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose):
         req = SpawnEntity.Request()

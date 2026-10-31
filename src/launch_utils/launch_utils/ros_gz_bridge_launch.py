@@ -40,6 +40,7 @@ def generate_launch_description():
 
         #_ WORLD HANDLING
         {"gz_topic": f"/world/{world_name}/stats", "gz_type": "gz.msgs.WorldStatistics", "ros_topic": "/world/stats", "ros_type": "ros_gz_interfaces/msg/WorldStatistics"},
+        {"gz_topic": f"/world/{world_name}/wrench", "gz_type": "gz.msgs.EntityWrench", "ros_topic": "/world/wrench", "ros_type": "ros_gz_interfaces/msg/EntityWrench", "direction": "]"}
     ]
 
     # 3. Define the Services using a dictionary for auto-remapping

@@ -60,7 +60,8 @@ class Topic:
     SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
 
     WORLD_STATS = "/world/stats"
-
+    WORLD_WRENCH = "/world/wrench"
+    
     class PX4:
         VEHICLE_COMMAND = "/fmu/in/vehicle_command"
 

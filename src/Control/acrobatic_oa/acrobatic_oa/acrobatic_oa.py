@@ -34,7 +34,7 @@ class AcrobaticOANode(Node):
             SpatialObservation,
             Topic.SPATIAL_OBSERVATION,
             self.spatial_callback,
-            10
+            qos_profile_sensor_data
         )
 
         self.SUB_intent = self.create_subscription(
@@ -52,7 +52,7 @@ class AcrobaticOANode(Node):
         )
 
         #: Publishers
-        self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, 10)
+        self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         #: Data
         self.world_handling = WorldHandling(self)
@@ -62,24 +62,45 @@ class AcrobaticOANode(Node):
 
         #: Test _______________________________________________________
 
+        time.sleep(1.0)
+
         # self.world_handling.pause()
 
         # self.world_handling.spawn_drone(
-        #     10.0, 0.0, 1.0,
+        #     10.0, -10.0, 1.0,
         #     1.0, 0.0, 0.0, 0.0
         # )
 
         # time.sleep(1.0)
 
-        # self.world_handling.reset_time_in_pause(123)
-
-        self.world_handling.teleport_drone_and_reset_time(
+        self.world_handling.teleport_drone(
             10.0, -10.0, 1.0,
-            1.0, 0.0, 0.0, 0.0,
-            123
+            1.0, 0.0, 0.0, 0.0
         )
 
-        self.get_logger().info("Acrobatic node init", throttle_duration_sec=1)
+        # self.world_handling.set_drone_wrench(
+        #     100000.0, 65546.0, 65604.0,
+        #     1.0, 2.0, 3.0
+        # )
+
+        # time.sleep(1.0)
+
+        # self.world_handling.set_drone_wrench(
+        #     -100000.0, 0.0, 0.0,
+        #     0.0, 0.0, 0.0
+        # )
+
+        # self.world_handling.play()
+
+        # time.sleep(3.0)
+
+        # self.world_handling.reset_px4_ekf()
+
+        # time.sleep(2.0)
+
+        # self.world_handling.reset_px4_ekf()
+
+        self.get_logger().info("Acrobatic node init completed")
 
 
     def spatial_callback(self, msg):
@@ -107,7 +128,7 @@ class AcrobaticOANode(Node):
         #     self.latest_intent
         # )
 
-        dummy_action = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0])
+        dummy_action = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         
         msg = NormalizedMotorsServos()
         msg.header.stamp = self.get_clock().now().to_msg()
