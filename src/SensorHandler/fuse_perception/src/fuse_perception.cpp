@@ -13,7 +13,7 @@ FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
 
     // Create Subscriber
     odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-        "/fmu/out/vehicle_odometry",
+        Topic::Px4::VEHICLE_ODOMETRY,
         rclcpp::SensorDataQoS(),
         std::bind(&FusePerceptionNode::OdoCallback, this, _1)
     );

@@ -113,6 +113,21 @@ namespace Topic {
     constexpr const char* LOGGER_RECORD = "/internal/logger/record_control"; // Contain flag to record data
     
     constexpr const char* SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"; // For Acrobatic OA 
+
+    
+
+    namespace Px4 {
+        constexpr const char* VEHICLE_ODOMETRY = "/fmu/out/vehicle_odometry";
+        constexpr const char* VEHICLE_STATUS = "/fmu/out/vehicle_status_v1";
+        constexpr const char* VEHICLE_LAND_DETECTED = "/fmu/out/vehicle_land_detected";
+        constexpr const char* VEHICLE_COMMAND = "/fmu/in/vehicle_command";
+        constexpr const char* VEHICLE_ATTITUDE_SETPOINT = "/fmu/in/vehicle_attitude_setpoint";
+        constexpr const char* OFFBOARD_CONTROL_MODE = "/fmu/in/offboard_control_mode";
+        constexpr const char* TRAJECTORY_SETPOINT = "/fmu/in/trajectory_setpoint";
+        constexpr const char* ACTUATOR_MOTORS = "/fmu/in/actuator_motors";
+        constexpr const char* ACTUATOR_SERVOS = "/fmu/in/actuator_servos";
+
+    }
     
 }
 

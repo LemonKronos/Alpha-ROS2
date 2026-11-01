@@ -53,33 +53,33 @@ FinalizeControlNode::FinalizeControlNode() :
     );
 
     SUB_vehicle_status = this->create_subscription<VehicleStatus>(
-        "/fmu/out/vehicle_status_v1",
+        Topic::Px4::VEHICLE_STATUS,
         rclcpp::SystemDefaultsQoS(),
         std::bind(&FinalizeControlNode::VehicleStatusCallback, this, _1),
         msg_group_option
     );
 
     SUB_vehicle_land = this->create_subscription<VehicleLandDetected>(
-        "/fmu/out/vehicle_land_detected",
+        Topic::Px4::VEHICLE_LAND_DETECTED,
         rclcpp::SystemDefaultsQoS(),
         std::bind(&FinalizeControlNode::VehicleLandedCallback, this, _1),
         msg_group_option
     );
 
     SUB_odometry = this->create_subscription<VehicleOdometry>(
-        "/fmu/out/vehicle_odometry",
+        Topic::Px4::VEHICLE_ODOMETRY,
         rclcpp::SensorDataQoS(),
         std::bind(&FinalizeControlNode::OdometryCallback, this, _1),
         msg_group_option
     );
 
     //: Create Publisher
-    PUB_vehicle_cmd = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
-    PUB_offboard_ctrl = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
-    PUB_attitude_set = this->create_publisher<VehicleAttitudeSetpoint>("/fmu/in/vehicle_attitude_setpoint", 10);
-    PUB_trajectory_set = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-    PUB_motors = this->create_publisher<ActuatorMotors>("/fmu/in/actuator_motors", 10);
-    PUB_servos = this->create_publisher<ActuatorServos>("/fmu/in/actuator_servos", 10);
+    PUB_vehicle_cmd = this->create_publisher<VehicleCommand>(Topic::Px4::VEHICLE_COMMAND, rclcpp::SystemDefaultsQoS());
+    PUB_offboard_ctrl = this->create_publisher<OffboardControlMode>(Topic::Px4::OFFBOARD_CONTROL_MODE, rclcpp::SystemDefaultsQoS());
+    PUB_attitude_set = this->create_publisher<VehicleAttitudeSetpoint>(Topic::Px4::VEHICLE_ATTITUDE_SETPOINT, rclcpp::SystemDefaultsQoS());
+    PUB_trajectory_set = this->create_publisher<TrajectorySetpoint>(Topic::Px4::TRAJECTORY_SETPOINT, rclcpp::SystemDefaultsQoS());
+    PUB_motors = this->create_publisher<ActuatorMotors>(Topic::Px4::ACTUATOR_MOTORS, rclcpp::SystemDefaultsQoS());
+    PUB_servos = this->create_publisher<ActuatorServos>(Topic::Px4::ACTUATOR_SERVOS, rclcpp::SystemDefaultsQoS());
 
     //: Create timer
     TIME_node_loop = this->create_timer(
@@ -212,12 +212,6 @@ void FinalizeControlNode::NodeLoopCallback() {
     //: Set final control signal (meaningful for non-actuator control only) 
     if(this->control_support == ControlInterface::NONE || this->control_support == ControlInterface::AUTOPILOT) {
         this->final_control = raw_input_control;
-        RCLCPP_WARN_THROTTLE(
-            this->get_logger(),
-            *this->get_clock(), 1000,
-            GREEN "In raw input, final_control is null = %b" RESET,
-            this->final_control == nullptr
-        );
     } else if(this->control_support == ControlInterface::REACTIVE_OA) {
         this->final_control = reactive_control;
     } else {
