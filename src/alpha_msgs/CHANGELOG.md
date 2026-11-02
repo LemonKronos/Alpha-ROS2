@@ -9,3 +9,4 @@ ___
 # Version 0.1.1
 Changes for DA1
 - Added `SpatialObservation.msg` for 2 spatial observation box.
+- Remove contact sensing and hazard_distance from `FusePerception.msg`

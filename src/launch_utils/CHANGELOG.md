@@ -14,3 +14,4 @@ Delete old and unuse files, make new changes for DA1.
 - Added pointcloud msg bridge for LiDAR down and 2D.
 - Added frame transform for LiDAR down and 2D.
 - Update to the new `python_utils`
+- Added more world control, actuator control and odometry read to replace PX4 in training.

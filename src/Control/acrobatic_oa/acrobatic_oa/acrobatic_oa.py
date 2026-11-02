@@ -68,17 +68,17 @@ class AcrobaticOANode(Node):
 
         # self.world_handling.pause()
 
-        self.world_handling.spawn_drone(
-            10.0, -10.0, 1.0,
-            1.0, 0.0, 0.0, 0.0
-        )
-
-        # time.sleep(1.0)
-
-        # self.world_handling.teleport_drone(
+        # self.world_handling.spawn_drone(
         #     10.0, -10.0, 1.0,
         #     1.0, 0.0, 0.0, 0.0
         # )
+
+        # time.sleep(1.0)
+
+        self.world_handling.teleport_drone(
+            0.0, 0.0, 0.25,
+            1.0, 0.0, 0.0, 0.0
+        )
 
         # self.world_handling.set_drone_wrench(
         #     100000.0, 65546.0, 65604.0,

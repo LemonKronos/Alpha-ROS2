@@ -15,7 +15,7 @@ GzGroundTruthNode::GzGroundTruthNode() : rclcpp::Node("gz_ground_truth") {
     //: Create publisher 
     this->PUB_px4_odometry = this->create_publisher<px4_msgs::msg::VehicleOdometry>(
         Topic::Px4::VEHICLE_ODOMETRY,
-        rclcpp::SensorDataQoS()
+        rclcpp::SystemDefaultsQoS()
     );
 
     //: Create timer 

@@ -50,7 +50,7 @@ def generate_launch_description():
         {"gz_topic": f"/model/{drone_id}/servo_3", "gz_type": "gz.msgs.Double", "ros_topic": "/drone/tilt_left", "ros_type": "std_msgs/msg/Float64", "direction": "]"},
 
         #_ gz ground truth 
-        {"gz_topic": f"/model/{drone_id}/odometry", "gz_type": "gz.msgs.Odometry", "roz_topic": "/drone/odometry", "ros_type": "nav_msgs/msg/Odometry"},
+        {"gz_topic": f"/model/{drone_id}/odometry", "gz_type": "gz.msgs.Odometry", "ros_topic": "/drone/odometry", "ros_type": "nav_msgs/msg/Odometry"},
 
     ]
 
