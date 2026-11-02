@@ -127,7 +127,7 @@ FinalizeControlNode::FinalizeControlNode() :
 }
 
 FinalizeControlNode::~FinalizeControlNode() {
-    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 5);
+    PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 5); // Return to Launch RTL
     SendDisarmCmd();
     PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 1, 1);
 
@@ -300,7 +300,7 @@ void FinalizeControlNode::NodeLoopCallback() {
         break;
         case NodeLoopState::OFFBOARD:
             if(just_change_loop_state) {
-                PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+                PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6); // Get into Offboard mode
 
                 just_change_loop_state = false;
                 offboard_stream_counter = 0; // Repurposed to lost offboard counter
@@ -355,7 +355,7 @@ void FinalizeControlNode::NodeLoopCallback() {
                 just_change_loop_state = false;
             }
 
-            PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3);
+            PublishVehicleCmd(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 4, 3); // Get into Hold/Loiter mdoe
             if(arming_state && last_nav_state == VehicleStatus::NAVIGATION_STATE_AUTO_LAND) {
                 SendDisarmCmd();
             }

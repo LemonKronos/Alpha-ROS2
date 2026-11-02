@@ -152,6 +152,13 @@ namespace frame_utils {
         return q_tf_world * q * q_tf_body;
     }
 
+    // Quaternion wxyz from ROS2 ENU frame to PX4 NED frame
+    inline std::array<float, 4> quaternionENUtoNED(const std::array<float, 4> q) {
+        Eigen::Quaternionf q_in(q[0], q[1], q[2], q[3]);
+        Eigen::Quaternionf q_out = quaternionENUtoNED(q_in);
+        return {q_out.w(), q_out.x(), q_out.y(), q_out.z()};
+    }
+
     inline float quaternionToHeading(const float w, const float x, const float y, const float z) {
         float yaw = static_cast<float>(std::atan2(2.0 * (w*z + x*y), 1.0 - 2.0 * (y*y + z*z)));
         return angleInWrapped(yaw);

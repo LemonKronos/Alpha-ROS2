@@ -1,36 +1,32 @@
 #include "fuse_perception/fuse_perception.hpp"
 
+using std::placeholders::_1;
+
 FusePerceptionNode::FusePerceptionNode() : rclcpp::Node("fuse_perception") {
     using namespace std::chrono_literals;
 
     Global::setup_for_simulation(this);
 
-    // Tf 
+    //: Transform broadcaster 
     broadcaster_TF = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     
-    // Create Publisher
+    //: Create Publisher 
     fuse_PUB = this->create_publisher<alpha_msgs::msg::FusePerception>(Topic::FUSE_PERCEPTION, rclcpp::SensorDataQoS());
 
-    // Create Subscriber
+    //: Create Subscriber 
     odo_SUB = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
         Topic::Px4::VEHICLE_ODOMETRY,
         rclcpp::SensorDataQoS(),
         std::bind(&FusePerceptionNode::OdoCallback, this, _1)
     );
 
-    contact_SUB = this->create_subscription<alpha_msgs::msg::ContactSensor>(
-        Topic::CONTACT_PARSER,
-        rclcpp::SensorDataQoS(),
-        std::bind(&FusePerceptionNode::ContactCallback, this, _1)
-    );
-
-    // Create wall timers
+    //: Create wall timers 
     publish_TIM = this->create_timer(
         std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&FusePerceptionNode::PublishCallback, this)
     );
 
-    // Init variable
+    //: Init data 
     lost_odometry = true;
     missed_odometry = Threshold::ALLOW_MISSED_FAST_TOPIC;
     last_hazard_distance = Drone::HAZARD_DISTANCE;
@@ -40,8 +36,8 @@ FusePerceptionNode::~FusePerceptionNode() {}
 
 void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     geometry_msgs::msg::TransformStamped tf;
-    tf.header.stamp.sec = last_odo->timestamp / 1000000;
-    tf.header.stamp.nanosec = (last_odo->timestamp % 1000000) * 1000;
+    tf.header.stamp.sec = last_odo->timestamp / 1'000'000ull;
+    tf.header.stamp.nanosec = (last_odo->timestamp % 1'000'000ull) * 1'000ull;
     tf.header.frame_id = "world";
     tf.child_frame_id = base_link.get();
     tf.transform.translation.x = msg.position[0];
@@ -54,9 +50,6 @@ void FusePerceptionNode::doFrameTransform(alpha_msgs::msg::FusePerception msg) {
     broadcaster_TF->sendTransform(tf);
 }
 
-/**
- * @brief Parse all data in last_ into the msg and publish
- */
 void FusePerceptionNode::PublishCallback() {
     auto msg = alpha_msgs::msg::FusePerception();
     
@@ -78,21 +71,6 @@ void FusePerceptionNode::PublishCallback() {
         msg.velocity = frame_utils::frameNEDtoENU(last_odo->velocity);
         msg.angular_velocity = frame_utils::frameFRDtoFLU(last_odo->angular_velocity);
 
-        // Compute safe_distance
-        float speed_sq = msg.velocity[0]*msg.velocity[0] + msg.velocity[1]*msg.velocity[1] + msg.velocity[2]*msg.velocity[2];
-        float speed = std::sqrt(speed_sq);
-
-        float hazard_distance = Drone::HAZARD_DISTANCE + speed * Drone::SLEW_TIME + (speed_sq / (2 * Drone::DECELERATE_MAX));
-        
-        constexpr float DECREASE_CONSTANT = Drone::HAZARD_DISTANCE / 20.0f;
-        if(hazard_distance + DECREASE_CONSTANT < last_hazard_distance) {
-            hazard_distance = last_hazard_distance - DECREASE_CONSTANT;
-        }
-
-        // hazard_distance = 20.0f; //#TEST
-        msg.hazard_distance = hazard_distance;
-        last_hazard_distance = msg.hazard_distance;
-
         doFrameTransform(msg);
     }
     else {
@@ -101,18 +79,6 @@ void FusePerceptionNode::PublishCallback() {
         msg.q.fill(NO_DATA_f);
         msg.velocity.fill(NO_DATA_f);
         msg.angular_velocity.fill(NO_DATA_f);
-    }
-    
-    // Contact sensor - flag
-    if(last_contact != nullptr) {
-        msg.bearable_contact = last_contact->bearable_contact;
-        msg.critical_contact = last_contact->critical_contact;
-
-        last_contact = nullptr;
-    }
-    else {
-        msg.bearable_contact = false;
-        msg.critical_contact = false;
     }
     
     // Publish msg
@@ -126,6 +92,3 @@ void FusePerceptionNode::OdoCallback(const px4_msgs::msg::VehicleOdometry::Share
     missed_odometry = 0;
 }
 
-void FusePerceptionNode::ContactCallback(const alpha_msgs::msg::ContactSensor::SharedPtr msg) {
-    last_contact = msg;
-}

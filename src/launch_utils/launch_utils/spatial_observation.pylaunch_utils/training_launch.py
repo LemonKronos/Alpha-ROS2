@@ -1,0 +1,1 @@
+/home/mr_lemon/MyCode/Project/Drone/ROS2/src/launch_utils/launch_utils/spatial_observation.pylaunch_utils/training_launch.py

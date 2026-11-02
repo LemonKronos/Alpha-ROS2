@@ -15,6 +15,8 @@ setup(
             'launch_utils/static_tf_launch.py',
             'launch_utils/spatial_container_launch.py',
             'launch_utils/full_launch.py',
+            'launch_utils/spatial_observation.py',
+            'launch_utils/training_launch.py'
         ]),
     ],
     install_requires=['setuptools'],

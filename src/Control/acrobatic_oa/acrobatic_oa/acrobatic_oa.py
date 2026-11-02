@@ -56,6 +56,8 @@ class AcrobaticOANode(Node):
 
         #: Data
         self.world_handling = WorldHandling(self)
+        self.counter = 0.0
+        self.flip = 1
         
         #: Timers
         # self.TIME_inference = self.create_timer(Clock.LOOP_CYCLE_FAST, self.inference_loop)
@@ -66,17 +68,17 @@ class AcrobaticOANode(Node):
 
         # self.world_handling.pause()
 
-        # self.world_handling.spawn_drone(
-        #     10.0, -10.0, 1.0,
-        #     1.0, 0.0, 0.0, 0.0
-        # )
-
-        # time.sleep(1.0)
-
-        self.world_handling.teleport_drone(
+        self.world_handling.spawn_drone(
             10.0, -10.0, 1.0,
             1.0, 0.0, 0.0, 0.0
         )
+
+        # time.sleep(1.0)
+
+        # self.world_handling.teleport_drone(
+        #     10.0, -10.0, 1.0,
+        #     1.0, 0.0, 0.0, 0.0
+        # )
 
         # self.world_handling.set_drone_wrench(
         #     100000.0, 65546.0, 65604.0,
@@ -128,7 +130,14 @@ class AcrobaticOANode(Node):
         #     self.latest_intent
         # )
 
-        dummy_action = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
+        if self.flip > 0 and self.counter >= 1.0:
+            self.flip = -1
+        elif self.flip < 0 and self.counter <= -1.0:
+            self.flip = 1
+
+        self.counter += 0.005 * self.flip;
+
+        dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, self.counter])
         
         msg = NormalizedMotorsServos()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -138,7 +147,7 @@ class AcrobaticOANode(Node):
 
         self.PUB_acrobatic.publish(msg)
 
-        self.get_logger().info("Published action",throttle_duration_sec=1)
+        self.get_logger().info(f"Published action {dummy_action}",throttle_duration_sec=1)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -15,6 +15,10 @@
         "*.msg": "rosmsg"
     },
     "python.terminal.activateEnvironment": false,
+    "python.terminal.shellIntegration.enabled": false,
+    "terminal.integrated.inheritEnv": true,
+    "terminal.integrated.shellIntegration.enabled": false,
+    "terminal.integrated.env.linux": {},
     "python.defaultInterpreterPath": "${workspaceFolder}/pyvenv/bin/python",
     "python.autoComplete.extraPaths": [
         "/opt/ros/jazzy/lib/python3.12/site-packages"

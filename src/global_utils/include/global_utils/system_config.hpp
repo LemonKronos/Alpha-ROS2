@@ -114,7 +114,12 @@ namespace Topic {
     
     constexpr const char* SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"; // For Acrobatic OA 
 
-    
+    constexpr const char* DRONE_MOTORS = "/drone/motors";
+    constexpr const char* DRONE_ELEVON_LEFT = "/drone/elevon_left";
+    constexpr const char* DRONE_ELEVON_RIGHT = "/drone/elevon_right";
+    constexpr const char* DRONE_TILT_RIGHT = "/drone/tilt_right";
+    constexpr const char* DRONE_TILT_LEFT = "/drone/tilt_left";
+    constexpr const char* DRONE_ODOMETRY = "/drone/odometry";
 
     namespace Px4 {
         constexpr const char* VEHICLE_ODOMETRY = "/fmu/out/vehicle_odometry";
@@ -154,6 +159,19 @@ namespace Drone {
     constexpr float SPEED_MAX_DOWN = 6.0f;
     constexpr float THRUST_SAFE_LIMIT = 1.0f;
     constexpr float HOVER_THRUST = 0.51f;
+
+    // Actuator: sync with airframe file
+    constexpr double ROTOR_MIN = 10.0;
+    constexpr double ROTOR_MAX = 1500.0;
+    constexpr double ROTOR_RANGE = ROTOR_MAX - ROTOR_MIN;
+
+    constexpr double ELEVON_MIN = -M_PI_4;
+    constexpr double ELEVON_MAX = M_PI_4;
+    constexpr double ELEVON_RANGE = M_PI_2;
+
+    constexpr double TILT_MIN = 0.0;
+    constexpr double TILT_MAX = M_PI_2;
+    constexpr double TILT_RANGE = M_PI_2;
 
     // Safety
     constexpr float RADIUS = 1.2f; // Single sphere drone radius in meter
