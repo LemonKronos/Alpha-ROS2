@@ -68,8 +68,9 @@ start_px4_sitl() {
   kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
 cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 
-mkdir -p build/px4_sitl_default/rootfs/fs/microsd/etc &&
-echo "param set UXRCE_DDS_SYNCT 0" > build/px4_sitl_default/rootfs/fs/microsd/etc/extras.txt &&
+#* This is to make PX4 use Sim time instead of UNIX time, unneeded here, have this set in the airframe file already
+# mkdir -p build/px4_sitl_default/rootfs/fs/microsd/etc &&
+# echo "param set UXRCE_DDS_SYNCT 0" > build/px4_sitl_default/rootfs/fs/microsd/etc/extras.txt &&
 
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\

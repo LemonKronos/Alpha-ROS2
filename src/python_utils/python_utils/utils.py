@@ -6,6 +6,7 @@ import os
 import math
 from rclpy.parameter import Parameter
 from collections.abc import Callable
+import numpy as np
 
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -61,6 +62,8 @@ class Topic:
 
     WORLD_STATS = "/world/stats"
     WORLD_WRENCH = "/world/wrench"
+
+    DRONE_ODOMETRY = "/drone/odometry"
     
     class PX4:
         VEHICLE_COMMAND = "/fmu/in/vehicle_command"
@@ -76,6 +79,8 @@ class Drone:
     WIDTH = 2.15
     LENGTH = 0.93
     HEIGHT = 0.31
+    MASS = 5.12000002
+    INERTIA = np.diag([0.53, 0.39, 0.87])
 
     SPEED_MAX_FORWARD = 10.0
     SPEED_MAX_BACKWARD = 6.0

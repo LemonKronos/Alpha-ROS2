@@ -8,12 +8,9 @@ import numpy as np
 
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
+from alpha_ai_core.interface import PolicyCore, SpatialEncoder
+from alpha_ai_core.models import spatial_cnn, monolithic
 
-from geometry_msgs.msg import (
-    Point,
-    Quaternion,
-    Pose
-)
 
 # Hack to allow VS Code 'Run' button to see the module before colcon build
 import sys
@@ -55,54 +52,11 @@ class AcrobaticOANode(Node):
         self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         #: Data
-        self.world_handling = WorldHandling(self)
-        self.counter = 0.0
-        self.flip = 1
+        self.policy_core: PolicyCore= monolithic()
+        self.cnn_core = spatial_cnn()
         
         #: Timers
-        # self.TIME_inference = self.create_timer(Clock.LOOP_CYCLE_FAST, self.inference_loop)
-
-        #: Test _______________________________________________________
-
-        time.sleep(1.0)
-
-        # self.world_handling.pause()
-
-        # self.world_handling.spawn_drone(
-        #     10.0, -10.0, 1.0,
-        #     1.0, 0.0, 0.0, 0.0
-        # )
-
-        # time.sleep(1.0)
-
-        self.world_handling.teleport_drone(
-            0.0, 0.0, 0.25,
-            1.0, 0.0, 0.0, 0.0
-        )
-
-        # self.world_handling.set_drone_wrench(
-        #     100000.0, 65546.0, 65604.0,
-        #     1.0, 2.0, 3.0
-        # )
-
-        # time.sleep(1.0)
-
-        # self.world_handling.set_drone_wrench(
-        #     -100000.0, 0.0, 0.0,
-        #     0.0, 0.0, 0.0
-        # )
-
-        # self.world_handling.play()
-
-        # time.sleep(3.0)
-
-        # self.world_handling.reset_px4_ekf()
-
-        # time.sleep(2.0)
-
-        # self.world_handling.reset_px4_ekf()
-
-        self.get_logger().info("Acrobatic node init completed")
+        self.TIME_inference = self.create_timer(1.0, self.inference_loop)
 
 
     def spatial_callback(self, msg):
@@ -118,26 +72,15 @@ class AcrobaticOANode(Node):
 
 
     def inference_loop(self):
-        #: Lost input check
-        #TODO 
+        """This is the real/evaluation run"""
+        # glob input the self.latest_spatial to np
+        # self.cnn_core.encode(the spatial)
 
-        #: Inference
-        # TODO Import and call AI core module 
-        # Example: 
-        # action = my_ai_core.infer(
-        #     self.latest_spatial,  
-        #     self.latest_state, 
-        #     self.latest_intent
-        # )
+        # convert the itent and state
+        # action, _, _ = self.policy_core.act(...) Normalize the action in the AI core code
 
-        if self.flip > 0 and self.counter >= 1.0:
-            self.flip = -1
-        elif self.flip < 0 and self.counter <= -1.0:
-            self.flip = 1
-
-        self.counter += 0.005 * self.flip;
-
-        dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, self.counter])
+        # action in here 8-DIM, all range [-1, 1], specific motor servo clamp get hangled in later node.
+        dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0])
         
         msg = NormalizedMotorsServos()
         msg.header.stamp = self.get_clock().now().to_msg()

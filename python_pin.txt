@@ -1,6 +1,8 @@
+-e file:///home/mr_lemon/MyCode/Project/Drone/AI_Core
 iniconfig==2.3.1
 numpy==1.26.4
 packaging==26.3
 pluggy==1.7.0
 pytest==7.4.4
+scipy==1.17.1
 websockets==10.4

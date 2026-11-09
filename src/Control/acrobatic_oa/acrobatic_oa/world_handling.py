@@ -4,6 +4,9 @@ Handle simulation world related task: pause/play/step/reset, drone teleportation
 from rclpy.node import Node
 from rclpy.qos import qos_profile_system_default
 
+import numpy as np
+from scipy.spatial.transform import Rotation
+
 from ros_gz_interfaces.msg import (
     WorldStatistics,
     EntityWrench
@@ -19,9 +22,11 @@ from geometry_msgs.msg import (
     Quaternion,
     Pose
 )
-from px4_msgs.msg import VehicleCommand
+from nav_msgs.msg import Odometry
 
 from python_utils.utils import *
+
+
 
 class WorldHandling:
     def __init__(self, the_node: Node):
@@ -57,13 +62,14 @@ class WorldHandling:
             2
         )
 
-        #: Publishers
-        self.PUB_vehicle_cmd = self.the_node.create_publisher(
-            VehicleCommand,
-            Topic.PX4.VEHICLE_COMMAND,
+        self.SUB_ground_truth = self.the_node.create_subscription(
+            Odometry,
+            Topic.DRONE_ODOMETRY,
+            self.ground_truth_callback,
             qos_profile_system_default
         )
 
+        #: Publishers
         self.PUB_world_wrench = self.the_node.create_publisher(
             EntityWrench,
             Topic.WORLD_WRENCH,
@@ -79,7 +85,18 @@ class WorldHandling:
         self.GOAL_RADIUS = 0.5
 
         self.lastest_stats: WorldStatistics = None
+        self.lastest_ground_truth: Odometry = None
+
         self.spawned_entities = [] # Track for clean up
+
+    def stats_callback(self, msg: WorldStatistics):
+        self.lastest_stats = msg
+
+    def ground_truth_callback(self, msg: Odometry):
+        self.lastest_ground_truth = msg
+        
+    def get_statistics(self) -> WorldStatistics:
+        return self.lastest_stats
 
     def play(self):
         req = ControlWorld.Request()
@@ -101,7 +118,7 @@ class WorldHandling:
         self.SRV_control_world.call_async(req)
         self.the_node.get_logger().info(f"{GREEN} Forward {step} step {RESET}")
 
-    def reset_time(self, seed: int): #BUG 
+    def reset_time(self, seed: int): #BUG Unusable 
         req = ControlWorld.Request()
         req.world_control.seed = seed
         req.world_control.reset.time_only = True
@@ -140,29 +157,6 @@ class WorldHandling:
             f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
         )
 
-    def reset_px4_ekf(self): #BUG 
-        msg = VehicleCommand()
-        """
-        uint16 VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN = 246 # Request the reboot or shutdown of system components. |0: Do nothing for autopilot, 1: Reboot autopilot, 2: Shutdown autopilot.|0: Do nothing for onboard computer, 1: Reboot onboard computer, 2: Shutdown onboard computer.|Unused|Unused|Unused|Unused|Unused|
-        """
-        msg.command = VehicleCommand.VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN
-        msg.param1 = 1.0
-        msg.param2 = 0.0
-    
-        # Target the main system (usually 1 for SITL)
-        msg.target_system = 1
-        msg.target_component = 1
-        msg.source_system = 1
-        msg.source_component = 1
-        msg.from_external = True
-        msg.timestamp = int(self.the_node.get_clock().now().nanoseconds / 1000)
-
-        self.PUB_vehicle_cmd.publish(msg)
-
-        self.the_node.get_logger().info(
-            f"{PINK} Sended reset PX4 EKF cmd {RESET}"
-        )
-
     def set_drone_wrench(self, force_x: float, force_y: float, force_z: float, torque_x: float, torque_y: float, torque_z: float):
         msg = EntityWrench()
 
@@ -181,6 +175,35 @@ class WorldHandling:
 
         self.PUB_world_wrench.publish(msg)
 
+    def zero_drone_speed(self):
+        """
+        Base on ground truth twist, set drone wrench to zero out the speed.
+        Teleport in on the ground first and set zero speed, then re-teleport to required position.
+        """
+        odo = self.lastest_ground_truth
+        if odo is None:
+            self.the_node.get_logger().warn(f"{RED} Zero drone speed failed, no ground truth")
+            return 0.0
+
+        quaternion = odo.pose.pose.orientation
+        rotation = Rotation.from_quat([quaternion.x, quaternion.y, quaternion.z, quaternion.w]).as_matrix()
+
+        linear = odo.twist.twist.linear
+        angular = odo.twist.twist.angular
+        velocity_linear = np.array([linear.x, linear.y, linear.z])
+        velocity_angular = np.array([angular.x, angular.y, angular.z])
+
+        inertia = rotation @ Drone.INERTIA @ rotation.T
+
+        force = -Drone.MASS * velocity_linear / Physics.STEP_SIZE
+        torque = -(inertia @ velocity_angular) / Physics.STEP_SIZE
+
+        self.set_drone_wrench(*force, *torque)
+        self.the_node.get_logger().info(
+            "Zero drone speed "
+            f"force {force}, "
+            f"torque {torque}"
+        )
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose):
         req = SpawnEntity.Request()
@@ -272,9 +295,3 @@ class WorldHandling:
             </sdf>
             """
             self.spawn_entity_from_sdf(name, sdf, pose)
-
-    def stats_callback(self, msg: WorldStatistics):
-        self.lastest_stats = msg
-
-    def get_statistics(self) -> WorldStatistics:
-        return self.lastest_stats
