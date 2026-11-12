@@ -6,6 +6,7 @@ from rclpy.qos import qos_profile_system_default
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+from scipy.linalg import norm
 
 from ros_gz_interfaces.msg import (
     WorldStatistics,
@@ -118,10 +119,10 @@ class WorldHandling:
         self.SRV_control_world.call_async(req)
         self.the_node.get_logger().info(f"{GREEN} Forward {step} step {RESET}")
 
-    def reset_time(self, seed: int): #BUG Unusable 
+    def reset_all(self, seed: int):
         req = ControlWorld.Request()
         req.world_control.seed = seed
-        req.world_control.reset.time_only = True
+        req.world_control.reset.all = True
         req.world_control.pause = True
         self.SRV_control_world.call_async(req)
         self.the_node.get_logger().info(f"{YELLOW} Reset simulation time {RESET}")
@@ -175,15 +176,22 @@ class WorldHandling:
 
         self.PUB_world_wrench.publish(msg)
 
-    def zero_drone_speed(self):
+    def zero_drone_speed(self) -> bool:
         """
+        UNUSE: favor reset_all instead
         Base on ground truth twist, set drone wrench to zero out the speed.
         Teleport in on the ground first and set zero speed, then re-teleport to required position.
         """
+        odo_wait = 0
+        while self.lastest_ground_truth is None and odo_wait < 3:
+            odo_wait += 1
+            self.step(100)
+            time.sleep(1)
+        if self.lastest_ground_truth is None and odo_wait >= 3 :
+            self.the_node.get_logger().error(f"{RED} Zero drone speed failed, no ground truth {RESET}")
+            return False
+
         odo = self.lastest_ground_truth
-        if odo is None:
-            self.the_node.get_logger().warn(f"{RED} Zero drone speed failed, no ground truth")
-            return 0.0
 
         quaternion = odo.pose.pose.orientation
         rotation = Rotation.from_quat([quaternion.x, quaternion.y, quaternion.z, quaternion.w]).as_matrix()
@@ -204,6 +212,49 @@ class WorldHandling:
             f"force {force}, "
             f"torque {torque}"
         )
+        return True
+
+    def reset_drone(self) -> bool:
+        """
+        UNUSE: favor reset_all instead
+        Repeatedly teleport_drone to (0.0, 0.0, 0.25) and zero_drone_speed until drone stay still
+        """
+        attempt = 0
+        while 1:
+            attempt += 1
+            if attempt > 5:
+                self.the_node.get_logger().error(f"{RED} Unable to reset drone: 5 attempt failed {RESET}")
+                return False
+
+            self.teleport_drone(
+                0.0, 0.0, 0.25,
+                1.0, 0.0, 0.0, 0.0
+            )
+            if not self.zero_drone_speed():
+                return False
+
+            self.step(1000)
+            time.sleep(1)
+
+            odo_wait = 0
+            while self.lastest_ground_truth is None and odo_wait < 3:
+                odo_wait += 1
+                self.step(100)
+                time.sleep(1)
+            if self.lastest_ground_truth is None and odo_wait >= 3:
+                self.the_node.get_logger().error(f"{RED} Unable to reset drone: no ground truth {RESET}")
+                return False
+
+            odo = self.lastest_ground_truth
+            
+            linear = odo.twist.twist.linear
+            angular = odo.twist.twist.angular
+            velocity_linear = np.array([linear.x, linear.y, linear.z])
+            velocity_angular = np.array([angular.x, angular.y, angular.z])
+
+            if norm(velocity_linear) < 0.05 or norm(velocity_angular) < 0.05:
+                self.the_node.get_logger().info(f"{GREEN} Successfully reset drone {RESET}")
+                return True
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose):
         req = SpawnEntity.Request()

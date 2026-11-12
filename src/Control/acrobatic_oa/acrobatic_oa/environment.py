@@ -6,13 +6,14 @@ from scipy.spatial.transform import Rotation
 
 from rclpy.node import Node
 from alpha_ai_core.interface import Action, EpisodeConfiguration, StepResult, TaskType
+from alpha_ai_core.training.environment import EnvironmentFailure
 from acrobatic_oa.world_handling import WorldHandling
 from python_utils.utils import *
 
 class GzEnvironment:
     def __init__(self, the_node: Node):
         self.the_node = the_node
-        self.world_handling = WorldHandling()
+        self.world_handling = WorldHandling(the_node)
 
     def reset(self, episode_config: EpisodeConfiguration) -> StepResult:
         # Ignore the seed reset with seed for now.
@@ -21,16 +22,13 @@ class GzEnvironment:
             case TaskType.HOVER:
                 self.world_handling.pause()
 
-                # Reset
-                self.world_handling.teleport_drone(
-                    0.0, 0.0, 0.25,
-                    1.0, 0.0, 0.0, 0.0
-                )
-                self.world_handling.zero_drone_speed()
-                #TODO change these teleport and zero to just reset drone 
+                #: Reset
+                if not self.world_handling.reset_drone():
+                    raise EnvironmentFailure
 
                 spawn = episode_config.spawn
 
+                #: Set spawn condition
                 # Pose
                 rotation = Rotation.from_euler('xyz', spawn.roll_pitch_yaw)
                 qx, qy, qz, qw = rotation.as_quat()
@@ -40,7 +38,7 @@ class GzEnvironment:
                     qw, qx, qy, qz
                 )
 
-                # Velocity
+                # Velocity -> force and torque
                 rotation = rotation.as_matrix()
                 inertia = rotation @ Drone.INERTIA @ rotation.T
                 linear_velocity = np.array(spawn.linear_velocity)

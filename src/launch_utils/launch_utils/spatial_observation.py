@@ -31,7 +31,7 @@ def generate_launch_description():
         name='omni_lidar'
     )
 
-    spatial_container = ComposableNodeContainer(
+    spatial_observation = ComposableNodeContainer(
         name='spatial_container',
         namespace='spatial',
         package='rclcpp_components',
@@ -51,4 +51,4 @@ def generate_launch_description():
         # prefix=['gdb -ex run --args'], #: DEBUG
     )
 
-    return LaunchDescription([spatial_container])
+    return LaunchDescription([spatial_observation])

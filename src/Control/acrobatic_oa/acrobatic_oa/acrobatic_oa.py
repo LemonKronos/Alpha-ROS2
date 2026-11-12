@@ -1,15 +1,20 @@
+
+
+
+import threading
+import numpy as np
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import rclpy.clock
 from rclpy.clock import Clock
 
-import numpy as np
-
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
+from acrobatic_oa.training_module import TrainingModule
 from alpha_ai_core.interface import PolicyCore, SpatialEncoder
-from alpha_ai_core.models import spatial_cnn, monolithic
+# from alpha_ai_core.models import spatial_cnn, monolithic
 
 
 # Hack to allow VS Code 'Run' button to see the module before colcon build
@@ -17,7 +22,6 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from acrobatic_oa.world_handling import WorldHandling
 
 class AcrobaticOANode(Node):
     def __init__(self):
@@ -25,6 +29,10 @@ class AcrobaticOANode(Node):
 
         #: Set up to use simulation clock
         Global.setup_for_simulation(self)
+
+        #: Load ROS2 params
+        self.declare_parameter('acrobatic_training', False)
+        self.training = self.get_parameter('acrobatic_training').get_parameter_value().bool_value
         
         #: Subscribers
         self.SUB_spatial = self.create_subscription(
@@ -52,11 +60,22 @@ class AcrobaticOANode(Node):
         self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         #: Data
-        self.policy_core: PolicyCore= monolithic()
-        self.cnn_core = spatial_cnn()
+
         
-        #: Timers
-        self.TIME_inference = self.create_timer(1.0, self.inference_loop)
+        if self.training: #_Branch for training 
+            self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
+            self.trainer = TrainingModule(self)
+
+            threading.Thread(target=self.trainer.training_loop, daemon=True).start()
+        else: #_Branch for running 
+            self.get_logger().info(f"{BLUE} Acrobatic inference mode {RESET}")
+
+            #: Data
+            # self.policy_core: PolicyCore= monolithic()
+            # self.cnn_core = spatial_cnn()
+
+            #: Timers
+            self.TIME_inference = self.create_timer(1.0, self.inference_loop)
 
 
     def spatial_callback(self, msg):
