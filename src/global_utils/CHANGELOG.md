@@ -17,3 +17,4 @@ Update for DA1
 - Remove old VFH setup
 - Added dynamic safe distance function for `Drone`
 - Added Px4 topic
+- Added `TopicStatus` to help check topic lost status.

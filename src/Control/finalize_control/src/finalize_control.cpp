@@ -89,11 +89,12 @@ FinalizeControlNode::FinalizeControlNode() :
     );
 
     //: Load parameters
-    const bool training = this->declare_parameter<bool>("acrobatic_training");
-    if(training) {
+    const bool training = this->declare_parameter<bool>("acrobatic_training", false);
+    if (training) {
         this->control_support = ControlInterface::ACROBATIC_OA;
+    } else {
+        this->control_support = ControlInterface::NONE;
     }
-    else this->control_support = ControlInterface::NONE;
 
     //: Set variables
     last_raw_input_control = nullptr;
@@ -146,16 +147,19 @@ FinalizeControlNode::~FinalizeControlNode() {
 void FinalizeControlNode::RawInputControlCallback(const ControlInterface::SharedPtr msg) {
     lock_guard lock(mutex_raw_input);
     last_raw_input_control = msg;
+    status_raw_input.reset();
 }
 
 void FinalizeControlNode::ReactiveControlCallback(const ControlInterface::SharedPtr msg) {
     lock_guard lock(mutex_reactive);
     last_reactive_control = msg;
+    status_reactive.reset();
 }
 
 void FinalizeControlNode::AcrobaticControlCallback(const NormalizedMotorsServos::SharedPtr msg) {
     lock_guard lock(mutex_acrobatic);
     last_acrobatic_control = msg;
+    status_acrobatic.reset();
 }
 
 void FinalizeControlNode::VehicleStatusCallback(const VehicleStatus::SharedPtr msg) {
@@ -185,21 +189,27 @@ void FinalizeControlNode::NodeLoopCallback() {
     //: Cache data 
     {
         lock_guard lock(mutex_raw_input);
+        status_raw_input.missed();
+        if(status_raw_input.is_lost()) last_raw_input_control = nullptr;
+
         raw_input_control = last_raw_input_control;
     }
-    //TODO handle lost signal here 
 
     {
         lock_guard lock(mutex_reactive);
+        status_reactive.missed();
+        if(status_reactive.is_lost()) last_reactive_control = nullptr;
+
         reactive_control = last_reactive_control;
     }
-    //TODO handle lost signal here 
 
     {
         lock_guard lock(mutex_acrobatic);
+        status_acrobatic.missed();
+        if(status_acrobatic.is_lost()) last_acrobatic_control = nullptr;
+        
         acrobatic_control = last_acrobatic_control;
     }
-    //TODO handle lost signal here 
 
     {
         lock_guard lock(mutex_pose);

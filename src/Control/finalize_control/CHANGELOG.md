@@ -20,3 +20,4 @@ Last ROS2 node to bring signal to PX4
 ## 0.1.3
 - Added subscription to input control topic.
 - Now switch between control signal (raw input, reactive, acrobatic) according to `control_suport`.
+- Added lost control signal check.
