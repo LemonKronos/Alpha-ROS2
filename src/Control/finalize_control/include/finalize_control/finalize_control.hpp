@@ -90,7 +90,7 @@ private:
     float heading_NED;
     float heading_ENU;
 
-    uint8_t control_support = alpha_msgs::msg::ControlInterface::NONE;
+    uint8_t control_support;
 
     enum class OffboardMode {
         POSITION,

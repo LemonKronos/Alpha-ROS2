@@ -144,16 +144,16 @@ main() {
 
   start_gazebo
   start_micro_xrce_agent
-  start_px4_sitl
+  # start_px4_sitl
   # start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
   
   sleep 1
   start_gazebo_gui
-  start_rviz2
+  # start_rviz2
 
-  start_web_control
+  # start_web_control
 
   sleep 1
   echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat

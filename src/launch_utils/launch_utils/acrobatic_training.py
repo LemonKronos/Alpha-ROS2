@@ -23,39 +23,40 @@ def generate_launch_description():
             executable='finalize_control',
             name='finalize_control',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'error'],
+            parameters=[training_params]
         ),
         Node(
             package='fuse_perception',
             executable='fuse_perception',
             name='fuse_perception',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'error']
         ),
          Node(
             package='contact_parser',
             executable='contact_parser',
             name='contact_parser',
             output='screen',
-            arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'error']
         ),
         Node(
             package='gz_ground_truth',
             executable='gz_ground_truth',
             name='gz_ground_truth',
-            arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'error']
         ),
         Node(
             package='px4_emulator',
             executable='px4_emulator',
             name='px4_emulator',
-            arguments=['--ros-args', '--log-level', 'warn']
+            arguments=['--ros-args', '--log-level', 'error']
         ),
-        Node(
-            package='acrobatic_oa',
-            executable='acrobatic_oa',
-            name='acrobatic_oa',
-            # arguments=['--ros-args', '--log-level', 'warn'],
-            parameters=[training_params]
-        )
+        # Node(
+        #     package='acrobatic_oa',
+        #     executable='acrobatic_oa',
+        #     name='acrobatic_oa',
+        #     # arguments=['--ros-args', '--log-level', 'error'],
+        #     parameters=[training_params]
+        # )
     ])

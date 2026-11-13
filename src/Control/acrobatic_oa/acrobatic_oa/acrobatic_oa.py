@@ -1,4 +1,7 @@
-
+# Hack to allow VS Code 'Run' button to see the module before colcon build
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 import threading
@@ -13,14 +16,7 @@ from rclpy.clock import Clock
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
 from acrobatic_oa.training_module import TrainingModule
-from alpha_ai_core.interface import PolicyCore, SpatialEncoder
-# from alpha_ai_core.models import spatial_cnn, monolithic
-
-
-# Hack to allow VS Code 'Run' button to see the module before colcon build
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from alpha_ai_core.interface import FloatArray
 
 
 class AcrobaticOANode(Node):
@@ -31,7 +27,7 @@ class AcrobaticOANode(Node):
         Global.setup_for_simulation(self)
 
         #: Load ROS2 params
-        self.declare_parameter('acrobatic_training', False)
+        self.declare_parameter('acrobatic_training', True)
         self.training = self.get_parameter('acrobatic_training').get_parameter_value().bool_value
         
         #: Subscribers
@@ -89,6 +85,16 @@ class AcrobaticOANode(Node):
     def state_callback(self, msg):
         self.latest_state = msg
 
+    def publish_action(self, action: FloatArray):
+        msg = NormalizedMotorsServos()
+        msg.header.stamp = self.get_clock().now().to_msg()
+
+        msg.motors_control = action[:4].astype(np.float32)
+        msg.servos_control = action[4:].astype(np.float32)
+
+        self.PUB_acrobatic.publish(msg)
+
+        self.get_logger().info(f"Published action {action}",throttle_duration_sec=1)
 
     def inference_loop(self):
         """This is the real/evaluation run"""
@@ -100,16 +106,8 @@ class AcrobaticOANode(Node):
 
         # action in here 8-DIM, all range [-1, 1], specific motor servo clamp get hangled in later node.
         dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0])
+        self.publish_action(dummy_action)
         
-        msg = NormalizedMotorsServos()
-        msg.header.stamp = self.get_clock().now().to_msg()
-
-        msg.motors_control = dummy_action[:4]
-        msg.servos_control = dummy_action[4:]
-
-        self.PUB_acrobatic.publish(msg)
-
-        self.get_logger().info(f"Published action {dummy_action}",throttle_duration_sec=1)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -43,9 +43,10 @@ def generate_launch_description():
             omni_lidar_node
         ],
         ros_arguments=[
-            '--log-level', 'low_spatial:=warn',
-            '--log-level', 'depth_cam:=warn',
-            '--log-level', 'omni_lidar:=warn'
+            '--log-level', 'error',
+            '--log-level', 'low_spatial:=error',
+            '--log-level', 'depth_cam:=error',
+            '--log-level', 'omni_lidar:=error'
         ],
         output='screen',
         # prefix=['gdb -ex run --args'], #: DEBUG

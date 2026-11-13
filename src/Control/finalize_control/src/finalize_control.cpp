@@ -88,6 +88,13 @@ FinalizeControlNode::FinalizeControlNode() :
         control_signal_group
     );
 
+    //: Load parameters
+    const bool training = this->declare_parameter<bool>("acrobatic_training");
+    if(training) {
+        this->control_support = ControlInterface::ACROBATIC_OA;
+    }
+    else this->control_support = ControlInterface::NONE;
+
     //: Set variables
     last_raw_input_control = nullptr;
     raw_input_control = nullptr;
