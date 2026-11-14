@@ -142,7 +142,7 @@ main() {
 
   source "$FAST_DDS_SETUP"
 
-  start_gazebo
+  # start_gazebo
   start_micro_xrce_agent
   # start_px4_sitl
   # start_qgroundcontrol
@@ -150,7 +150,7 @@ main() {
   start_gz_ros_bridge
   
   sleep 1
-  start_gazebo_gui
+  # start_gazebo_gui
   # start_rviz2
 
   # start_web_control

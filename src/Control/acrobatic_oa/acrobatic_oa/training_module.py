@@ -11,7 +11,7 @@ from alpha_ai_core.interface import EpisodeConfiguration, SpawnCondition, Action
 import time
 MAX_LINEAR_SPEED = 50.0   # m/s, total speed
 MAX_ANGULAR_SPEED = 6.0  # rad/s, total rate
-MAX_TILT_ANGLE = 3.14    # rad, angle between body z-axis and world z-axis
+MAX_TILT_ANGLE = 1.57    # rad, angle between body z-axis and world z-axis
 
 def random_vector(rng: np.random.Generator, max_norm: float) -> np.ndarray:
     """Random direction, magnitude uniform in [0, max_norm]. Total norm never exceeds max_norm."""
@@ -46,60 +46,63 @@ class TrainingModule:
     def __init__(self, the_node: Node):
         self.the_node = the_node
         self.gz_environment = GzEnvironment(the_node)
-        self.step_results: list[StepResult] = []
+        self.step_result: StepResult = None
+
 
     def training_loop(self):
         """
-        #: Test
         Repeatedly run reset, then 20 step, try to populate the 
         """
-        # rng = np.random.default_rng()
+        # : Test train loop
+        rng = np.random.default_rng()
+        while True:
+            spawn = random_spawn_condition(rng, position=[0.0, 0.0, 3.0])
+            ep_conf = EpisodeConfiguration(
+                task=TaskType.HOVER,
+                seed=9,
+                spawn=spawn,
+                condition_index=0,
+                repeat_index=0,
+                episode_index=0
+            )
+            #: Reset
+            self.step_result = self.gz_environment.reset(episode_config=ep_conf)
+            self.the_node.get_logger().info(f"{self.step_result}")
+
+            #: Step
+            counter = 0.0
+            flip = -1
+            for _ in range(0, 30):
+                if flip > 0 and counter >= 1.0:
+                    flip = -1
+                elif flip < 0 and counter <= -1.0:
+                    flip = 1
+
+                counter += 0.1 * flip
+                dummy_actions = np.array([counter, counter, counter, counter, counter, counter, -counter, -counter])
+
+                self.step_result = self.gz_environment.step(Action(values=dummy_actions))
+                self.the_node.get_logger().info(f"{self.step_result}")
+                time.sleep(1)
+
+            time.sleep(2)
+
+        # #: Test contact
         # while True:
-        #     spawn = random_spawn_condition(rng, position=[0.0, 0.0, 3.0])
-        #     ep_conf = EpisodeConfiguration(
-        #         task=TaskType.HOVER,
-        #         seed=0,
-        #         spawn=spawn,
-        #         condition_index=0,
-        #         repeat_index=0,
-        #         episode_index=0
-        #     )
-        #     #: Reset
-        #     # self.step_results.append(self.gz_environment.reset(episode_config=ep_conf))
-        #     self.gz_environment.reset(episode_config=ep_conf)
-
-        #     #: Step
-        #     counter = 0.0
-        #     flip = 1
-        #     for _ in range(0, 10):
-        #         if flip > 0 and counter >= 1.0:
-        #             flip = -1
-        #         elif flip < 0 and counter <= -1.0:
-        #             flip = 1
-
-        #         counter += 0.005 * flip
-        #         arr = np.array([counter, counter, counter, counter, counter, counter, counter, counter])
-
-        #         # self.step_results.append(self.gz_environment.step(dummy_action))
-        #         self.gz_environment.step(Action(values=arr))
-        #         time.sleep(1)
-
+        #     self.gz_environment.world_handling.reset_all(0)
+        #     self.gz_environment.world_handling.play()
+        #     time.sleep(1)
+        #     self.gz_environment.world_handling.spawn_drone(0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 0.0)
+        #     time.sleep(3)
+        #     self.gz_environment.world_handling.reset_all(0)
+        #     self.gz_environment.world_handling.play()
+        #     time.sleep(1)
+        #     self.gz_environment.world_handling.spawn_drone(3.0, 3.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+        #     self.gz_environment.world_handling.play()
         #     time.sleep(3)
 
-        #: Steps
-        counter = 0.0
-        flip = 1
-        while True:
-            if flip > 0 and counter >= 1.0:
-                flip = -1
-            elif flip < 0 and counter <= -1.0:
-                flip = 1
+        
 
-            counter += 0.005 * flip
-            arr = np.array([counter, counter, counter, counter, counter, counter, counter, counter])
 
-            # self.step_results.append(self.gz_environment.step(dummy_action))
-            self.gz_environment.step(Action(values=arr))
-            time.sleep(1)
             
     

@@ -58,6 +58,8 @@ class Topic:
 
     LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
 
+    CONTACT_PARSER = "/internal/sensor/contacts"
+
     SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
 
     WORLD_STATS = "/world/stats"
@@ -104,6 +106,10 @@ class Sensor:
 class Physics:
     STEP_SIZE = 0.001
     ONE_STEP_FAST = Clock.LOOP_CYCLE_FAST / STEP_SIZE
+
+    class Drone:
+        REF_ANGULAR_VELOCITY = 10.0 # rad/s
+        REF_LINEAR_VELOCITY = 30.0  # m/s
 
 
 #_                                   DYNAMIC NAME

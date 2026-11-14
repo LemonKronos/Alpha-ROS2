@@ -112,9 +112,6 @@ class WorldHandling:
 
     def ground_truth_callback(self, msg: Odometry):
         self.lastest_ground_truth = msg
-        
-    def get_statistics(self) -> WorldStatistics:
-        return self.lastest_stats
 
     def _blocking_service_call(self, client, req, desc: str, timeout: float = None):
         """
@@ -228,7 +225,7 @@ class WorldHandling:
         return ok
 
     def spawn_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float) -> bool:
-        """warning: respawn drone a second time will crash Gazebo"""
+        """warning: respawn drone a second time without reset world will crash Gazebo"""
         req_spawn = SpawnEntity.Request()
         req_spawn.entity_factory.name = self.drone_id
         req_spawn.entity_factory.sdf_filename = self.drone_sdf_path
@@ -242,6 +239,18 @@ class WorldHandling:
         if ok:
             self.the_node.get_logger().info(f"{PINK} Spawn the drone {RESET}")
         return ok
+
+    def delete_drone(self) -> bool:
+        """Remove the drone model. Returns False (with a warning) if there was nothing to delete."""
+        delete_request = DeleteEntity.Request()
+        delete_request.entity.name = self.drone_id
+        delete_request.entity.type = delete_request.entity.MODEL
+
+        response = self._blocking_service_call(self.SRV_delete, delete_request, "delete drone")
+        delete_succeeded = bool(response and response.success)
+        if delete_succeeded:
+            self.the_node.get_logger().info(f"{PINK} Deleted the drone {RESET}")
+        return delete_succeeded
 
     def teleport_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float) -> bool:
         req_pose = SetEntityPose.Request()

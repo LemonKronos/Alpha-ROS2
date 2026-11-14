@@ -56,7 +56,9 @@ class AcrobaticOANode(Node):
         self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         #: Data
-
+        self.latest_intent = None
+        self.latest_state = None
+        self.latest_spatial = None
         
         if self.training: #_Branch for training 
             self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
