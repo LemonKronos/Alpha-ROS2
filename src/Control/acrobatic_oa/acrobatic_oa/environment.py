@@ -120,19 +120,16 @@ class GzEnvironment:
                 torque = (inertia @ angular_velocity) / Physics.STEP_SIZE
                 self.world_handling.set_drone_wrench(*force, *torque)
 
-                #DEV test play
-                # self.world_handling.play()
-
             case _:
-                #TODO
-                pass
+                #TODO later 
+                raise Exception(f"Task has not been implemented yet")
 
         #: Difficulty handling
-        #TODO
+        #TODO later 
 
-        #? Step to get the first observation, this mean that the total time have to minus the first step. It OK because after step the Observation and Ground Truth does sync?
-        self.world_handling.step(10)
-        time.sleep(0.5)
+        #! Step to get the first observation, this mean that the total time have to minus the first step. It OK because after step the Observation and Ground Truth does sync up 
+        self.world_handling.step()
+        time.sleep(0.01) #TODO replace with a "_wait_ready" with realtime 
 
         #: Return
         return self._collect_step_result()
@@ -145,7 +142,7 @@ class GzEnvironment:
         self.world_handling.step()
 
         #: Wait for step completion
-        #TODO look into self.world_handling.lastest_stats to check
+        #TODO look into self.world_handling.lastest_stats to check 
 
         #: Return
         return self._collect_step_result()

@@ -7,7 +7,6 @@ from acrobatic_oa.environment import GzEnvironment
 
 from alpha_ai_core.interface import EpisodeConfiguration, SpawnCondition, Action, StepResult, TaskType
 
-#DEV test stuff 
 import time
 MAX_LINEAR_SPEED = 50.0   # m/s, total speed
 MAX_ANGULAR_SPEED = 6.0  # rad/s, total rate
@@ -54,6 +53,7 @@ class TrainingModule:
         Repeatedly run reset, then 20 step, try to populate the 
         """
         # : Test train loop
+        time.sleep(1)
         rng = np.random.default_rng()
         while True:
             spawn = random_spawn_condition(rng, position=[0.0, 0.0, 3.0])
@@ -83,23 +83,10 @@ class TrainingModule:
 
                 self.step_result = self.gz_environment.step(Action(values=dummy_actions))
                 self.the_node.get_logger().info(f"{self.step_result}")
-                time.sleep(1)
+                # time.sleep(1)
 
-            time.sleep(2)
+            # time.sleep(2)
 
-        # #: Test contact
-        # while True:
-        #     self.gz_environment.world_handling.reset_all(0)
-        #     self.gz_environment.world_handling.play()
-        #     time.sleep(1)
-        #     self.gz_environment.world_handling.spawn_drone(0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 0.0)
-        #     time.sleep(3)
-        #     self.gz_environment.world_handling.reset_all(0)
-        #     self.gz_environment.world_handling.play()
-        #     time.sleep(1)
-        #     self.gz_environment.world_handling.spawn_drone(3.0, 3.0, 1.0, 1.0, 0.0, 0.0, 0.0)
-        #     self.gz_environment.world_handling.play()
-        #     time.sleep(3)
 
         
 
