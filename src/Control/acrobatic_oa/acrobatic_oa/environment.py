@@ -129,7 +129,7 @@ class GzEnvironment:
 
         #! Step to get the first observation, this mean that the total time have to minus the first step. It OK because after step the Observation and Ground Truth does sync up 
         self.world_handling.step()
-        time.sleep(0.01) #TODO replace with a "_wait_ready" with realtime 
+        time.sleep(0.05) #TODO replace with a "_wait_ready" with realtime 
 
         #: Return
         return self._collect_step_result()

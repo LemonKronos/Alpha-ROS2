@@ -1,4 +1,6 @@
-
+"""
+A toy trainner to test pipeline behavior without the need of AI core.
+"""
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -41,7 +43,7 @@ def random_spawn_condition(rng: np.random.Generator, position) -> SpawnCondition
         roll_pitch_yaw=random_spawn_attitude(rng, MAX_TILT_ANGLE),
     )
 
-class TrainingModule:
+class ToyTrainer:
     def __init__(self, the_node: Node):
         self.the_node = the_node
         self.gz_environment = GzEnvironment(the_node)
@@ -50,7 +52,7 @@ class TrainingModule:
 
     def training_loop(self):
         """
-        Repeatedly run reset, then 20 step, try to populate the 
+        Repeatedly run reset, then 30 step while collection StepResult.
         """
         # : Test train loop
         time.sleep(1)

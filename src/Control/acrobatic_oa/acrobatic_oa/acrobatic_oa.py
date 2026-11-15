@@ -15,7 +15,7 @@ from rclpy.clock import Clock
 
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
-from acrobatic_oa.training_module import TrainingModule
+from acrobatic_oa.toy_trainer import ToyTrainer
 from alpha_ai_core.interface import FloatArray
 
 
@@ -62,7 +62,7 @@ class AcrobaticOANode(Node):
         
         if self.training: #_Branch for training 
             self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
-            self.trainer = TrainingModule(self)
+            self.trainer = ToyTrainer(self)
 
             threading.Thread(target=self.trainer.training_loop, daemon=True).start()
         else: #_Branch for running 
