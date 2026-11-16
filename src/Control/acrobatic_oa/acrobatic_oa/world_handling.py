@@ -1,8 +1,19 @@
 """
 Handle simulation world related task: pause/play/step/reset, drone teleportation and goal points, obstacle generation.
+
+All service calls are blocking: they wait for the ACK (or a wall-clock timeout) before returning.
+They must be called from a thread other than the one spinning the node (e.g. the training thread).
+
+Note: a service ACK from Gazebo only means "request accepted/queued", not "applied".
+reset_all() therefore additionally waits until the reset is observed in WorldStatistics
+(sim time back to ~0) before returning.
 """
+import threading
+
 from rclpy.node import Node
-from rclpy.qos import qos_profile_system_default
+
+import numpy as np
+from scipy.spatial.transform import Rotation
 
 from ros_gz_interfaces.msg import (
     WorldStatistics,
@@ -19,9 +30,10 @@ from geometry_msgs.msg import (
     Quaternion,
     Pose
 )
-from px4_msgs.msg import VehicleCommand
 
 from python_utils.utils import *
+
+
 
 class WorldHandling:
     def __init__(self, the_node: Node):
@@ -58,12 +70,6 @@ class WorldHandling:
         )
 
         #: Publishers
-        self.PUB_vehicle_cmd = self.the_node.create_publisher(
-            VehicleCommand,
-            Topic.PX4.VEHICLE_COMMAND,
-            qos_profile_system_default
-        )
-
         self.PUB_world_wrench = self.the_node.create_publisher(
             EntityWrench,
             Topic.WORLD_WRENCH,
@@ -78,39 +84,135 @@ class WorldHandling:
         #TODO sync this with training module config 
         self.GOAL_RADIUS = 0.5
 
+        self.SERVICE_TIMEOUT = 5.0 # Blocking service call timeout, in WALL-CLOCK seconds
+
         self.lastest_stats: WorldStatistics = None
+
+        # Used to wait for a fresh WorldStatistics message (e.g. to confirm a reset was applied)
+        self._stats_cond = threading.Condition()
+        self._stats_count = 0
+
         self.spawned_entities = [] # Track for clean up
 
-    def play(self):
+    def stats_callback(self, msg: WorldStatistics):
+        with self._stats_cond:
+            self.lastest_stats = msg
+            self._stats_count += 1
+            self._stats_cond.notify_all()
+
+    def _blocking_service_call(self, client, req, desc: str, timeout: float = None):
+        """
+        Blocking service call. Sends the request, then blocks the calling thread until the
+        response arrives or the timeout expires.
+
+        Returns the response, or None on service unavailable / timeout / exception.
+        The node must be spinning in another thread to deliver the response.
+        """
+        timeout = self.SERVICE_TIMEOUT if timeout is None else timeout
+        logger = self.the_node.get_logger()
+
+        if not client.wait_for_service(timeout_sec=timeout):
+            logger.error(f"{desc}: service not available after {timeout}s")
+            return None
+
+        done = threading.Event()
+        future = client.call_async(req)
+        future.add_done_callback(lambda _: done.set())
+
+        if not done.wait(timeout):
+            future.cancel()
+            # Avoid leaking the pending request (available in recent rclpy versions)
+            remove = getattr(client, "remove_pending_request", None)
+            if remove is not None:
+                remove(future)
+            logger.error(f"{desc}: no ACK within {timeout}s")
+            return None
+
+        if future.exception() is not None:
+            logger.error(f"{desc}: service call failed: {future.exception()}")
+            return None
+
+        res = future.result()
+        if hasattr(res, "success") and not res.success:
+            logger.warn(f"{desc}: service replied success=False")
+        return res
+
+    def _wait_reset_applied(self, timeout: float = None, sim_time_eps: float = 0.01) -> bool:
+        """
+        Block until a WorldStatistics message shows sim time back at ~0, i.e. the queued
+        reset has actually been executed by Gazebo. Wall-clock timeout.
+        Requires at least 2 new stats messages after the call, to avoid matching a stale
+        message published before the reset ran (e.g. when sim time was already 0).
+
+        NOTE: assumes WorldStatistics.sim_time is builtin_interfaces/Time.
+        Check with: ros2 interface show ros_gz_interfaces/msg/WorldStatistics
+        """
+        timeout = self.SERVICE_TIMEOUT if timeout is None else timeout
+
+        with self._stats_cond:
+            start = self._stats_count
+
+            def applied():
+                s = self.lastest_stats
+                if s is None or self._stats_count < start + 2:
+                    return False
+                t = s.sim_time.sec + s.sim_time.nanosec * 1e-9
+                return t < sim_time_eps
+
+            ok = self._stats_cond.wait_for(applied, timeout)
+
+        if not ok:
+            self.the_node.get_logger().error(f"reset: sim time did not return to 0 within {timeout}s")
+        return ok
+
+    def play(self) -> bool:
         req = ControlWorld.Request()
         req.world_control.pause = False
-        self.SRV_control_world.call_async(req)
-        self.the_node.get_logger().info(f"{GREEN} Play simulation {RESET}")
+        res = self._blocking_service_call(self.SRV_control_world, req, "play")
+        ok = bool(res and res.success)
+        if ok:
+            self.the_node.get_logger().info(f"{GREEN} Play simulation {RESET}")
+        return ok
 
-    def pause(self):
+    def pause(self) -> bool:
         req = ControlWorld.Request()
         req.world_control.pause = True
-        self.SRV_control_world.call_async(req)
-        self.the_node.get_logger().info(f"{YELLOW} Pause simulation {RESET}")
+        res = self._blocking_service_call(self.SRV_control_world, req, "pause")
+        ok = bool(res and res.success)
+        if ok:
+            self.the_node.get_logger().info(f"{YELLOW} Pause simulation {RESET}")
+        return ok
 
-    def step(self, step: int = Physics.ONE_STEP_FAST):
+    def step(self, step: int = Physics.ONE_STEP_FAST) -> bool:
+        """
+        Step forward, default value is one cycle fast at 100 Hz
+        """
         req = ControlWorld.Request()
         req.world_control.pause = True
         req.world_control.step = True
-        req.world_control.multi_step = step
-        self.SRV_control_world.call_async(req)
-        self.the_node.get_logger().info(f"{GREEN} Forward {step} step {RESET}")
+        req.world_control.multi_step = int(step)
+        res = self._blocking_service_call(self.SRV_control_world, req, f"step x{step}")
+        ok = bool(res and res.success)
+        if ok:
+            self.the_node.get_logger().info(f"{GREEN} Forward {step} step {RESET}")
+        return ok
 
-    def reset_time(self, seed: int): #BUG 
+    def reset_all(self, seed: int) -> bool:
         req = ControlWorld.Request()
-        req.world_control.seed = seed
-        req.world_control.reset.time_only = True
+        req.world_control.seed = int(seed)
+        req.world_control.reset.all = True
         req.world_control.pause = True
-        self.SRV_control_world.call_async(req)
-        self.the_node.get_logger().info(f"{YELLOW} Reset simulation time {RESET}")
+        res = self._blocking_service_call(self.SRV_control_world, req, "reset")
+        if not (res and res.success):
+            return False
+        # The ACK only means the reset was queued; wait until it is actually applied.
+        ok = self._wait_reset_applied()
+        if ok:
+            self.the_node.get_logger().info(f"{YELLOW} Reset simulation {RESET}")
+        return ok
 
-    def spawn_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float):
-        """warning: respawn drone a second time will crash Gazebo"""
+    def spawn_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float) -> bool:
+        """warning: respawn drone a second time without reset world will crash Gazebo"""
         req_spawn = SpawnEntity.Request()
         req_spawn.entity_factory.name = self.drone_id
         req_spawn.entity_factory.sdf_filename = self.drone_sdf_path
@@ -119,10 +221,25 @@ class WorldHandling:
         pose.orientation = Quaternion(w=qw, x=qx, y=qy, z=qz)
         req_spawn.entity_factory.pose = pose
         
-        self.SRV_spawn.call_async(req_spawn)
-        self.the_node.get_logger().info(f"{PINK} Spawn the drone {RESET}")
+        res = self._blocking_service_call(self.SRV_spawn, req_spawn, "spawn drone")
+        ok = bool(res and res.success)
+        if ok:
+            self.the_node.get_logger().info(f"{PINK} Spawn the drone {RESET}")
+        return ok
 
-    def teleport_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float):
+    def delete_drone(self) -> bool:
+        """Remove the drone model. Returns False (with a warning) if there was nothing to delete."""
+        delete_request = DeleteEntity.Request()
+        delete_request.entity.name = self.drone_id
+        delete_request.entity.type = delete_request.entity.MODEL
+
+        response = self._blocking_service_call(self.SRV_delete, delete_request, "delete drone")
+        delete_succeeded = bool(response and response.success)
+        if delete_succeeded:
+            self.the_node.get_logger().info(f"{PINK} Deleted the drone {RESET}")
+        return delete_succeeded
+
+    def teleport_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float) -> bool:
         req_pose = SetEntityPose.Request()
         req_pose.entity.name = self.drone_id
         req_pose.entity.type = req_pose.entity.MODEL
@@ -132,36 +249,15 @@ class WorldHandling:
         pose.orientation = Quaternion(w=qw, x=qx, y=qy, z=qz)
         req_pose.pose = pose
         
-        self.SRV_set_pose.call_async(req_pose)
-
-        self.the_node.get_logger().info(
-            f"{TEAL} Teleported drone to "
-            f"xyz= ({x},{y},{z}), "
-            f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
-        )
-
-    def reset_px4_ekf(self): #BUG 
-        msg = VehicleCommand()
-        """
-        uint16 VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN = 246 # Request the reboot or shutdown of system components. |0: Do nothing for autopilot, 1: Reboot autopilot, 2: Shutdown autopilot.|0: Do nothing for onboard computer, 1: Reboot onboard computer, 2: Shutdown onboard computer.|Unused|Unused|Unused|Unused|Unused|
-        """
-        msg.command = VehicleCommand.VEHICLE_CMD_PREFLIGHT_REBOOT_SHUTDOWN
-        msg.param1 = 1.0
-        msg.param2 = 0.0
-    
-        # Target the main system (usually 1 for SITL)
-        msg.target_system = 1
-        msg.target_component = 1
-        msg.source_system = 1
-        msg.source_component = 1
-        msg.from_external = True
-        msg.timestamp = int(self.the_node.get_clock().now().nanoseconds / 1000)
-
-        self.PUB_vehicle_cmd.publish(msg)
-
-        self.the_node.get_logger().info(
-            f"{PINK} Sended reset PX4 EKF cmd {RESET}"
-        )
+        res = self._blocking_service_call(self.SRV_set_pose, req_pose, "teleport drone")
+        ok = bool(res and res.success)
+        if ok:
+            self.the_node.get_logger().info(
+                f"{TEAL} Teleported drone to "
+                f"xyz= ({x},{y},{z}), "
+                f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
+            )
+        return ok
 
     def set_drone_wrench(self, force_x: float, force_y: float, force_z: float, torque_x: float, torque_y: float, torque_z: float):
         msg = EntityWrench()
@@ -181,21 +277,23 @@ class WorldHandling:
 
         self.PUB_world_wrench.publish(msg)
 
-
-    def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose):
+    def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose) -> bool:
         req = SpawnEntity.Request()
         req.entity_factory.name = name
         req.entity_factory.sdf = sdf
         req.entity_factory.pose = pose
-        self.SRV_spawn.call_async(req)
-        self.spawned_entities.append(name)
+        res = self._blocking_service_call(self.SRV_spawn, req, f"spawn {name}")
+        ok = bool(res and res.success)
+        if ok:
+            self.spawned_entities.append(name)  # only track what actually spawned
+        return ok
 
     def clear_spawned_entities(self):
         for entity_name in self.spawned_entities:
             req = DeleteEntity.Request()
             req.entity.name = entity_name
             req.entity.type = req.entity.MODEL
-            self.SRV_delete.call_async(req)
+            self._blocking_service_call(self.SRV_delete, req, f"delete {entity_name}")
         self.spawned_entities.clear()
 
     def show_goals(self, goal_list: list[Pose]):
@@ -272,9 +370,3 @@ class WorldHandling:
             </sdf>
             """
             self.spawn_entity_from_sdf(name, sdf, pose)
-
-    def stats_callback(self, msg: WorldStatistics):
-        self.lastest_stats = msg
-
-    def get_statistics(self) -> WorldStatistics:
-        return self.lastest_stats

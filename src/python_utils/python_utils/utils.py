@@ -6,6 +6,7 @@ import os
 import math
 from rclpy.parameter import Parameter
 from collections.abc import Callable
+import numpy as np
 
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -57,10 +58,14 @@ class Topic:
 
     LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
 
+    CONTACT_PARSER = "/internal/sensor/contacts"
+
     SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
 
     WORLD_STATS = "/world/stats"
     WORLD_WRENCH = "/world/wrench"
+
+    DRONE_ODOMETRY = "/drone/odometry"
     
     class PX4:
         VEHICLE_COMMAND = "/fmu/in/vehicle_command"
@@ -76,6 +81,8 @@ class Drone:
     WIDTH = 2.15
     LENGTH = 0.93
     HEIGHT = 0.31
+    MASS = 5.12000002
+    INERTIA = np.diag([0.53, 0.39, 0.87])
 
     SPEED_MAX_FORWARD = 10.0
     SPEED_MAX_BACKWARD = 6.0
@@ -99,6 +106,10 @@ class Sensor:
 class Physics:
     STEP_SIZE = 0.001
     ONE_STEP_FAST = Clock.LOOP_CYCLE_FAST / STEP_SIZE
+
+    class Drone:
+        REF_ANGULAR_VELOCITY = 10.0 # rad/s
+        REF_LINEAR_VELOCITY = 30.0  # m/s
 
 
 #_                                   DYNAMIC NAME

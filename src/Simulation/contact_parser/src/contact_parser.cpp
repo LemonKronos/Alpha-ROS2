@@ -41,7 +41,7 @@ ContactParserNode::ContactParserNode() : rclcpp::Node("contact_parser") {
 
     // Create wall timer
     Contact_pub_TIME = this->create_timer(
-        std::chrono::nanoseconds(PUBLISH_CYCLE),
+        std::chrono::nanoseconds(Clock::LOOP_CYCLE_FAST_NANOSEC),
         std::bind(&ContactParserNode::PublisherCallback, this)
     );
 
@@ -56,12 +56,14 @@ ContactParserNode::~ContactParserNode() {
 
 }
 
-void ContactParserNode::BodyCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr) {
-    bearable = true;
+void ContactParserNode::BodyCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr msg) {
+    if(!msg->contacts.empty()) bearable = true;
+    else bearable = false;
 }
 
-void ContactParserNode::RotorCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr) {
-    critical = true;
+void ContactParserNode::RotorCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr msg) {
+    if(!msg->contacts.empty()) critical = true;
+    else critical = false;
 }
 
 void ContactParserNode::PublisherCallback() {
@@ -84,6 +86,4 @@ void ContactParserNode::PublisherCallback() {
         last_bearable = current_bearable;
         last_critical = current_critical;
     }
-    bearable = false;
-    critical = false;
 }

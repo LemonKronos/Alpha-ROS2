@@ -16,9 +16,7 @@
     },
     "python.terminal.activateEnvironment": false,
     "python.terminal.shellIntegration.enabled": false,
-    "terminal.integrated.inheritEnv": true,
-    "terminal.integrated.shellIntegration.enabled": false,
-    "terminal.integrated.env.linux": {},
+    "python.experiments.optOutFrom": ["pythonTerminalEnvVarActivation"],
     "python.defaultInterpreterPath": "${workspaceFolder}/pyvenv/bin/python",
     "python.autoComplete.extraPaths": [
         "/opt/ros/jazzy/lib/python3.12/site-packages"
@@ -26,7 +24,7 @@
     "python.analysis.extraPaths": [
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
-    // "python.envFile": "${workspaceFolder}/.env",
+    "python.envFile": "${workspaceFolder}/.env",
     "ROS2.distro": "jazzy",
     "C_Cpp.files.exclude": {
         "**/build/**": true,
@@ -43,4 +41,9 @@
         "**/log/**": true
     },
     "cmake.ignoreCMakeListsMissing": true,
+    "python-envs.workspaceSearchPaths": [
+        ".venv",
+        "*/.venv",
+        "pyvenv"
+    ],
 }

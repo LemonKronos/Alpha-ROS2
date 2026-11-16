@@ -9,8 +9,6 @@
 
 using std::placeholders::_1;
 
-constexpr uint64_t PUBLISH_CYCLE = 1e8;
-
 class ContactParserNode : public rclcpp::Node {
 public:
     ContactParserNode();
@@ -36,8 +34,8 @@ private:
     rclcpp::TimerBase::SharedPtr Contact_pub_TIME;
 
     // Callbacks
-    void BodyCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr);
-    void RotorCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr);
+    void BodyCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr msg);
+    void RotorCallback(const ros_gz_interfaces::msg::Contacts::SharedPtr msg);
     void PublisherCallback();
 
 };

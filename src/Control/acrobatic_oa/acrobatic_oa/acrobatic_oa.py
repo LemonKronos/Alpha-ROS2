@@ -1,26 +1,23 @@
+# Hack to allow VS Code 'Run' button to see the module before colcon build
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
+import threading
+import numpy as np
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import rclpy.clock
 from rclpy.clock import Clock
 
-import numpy as np
-
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
+from acrobatic_oa.toy_trainer import ToyTrainer
+from alpha_ai_core.interface import FloatArray
 
-from geometry_msgs.msg import (
-    Point,
-    Quaternion,
-    Pose
-)
-
-# Hack to allow VS Code 'Run' button to see the module before colcon build
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from acrobatic_oa.world_handling import WorldHandling
 
 class AcrobaticOANode(Node):
     def __init__(self):
@@ -28,81 +25,55 @@ class AcrobaticOANode(Node):
 
         #: Set up to use simulation clock
         Global.setup_for_simulation(self)
-        
-        #: Subscribers
-        self.SUB_spatial = self.create_subscription(
-            SpatialObservation,
-            Topic.SPATIAL_OBSERVATION,
-            self.spatial_callback,
-            qos_profile_sensor_data
-        )
 
-        self.SUB_intent = self.create_subscription(
-            ControlInterface,
-            Topic.CONTROL_INPUT,
-            self.intent_callback,
-            qos_profile_sensor_data
-        )
-
-        self.SUB_state = self.create_subscription(
-            FusePerception,
-            Topic.FUSE_PERCEPTION,
-            self.state_callback,
-            qos_profile_sensor_data
-        )
+        #: Load ROS2 params
+        self.declare_parameter('acrobatic_training', True)
+        self.training = self.get_parameter('acrobatic_training').get_parameter_value().bool_value
 
         #: Publishers
         self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
 
         #: Data
-        self.world_handling = WorldHandling(self)
-        self.counter = 0.0
-        self.flip = 1
+        self.latest_intent = None
+        self.latest_state = None
+        self.latest_spatial = None
         
-        #: Timers
-        # self.TIME_inference = self.create_timer(Clock.LOOP_CYCLE_FAST, self.inference_loop)
+        if self.training: #_Branch for training 
+            self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
+            self.trainer = ToyTrainer(self)
 
-        #: Test _______________________________________________________
+            threading.Thread(target=self.trainer.training_loop, daemon=True).start()
+        else: #_Branch for running 
+            self.get_logger().info(f"{BLUE} Acrobatic inference mode {RESET}")
 
-        time.sleep(1.0)
+            #: Subscribers
+            self.SUB_spatial = self.create_subscription(
+                SpatialObservation,
+                Topic.SPATIAL_OBSERVATION,
+                self.spatial_callback,
+                qos_profile_sensor_data
+            )
+    
+            self.SUB_intent = self.create_subscription(
+                ControlInterface,
+                Topic.CONTROL_INPUT,
+                self.intent_callback,
+                qos_profile_sensor_data
+            )
+    
+            self.SUB_state = self.create_subscription(
+                FusePerception,
+                Topic.FUSE_PERCEPTION,
+                self.state_callback,
+                qos_profile_sensor_data
+            )
+            
+            #: Data
+            # self.policy_core: PolicyCore= monolithic()
+            # self.cnn_core = spatial_cnn()
 
-        # self.world_handling.pause()
-
-        # self.world_handling.spawn_drone(
-        #     10.0, -10.0, 1.0,
-        #     1.0, 0.0, 0.0, 0.0
-        # )
-
-        # time.sleep(1.0)
-
-        self.world_handling.teleport_drone(
-            0.0, 0.0, 0.25,
-            1.0, 0.0, 0.0, 0.0
-        )
-
-        # self.world_handling.set_drone_wrench(
-        #     100000.0, 65546.0, 65604.0,
-        #     1.0, 2.0, 3.0
-        # )
-
-        # time.sleep(1.0)
-
-        # self.world_handling.set_drone_wrench(
-        #     -100000.0, 0.0, 0.0,
-        #     0.0, 0.0, 0.0
-        # )
-
-        # self.world_handling.play()
-
-        # time.sleep(3.0)
-
-        # self.world_handling.reset_px4_ekf()
-
-        # time.sleep(2.0)
-
-        # self.world_handling.reset_px4_ekf()
-
-        self.get_logger().info("Acrobatic node init completed")
+            #: Timers
+            self.TIME_inference = self.create_timer(1.0, self.inference_loop)
 
 
     def spatial_callback(self, msg):
@@ -116,38 +87,29 @@ class AcrobaticOANode(Node):
     def state_callback(self, msg):
         self.latest_state = msg
 
-
-    def inference_loop(self):
-        #: Lost input check
-        #TODO 
-
-        #: Inference
-        # TODO Import and call AI core module 
-        # Example: 
-        # action = my_ai_core.infer(
-        #     self.latest_spatial,  
-        #     self.latest_state, 
-        #     self.latest_intent
-        # )
-
-        if self.flip > 0 and self.counter >= 1.0:
-            self.flip = -1
-        elif self.flip < 0 and self.counter <= -1.0:
-            self.flip = 1
-
-        self.counter += 0.005 * self.flip;
-
-        dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, self.counter])
-        
+    def publish_action(self, action: FloatArray):
         msg = NormalizedMotorsServos()
         msg.header.stamp = self.get_clock().now().to_msg()
 
-        msg.motors_control = dummy_action[:4]
-        msg.servos_control = dummy_action[4:]
+        msg.motors_control = action[:4].astype(np.float32)
+        msg.servos_control = action[4:].astype(np.float32)
 
         self.PUB_acrobatic.publish(msg)
 
-        self.get_logger().info(f"Published action {dummy_action}",throttle_duration_sec=1)
+        self.get_logger().info(f"Published action {action}",throttle_duration_sec=1)
+
+    def inference_loop(self):
+        """This is the real/evaluation run"""
+        # glob input the self.latest_spatial to np
+        # self.cnn_core.encode(the spatial)
+
+        # convert the itent and state
+        # action, _, _ = self.policy_core.act(...) Normalize the action in the AI core code
+
+        # action in here 8-DIM, all range [-1, 1], specific motor servo clamp get hangled in later node.
+        dummy_action = np.array([0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0])
+        self.publish_action(dummy_action)
+        
 
 def main(args=None):
     rclpy.init(args=args)

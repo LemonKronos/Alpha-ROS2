@@ -68,9 +68,6 @@ start_px4_sitl() {
   kitty --title "PX4 Autopilot" env TERMINAL_TAG=PX4 zsh -c "$(cat <<EOF
 cd ~/MyCode/Project/Drone/PX4-Autopilot &&
 
-mkdir -p build/px4_sitl_default/rootfs/fs/microsd/etc &&
-echo "param set UXRCE_DDS_SYNCT 0" > build/px4_sitl_default/rootfs/fs/microsd/etc/extras.txt &&
-
 MAV_0_CONFIG=0 \\
 PX4_GZ_STANDALONE=1 \\
 PX4_GZ_WORLD="$WORLD_NAME" \\
@@ -143,16 +140,16 @@ main() {
 
   start_gazebo
   start_micro_xrce_agent
-  start_px4_sitl
+  # start_px4_sitl
   # start_qgroundcontrol
   start_ros2_terminal
   start_gz_ros_bridge
   
   sleep 1
   start_gazebo_gui
-  start_rviz2
+  # start_rviz2
 
-  start_web_control
+  # start_web_control
 
   sleep 1
   echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat

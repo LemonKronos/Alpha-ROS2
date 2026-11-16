@@ -16,6 +16,7 @@
 #include "px4_msgs/msg/actuator_servos.hpp"
 
 #include "global_utils/utils.hpp"
+#include "global_utils/utils/pipeline.hpp"
 #include "global_utils/system_config.hpp"
 #include "alpha_msgs/msg/control_interface.hpp"
 #include "alpha_msgs/msg/normalized_motors_servos.hpp"
@@ -59,14 +60,17 @@ private:
     std::mutex mutex_raw_input;
     alpha_msgs::msg::ControlInterface::SharedPtr last_raw_input_control;
     alpha_msgs::msg::ControlInterface::SharedPtr raw_input_control;
+    TopicStatus status_raw_input = TopicStatus(Threshold::ALLOW_MISSED_FAST_TOPIC);
 
     std::mutex mutex_reactive;
     alpha_msgs::msg::ControlInterface::SharedPtr last_reactive_control;
     alpha_msgs::msg::ControlInterface::SharedPtr reactive_control;
+    TopicStatus status_reactive = TopicStatus(Threshold::ALLOW_MISSED_FAST_TOPIC);
 
     std::mutex mutex_acrobatic;
     alpha_msgs::msg::NormalizedMotorsServos::SharedPtr last_acrobatic_control;
     alpha_msgs::msg::NormalizedMotorsServos::SharedPtr acrobatic_control;
+    TopicStatus status_acrobatic = TopicStatus(Threshold::ALLOW_MISSED_FAST_TOPIC);
 
     //: Variables
     alpha_msgs::msg::ControlInterface::SharedPtr final_control;
@@ -90,7 +94,7 @@ private:
     float heading_NED;
     float heading_ENU;
 
-    uint8_t control_support = alpha_msgs::msg::ControlInterface::NONE;
+    uint8_t control_support;
 
     enum class OffboardMode {
         POSITION,

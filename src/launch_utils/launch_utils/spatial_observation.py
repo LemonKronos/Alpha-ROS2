@@ -31,7 +31,7 @@ def generate_launch_description():
         name='omni_lidar'
     )
 
-    spatial_container = ComposableNodeContainer(
+    spatial_observation = ComposableNodeContainer(
         name='spatial_container',
         namespace='spatial',
         package='rclcpp_components',
@@ -43,12 +43,13 @@ def generate_launch_description():
             omni_lidar_node
         ],
         ros_arguments=[
-            '--log-level', 'low_spatial:=warn',
-            '--log-level', 'depth_cam:=warn',
-            '--log-level', 'omni_lidar:=warn'
+            '--log-level', 'error',
+            '--log-level', 'low_spatial:=error',
+            '--log-level', 'depth_cam:=error',
+            '--log-level', 'omni_lidar:=error'
         ],
         output='screen',
         # prefix=['gdb -ex run --args'], #: DEBUG
     )
 
-    return LaunchDescription([spatial_container])
+    return LaunchDescription([spatial_observation])

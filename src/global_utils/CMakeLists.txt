@@ -15,6 +15,7 @@ find_package(voxblox_ros REQUIRED)
 
 # build the library (no main function needed)
 add_library(${PROJECT_NAME}
+  src/utils/pipeline.cpp
   src/utils.cpp
   src/system_config.cpp
   src/spatial_container.cpp
