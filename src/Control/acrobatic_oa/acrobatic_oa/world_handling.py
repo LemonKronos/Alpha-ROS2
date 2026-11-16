@@ -11,7 +11,6 @@ reset_all() therefore additionally waits until the reset is observed in WorldSta
 import threading
 
 from rclpy.node import Node
-from rclpy.qos import qos_profile_system_default
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -31,7 +30,6 @@ from geometry_msgs.msg import (
     Quaternion,
     Pose
 )
-from nav_msgs.msg import Odometry
 
 from python_utils.utils import *
 
@@ -71,13 +69,6 @@ class WorldHandling:
             2
         )
 
-        self.SUB_ground_truth = self.the_node.create_subscription(
-            Odometry,
-            Topic.DRONE_ODOMETRY,
-            self.ground_truth_callback,
-            qos_profile_system_default
-        )
-
         #: Publishers
         self.PUB_world_wrench = self.the_node.create_publisher(
             EntityWrench,
@@ -96,7 +87,6 @@ class WorldHandling:
         self.SERVICE_TIMEOUT = 5.0 # Blocking service call timeout, in WALL-CLOCK seconds
 
         self.lastest_stats: WorldStatistics = None
-        self.lastest_ground_truth: Odometry = None
 
         # Used to wait for a fresh WorldStatistics message (e.g. to confirm a reset was applied)
         self._stats_cond = threading.Condition()
@@ -109,9 +99,6 @@ class WorldHandling:
             self.lastest_stats = msg
             self._stats_count += 1
             self._stats_cond.notify_all()
-
-    def ground_truth_callback(self, msg: Odometry):
-        self.lastest_ground_truth = msg
 
     def _blocking_service_call(self, client, req, desc: str, timeout: float = None):
         """

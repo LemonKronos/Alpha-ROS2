@@ -7,7 +7,12 @@ from scipy.spatial.transform import Rotation
 from rclpy.node import Node
 from acrobatic_oa.environment import GzEnvironment
 
-from alpha_ai_core.interface import EpisodeConfiguration, SpawnCondition, Action, StepResult, TaskType
+from alpha_ai_core.interface import (
+    EpisodeConfiguration,
+    SpawnCondition, Action, StepResult,
+    TaskType,
+    Observation, SimulationInformation
+)
 
 import time
 MAX_LINEAR_SPEED = 50.0   # m/s, total speed
@@ -43,6 +48,52 @@ def random_spawn_condition(rng: np.random.Generator, position) -> SpawnCondition
         roll_pitch_yaw=random_spawn_attitude(rng, MAX_TILT_ANGLE),
     )
 
+def format_step_result(step_result: StepResult) -> str:
+    """Formats a StepResult dataclass into a perfectly aligned text table string."""
+    obs: Observation = step_result.observation
+    info: SimulationInformation = step_result.information
+
+    # Check spatial boxes
+    coarse_status = "Empty (All Zeros)" if np.all(obs.spatial_coarse == 0) else f"Occupied ({np.count_nonzero(obs.spatial_coarse)} active elements)"
+    detail_status = "Empty (All Zeros)" if np.all(obs.spatial_detail == 0) else f"Occupied ({np.count_nonzero(obs.spatial_detail)} active elements)"
+
+    # Format arrays compactly with fixed decimal places
+    state_str = "[" + ", ".join(f"{x:6.2f}" for x in obs.state) + "]"
+    intent_str = "[" + ", ".join(f"{x:5.2f}" for x in obs.intent) + "]"
+    pos_str = "[" + ", ".join(f"{x:6.2f}" for x in info.position) + "]"
+
+    # Column widths designed to fit long array strings comfortably
+    col1 = 17
+    col2 = 76
+    total_width = col1 + col2 + 3  
+
+    def make_row(label, val):
+        return f"│ {label:<{col1}} │ {val:<{col2}} │"
+
+    top_border = "┌" + "─" * (total_width + 2) + "┐"
+    header_sep = "├" + "─" * (total_width + 2) + "┤"
+    mid_border = "├" + "─" * (col1 + 2) + "┬" + "─" * (col2 + 2) + "┤"
+    data_sep   = "├" + "─" * (col1 + 2) + "┼" + "─" * (col2 + 2) + "┤"
+    bot_border = "└" + "─" * (total_width + 2) + "┘"
+    
+    title_line = f"│ {'STEP RESULT LOG':^{total_width}} │"
+
+    return "\n".join([
+        top_border,
+        title_line,
+        header_sep,
+        make_row("Sim Time", f"{info.simulation_time_us} us"),
+        make_row("Position (x,y,z)", pos_str),
+        make_row("Body Contact", str(info.body_contact)),
+        make_row("Propeller Contact", str(info.propeller_contact)),
+        data_sep,
+        make_row("State", state_str),
+        make_row("Intent", intent_str),
+        make_row("Spatial Coarse", coarse_status),
+        make_row("Spatial Detail", detail_status),
+        bot_border
+    ])
+
 class ToyTrainer:
     def __init__(self, the_node: Node):
         self.the_node = the_node
@@ -52,7 +103,7 @@ class ToyTrainer:
 
     def training_loop(self):
         """
-        Repeatedly run reset, then 30 step while collection StepResult.
+        Repeatedly run reset, then 30 step while collecting StepResult.
         """
         # : Test train loop
         time.sleep(1)
@@ -69,7 +120,7 @@ class ToyTrainer:
             )
             #: Reset
             self.step_result = self.gz_environment.reset(episode_config=ep_conf)
-            self.the_node.get_logger().info(f"{self.step_result}")
+            self.the_node.get_logger().info(format_step_result(self.step_result))
 
             #: Step
             counter = 0.0
@@ -84,7 +135,7 @@ class ToyTrainer:
                 dummy_actions = np.array([counter, counter, counter, counter, counter, counter, -counter, -counter])
 
                 self.step_result = self.gz_environment.step(Action(values=dummy_actions))
-                self.the_node.get_logger().info(f"{self.step_result}")
+                self.the_node.get_logger().info(format_step_result(self.step_result))
                 # time.sleep(1)
 
             # time.sleep(2)

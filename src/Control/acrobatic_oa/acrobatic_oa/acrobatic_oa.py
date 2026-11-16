@@ -29,28 +29,6 @@ class AcrobaticOANode(Node):
         #: Load ROS2 params
         self.declare_parameter('acrobatic_training', True)
         self.training = self.get_parameter('acrobatic_training').get_parameter_value().bool_value
-        
-        #: Subscribers
-        self.SUB_spatial = self.create_subscription(
-            SpatialObservation,
-            Topic.SPATIAL_OBSERVATION,
-            self.spatial_callback,
-            qos_profile_sensor_data
-        )
-
-        self.SUB_intent = self.create_subscription(
-            ControlInterface,
-            Topic.CONTROL_INPUT,
-            self.intent_callback,
-            qos_profile_sensor_data
-        )
-
-        self.SUB_state = self.create_subscription(
-            FusePerception,
-            Topic.FUSE_PERCEPTION,
-            self.state_callback,
-            qos_profile_sensor_data
-        )
 
         #: Publishers
         self.PUB_acrobatic = self.create_publisher(NormalizedMotorsServos, Topic.CONTROL_ACROBATIC, qos_profile_sensor_data)
@@ -68,6 +46,28 @@ class AcrobaticOANode(Node):
         else: #_Branch for running 
             self.get_logger().info(f"{BLUE} Acrobatic inference mode {RESET}")
 
+            #: Subscribers
+            self.SUB_spatial = self.create_subscription(
+                SpatialObservation,
+                Topic.SPATIAL_OBSERVATION,
+                self.spatial_callback,
+                qos_profile_sensor_data
+            )
+    
+            self.SUB_intent = self.create_subscription(
+                ControlInterface,
+                Topic.CONTROL_INPUT,
+                self.intent_callback,
+                qos_profile_sensor_data
+            )
+    
+            self.SUB_state = self.create_subscription(
+                FusePerception,
+                Topic.FUSE_PERCEPTION,
+                self.state_callback,
+                qos_profile_sensor_data
+            )
+            
             #: Data
             # self.policy_core: PolicyCore= monolithic()
             # self.cnn_core = spatial_cnn()
