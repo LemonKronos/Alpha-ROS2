@@ -155,5 +155,7 @@ main() {
   echo "Run $DRONE_NAME with world $WORLD_NAME" | cowsay -f duck | lolcat
 }
 
-#_ Run the script
-main
+#_ Run the script (only when executed, not when sourced by restartGazebo.sh)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main
+fi

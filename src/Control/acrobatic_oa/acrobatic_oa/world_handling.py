@@ -9,11 +9,9 @@ reset_all() therefore additionally waits until the reset is observed in WorldSta
 (sim time back to ~0) before returning.
 """
 import threading
+import time
 
 from rclpy.node import Node
-
-import numpy as np
-from scipy.spatial.transform import Rotation
 
 from ros_gz_interfaces.msg import (
     WorldStatistics,
@@ -33,6 +31,10 @@ from geometry_msgs.msg import (
 
 from python_utils.utils import *
 
+
+
+GOAL_RADIUS = 0.5 #TODO sync this with training module config 
+SERVICE_TIMEOUT = 3.0 # Blocking service call timeout, in WALL-CLOCK seconds
 
 
 class WorldHandling:
@@ -81,11 +83,6 @@ class WorldHandling:
         self.drone_id = Name.Dynamic.DRONE_ID().get()
         self.drone_sdf_path = Path.Dynamic.DRONE_MODEL_SDF().get()
 
-        #TODO sync this with training module config 
-        self.GOAL_RADIUS = 0.5
-
-        self.SERVICE_TIMEOUT = 5.0 # Blocking service call timeout, in WALL-CLOCK seconds
-
         self.lastest_stats: WorldStatistics = None
 
         # Used to wait for a fresh WorldStatistics message (e.g. to confirm a reset was applied)
@@ -108,7 +105,7 @@ class WorldHandling:
         Returns the response, or None on service unavailable / timeout / exception.
         The node must be spinning in another thread to deliver the response.
         """
-        timeout = self.SERVICE_TIMEOUT if timeout is None else timeout
+        timeout = SERVICE_TIMEOUT if timeout is None else timeout
         logger = self.the_node.get_logger()
 
         if not client.wait_for_service(timeout_sec=timeout):
@@ -147,7 +144,7 @@ class WorldHandling:
         NOTE: assumes WorldStatistics.sim_time is builtin_interfaces/Time.
         Check with: ros2 interface show ros_gz_interfaces/msg/WorldStatistics
         """
-        timeout = self.SERVICE_TIMEOUT if timeout is None else timeout
+        timeout = SERVICE_TIMEOUT if timeout is None else timeout
 
         with self._stats_cond:
             start = self._stats_count
@@ -164,6 +161,15 @@ class WorldHandling:
         if not ok:
             self.the_node.get_logger().error(f"reset: sim time did not return to 0 within {timeout}s")
         return ok
+
+    def wait_for_services(self, timeout: float) -> bool:
+        """Block until the world services are discoverable. Wall-clock timeout."""
+        deadline = time.monotonic() + timeout
+        for client in (self.SRV_control_world, self.SRV_set_pose):
+            remaining_seconds = max(0.0, deadline - time.monotonic())
+            if not client.wait_for_service(timeout_sec=remaining_seconds):
+                return False
+        return True
 
     def play(self) -> bool:
         req = ControlWorld.Request()
@@ -259,7 +265,10 @@ class WorldHandling:
             )
         return ok
 
-    def set_drone_wrench(self, force_x: float, force_y: float, force_z: float, torque_x: float, torque_y: float, torque_z: float):
+    def set_drone_wrench(self, force_x: float, force_y: float, force_z: float, torque_x: float, torque_y: float, torque_z: float) -> bool:
+        if self.PUB_world_wrench.get_subscription_count() == 0:
+            return False
+
         msg = EntityWrench()
 
         msg.wrench.force.x = force_x
@@ -276,6 +285,7 @@ class WorldHandling:
         msg.header.stamp = self.the_node.get_clock().now().to_msg()
 
         self.PUB_world_wrench.publish(msg)
+        return True
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose) -> bool:
         req = SpawnEntity.Request()
@@ -309,7 +319,7 @@ class WorldHandling:
                     <static>true</static>
                     <link name="link">
                         <visual name="visual">
-                            <geometry><sphere><radius>{self.GOAL_RADIUS}</radius></sphere></geometry>
+                            <geometry><sphere><radius>{GOAL_RADIUS}</radius></sphere></geometry>
                             <material>
                                 <ambient>0 1 0 0.5</ambient>
                                 <diffuse>0 1 0 0.5</diffuse>
@@ -332,7 +342,7 @@ class WorldHandling:
                     <static>true</static>
                     <link name="link">
                         <visual name="visual">
-                            <geometry><sphere><radius>{self.GOAL_RADIUS}</radius></sphere></geometry>
+                            <geometry><sphere><radius>{GOAL_RADIUS}</radius></sphere></geometry>
                             <material>
                                 <ambient>0 0 1 0.5</ambient>
                                 <diffuse>0 0 1 0.5</diffuse>

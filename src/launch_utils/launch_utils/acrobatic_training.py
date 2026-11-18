@@ -52,6 +52,7 @@ def generate_launch_description():
             name='px4_emulator',
             arguments=['--ros-args', '--log-level', 'error']
         ),
+        #! Do not include this, currently acrobatic oa mean to be isolated
         # Node(
         #     package='acrobatic_oa',
         #     executable='acrobatic_oa',

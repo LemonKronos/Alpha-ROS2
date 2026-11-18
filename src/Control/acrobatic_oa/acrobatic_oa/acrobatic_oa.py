@@ -37,6 +37,8 @@ class AcrobaticOANode(Node):
         self.latest_intent = None
         self.latest_state = None
         self.latest_spatial = None
+        self.trainer = None
+        self.training_failed = False
         
         if self.training: #_Branch for training 
             self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
@@ -87,6 +89,11 @@ class AcrobaticOANode(Node):
     def state_callback(self, msg):
         self.latest_state = msg
 
+    def request_shutdown_after_failure(self):
+        """Called from the trainer thread when training cannot continue."""
+        self.training_failed = True
+        rclpy.try_shutdown()
+
     def publish_action(self, action: FloatArray):
         msg = NormalizedMotorsServos()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -118,9 +125,17 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        if node.trainer is not None:
+            node.trainer.stop()
     finally:
+        if node.training and node.trainer.analyzer is not None:
+            node.trainer.analyzer.print_summary()
+            
         node.destroy_node()
+        rclpy.try_shutdown()
+
+    if node.training_failed:
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

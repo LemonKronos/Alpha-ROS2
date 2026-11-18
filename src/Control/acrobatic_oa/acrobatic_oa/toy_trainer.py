@@ -1,12 +1,18 @@
 """
 A toy trainner to test pipeline behavior without the need of AI core.
 """
+
 import numpy as np
+import time
+import threading
+import traceback
 from scipy.spatial.transform import Rotation
 
 from rclpy.node import Node
 from acrobatic_oa.environment import GzEnvironment
+from acrobatic_oa.simulation_recovery import SimulationRecovery
 
+from alpha_ai_core.training.environment import EnvironmentFailure
 from alpha_ai_core.interface import (
     EpisodeConfiguration,
     SpawnCondition, Action, StepResult,
@@ -14,8 +20,10 @@ from alpha_ai_core.interface import (
     Observation, SimulationInformation
 )
 
-import time
-MAX_LINEAR_SPEED = 50.0   # m/s, total speed
+from python_utils.utils import *
+
+
+MAX_LINEAR_SPEED = 20.0   # m/s, total speed
 MAX_ANGULAR_SPEED = 6.0  # rad/s, total rate
 MAX_TILT_ANGLE = 1.57    # rad, angle between body z-axis and world z-axis
 
@@ -24,7 +32,6 @@ def random_vector(rng: np.random.Generator, max_norm: float) -> np.ndarray:
     direction = rng.normal(size=3)
     direction /= np.linalg.norm(direction)
     return direction * rng.uniform(0.0, max_norm)
-
 
 def random_spawn_attitude(rng: np.random.Generator, max_tilt: float) -> list[float]:
     """
@@ -38,7 +45,6 @@ def random_spawn_attitude(rng: np.random.Generator, max_tilt: float) -> list[flo
     tilt_axis = np.array([np.cos(tilt_azimuth), np.sin(tilt_azimuth), 0.0])
     rotation = Rotation.from_euler('z', yaw) * Rotation.from_rotvec(tilt * tilt_axis)
     return rotation.as_euler('xyz').tolist()
-
 
 def random_spawn_condition(rng: np.random.Generator, position) -> SpawnCondition:
     return SpawnCondition(
@@ -94,55 +100,87 @@ def format_step_result(step_result: StepResult) -> str:
         bot_border
     ])
 
+
 class ToyTrainer:
     def __init__(self, the_node: Node):
         self.the_node = the_node
+
         self.gz_environment = GzEnvironment(the_node)
+        self.simulation_recovery = SimulationRecovery(the_node, self.gz_environment.world_handling)
+
         self.step_result: StepResult = None
+        
+        self.stop_event = threading.Event()
+
+        self.analyzer = TimeAnalyzer(the_node)
+
+
+    def __del__(self):
+        """Called automatically when the ToyTrainer instance is destroyed."""
+        self.analyzer.print_summary()
+
+
+    def stop(self):
+        self.stop_event.set()
 
 
     def training_loop(self):
-        """
-        Repeatedly run reset, then 30 step while collecting StepResult.
-        """
-        # : Test train loop
+        """Thread entry point. Any error that gets out of here is fatal: log it and shut the node down."""
+        try:
+            self._run_episodes()
+        except Exception:
+            self.the_node.get_logger().fatal(f"{RED} Toy trainer stopped:\n{traceback.format_exc()} {RESET}")
+            self.the_node.request_shutdown_after_failure()
+
+
+    def _run_episodes(self):
         time.sleep(1)
         rng = np.random.default_rng()
-        while True:
-            spawn = random_spawn_condition(rng, position=[0.0, 0.0, 3.0])
-            ep_conf = EpisodeConfiguration(
-                task=TaskType.HOVER,
-                seed=9,
-                spawn=spawn,
-                condition_index=0,
-                repeat_index=0,
-                episode_index=0
-            )
-            #: Reset
-            self.step_result = self.gz_environment.reset(episode_config=ep_conf)
-            self.the_node.get_logger().info(format_step_result(self.step_result))
-
-            #: Step
-            counter = 0.0
-            flip = -1
-            for _ in range(0, 30):
-                if flip > 0 and counter >= 1.0:
-                    flip = -1
-                elif flip < 0 and counter <= -1.0:
-                    flip = 1
-
-                counter += 0.1 * flip
-                dummy_actions = np.array([counter, counter, counter, counter, counter, counter, -counter, -counter])
-
-                self.step_result = self.gz_environment.step(Action(values=dummy_actions))
-                self.the_node.get_logger().info(format_step_result(self.step_result))
-                # time.sleep(1)
-
-            # time.sleep(2)
-
-
-        
-
-
-            
+        while not self.stop_event.is_set():
+            try:
+                self._run_one_episode(rng)
+            except EnvironmentFailure as failure:
+                self.the_node.get_logger().error(f"{RED} Environment failure: {failure} {RESET}")
+                if not self.simulation_recovery.handle(failure):
+                    raise
+                continue
+            self.simulation_recovery.report_success()
     
+
+    def _run_one_episode(self, rng: np.random.Generator):
+        spawn = random_spawn_condition(rng, position=[0.0, 0.0, 3.0])
+        ep_conf = EpisodeConfiguration(
+            task=TaskType.HOVER,
+            seed=9,
+            spawn=spawn,
+            condition_index=0,
+            repeat_index=0,
+            episode_index=0
+        )
+        
+        # 1. Reset with timing
+        self.analyzer.start_segment("Reset")
+        self.step_result = self.gz_environment.reset(episode_config=ep_conf)
+        self.analyzer.stop_segment("Reset")
+        
+        self.the_node.get_logger().info(format_step_result(self.step_result))
+
+        # 2. Step loop with timing (30 steps)
+        counter = 0.0
+        flip = -1
+        for _ in range(0, 50):
+            if self.stop_event.is_set():
+                return
+            
+            self.analyzer.start_segment("Step")
+            if flip > 0 and counter >= 1.0:
+                flip = -1
+            elif flip < 0 and counter <= -1.0:
+                flip = 1
+
+            counter += 0.1 * flip
+            dummy_actions = np.array([counter, counter, counter, counter, counter, counter, -counter, -counter])
+
+            self.step_result = self.gz_environment.step(Action(values=dummy_actions))
+            self.the_node.get_logger().info(format_step_result(self.step_result))
+            self.analyzer.stop_segment("Step")

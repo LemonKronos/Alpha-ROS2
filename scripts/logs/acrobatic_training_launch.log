@@ -1,0 +1,22 @@
+[INFO] [launch]: All log files can be found below /home/mr_lemon/.ros/log/2026-11-18-14-48-00-948051-AcerLinux-463309
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [static_transform_publisher-1]: process started with pid [463373]
+[INFO] [static_transform_publisher-2]: process started with pid [463374]
+[INFO] [static_transform_publisher-3]: process started with pid [463375]
+[INFO] [static_transform_publisher-4]: process started with pid [463376]
+[INFO] [static_transform_publisher-5]: process started with pid [463377]
+[INFO] [component_container_mt-6]: process started with pid [463378]
+[INFO] [finalize_control-7]: process started with pid [463379]
+[INFO] [fuse_perception-8]: process started with pid [463380]
+[INFO] [contact_parser-9]: process started with pid [463381]
+[INFO] [gz_ground_truth-10]: process started with pid [463382]
+[INFO] [px4_emulator-11]: process started with pid [463383]
+[component_container_mt-6] [37;1m2026-11-18 14:48:01.231 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7006: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[fuse_perception-8] [37;1m2026-11-18 14:48:01.231 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7429: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[contact_parser-9] [37;1m2026-11-18 14:48:01.241 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7429: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[fuse_perception-8] [37;1m2026-11-18 14:48:01.241 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7006: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[contact_parser-9] [37;1m2026-11-18 14:48:01.248 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7006: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[finalize_control-7] [37;1m2026-11-18 14:48:01.342 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7006: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[INFO] [launch_ros.actions.load_composable_nodes]: Loaded node '/low_spatial' in container '/spatial/spatial_container'
+[INFO] [launch_ros.actions.load_composable_nodes]: Loaded node '/depth_cam' in container '/spatial/spatial_container'
+[INFO] [launch_ros.actions.load_composable_nodes]: Loaded node '/omni_lidar' in container '/spatial/spatial_container'

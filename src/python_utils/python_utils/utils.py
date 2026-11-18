@@ -7,6 +7,7 @@ import math
 from rclpy.parameter import Parameter
 from collections.abc import Callable
 import numpy as np
+import threading
 
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -197,10 +198,16 @@ class Path:
                 )
 
         class DRONE_MODEL_SDF(DynamicInfo):
-                    def __init__(self) -> None:
-                        super().__init__(
-                            lambda: DynamicInfoHelper.updateENV("DRONE_MODEL_SDF_PATH")
-                        )
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("DRONE_MODEL_SDF_PATH")
+                )
+
+        class SIMULATION_SCRIPTS(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("SIMULATION_SCRIPTS_PATH")
+                )
 
 
 #_                                   FUNCTION 
@@ -250,3 +257,108 @@ class Global:
             node.get_logger().info(f"{PINK}No simulation clock found, run in realtime.{RESET}")
             if not node.has_parameter("use_sim_time"):
                 node.declare_parameter("use_sim_time", False)
+
+
+class TimeAnalyzer:
+    class TagData:
+        def __init__(self, window_size: int):
+            self.history = [0.0] * window_size
+            self.head = 0
+            self.count = 0
+            self.min_time = 1e9     # Init ridiculously high
+            self.max_time = 0.0
+            self.last_time = 0.0    # Store the most recent compute time
+            self.start_time = 0.0
+            self.window_size = window_size
+
+    def __init__(self, node, window_size: int = 500):
+        self.node = node
+        self.window_size_ = window_size
+        self.data_: dict[str, TimeAnalyzer.TagData] = {}
+        self.mtx_ = threading.Lock()  # Thread safety for ROS 2 callbacks/background threads
+
+    # 1. Call this right before the code you want to measure
+    def start_segment(self, tag: str):
+        with self.mtx_:
+            if tag not in self.data_:
+                self.data_[tag] = self.TagData(self.window_size_)
+            self.data_[tag].start_time = time.perf_counter()
+
+    # 2. Call this right after. Returns the microseconds it took.
+    def stop_segment(self, tag: str) -> float:
+        end_time = time.perf_counter()
+        with self.mtx_:
+            if tag not in self.data_:
+                return 0.0  # Failsafe if stop() is called before start()
+
+            d = self.data_[tag]
+            # Convert seconds to microseconds
+            duration_us = (end_time - d.start_time) * 1_000_000.0
+            
+            # Update circular buffer
+            d.history[d.head] = duration_us
+            d.head = (d.head + 1) % d.window_size
+            if d.count < d.window_size:
+                d.count += 1
+            
+            # Update global bounds
+            d.min_time = min(d.min_time, duration_us)
+            d.max_time = max(d.max_time, duration_us)
+            d.last_time = duration_us
+
+            return duration_us
+
+    # 3. Print the absolute latest time for a specific loop
+    def print_current(self, tag: str):
+        with self.mtx_:
+            if tag in self.data_:
+                msg = f"[Profiler] {tag} took: {self.data_[tag].last_time:.2f} us"
+                try:
+                    self.node.get_logger().info(msg)
+                except Exception:
+                    print(msg)
+
+    # Convenience function to stop and print instantly
+    def stop_and_print(self, tag: str):
+        self.stop_segment(tag)
+        self.print_current(tag)
+
+    # 4. Call this when shutting down or summarizing
+    def print_summary(self):
+        with self.mtx_:
+            ss = []
+            ss.append("\n======================= COMPUTE PROFILER SUMMARY (us) ========================\n")
+            ss.append(f"{'Tag':<20}{'Avg':>12}{'Med':>12}{'Min':>12}{'Max':>12}{'Samples':>10}\n")
+            ss.append("------------------------------------------------------------------------------\n")
+
+            for tag, d in self.data_.items():
+                if d.count == 0:
+                    continue
+
+                valid_history = d.history[:d.count]
+                avg = sum(valid_history) / d.count
+
+                # Calculate Median
+                sorted_history = sorted(valid_history)
+                n = len(sorted_history)
+                median = sorted_history[n // 2]
+                if n % 2 == 0:
+                    median = (sorted_history[n // 2 - 1] + sorted_history[n // 2]) / 2.0
+
+                ss.append(
+                    f"{tag:<20}"
+                    f"{avg:>12.2f}"
+                    f"{median:>12.2f}"
+                    f"{d.min_time:>12.2f}"
+                    f"{d.max_time:>12.2f}"
+                    f"{d.count:>10}\n"
+                )
+            
+            ss.append("==============================================================================\n")
+            summary_msg = "".join(ss)
+            
+            try:
+                self.node.get_logger().info(summary_msg)
+            except Exception:
+                # Fallback if ROS node is already destroyed during shutdown
+                print(summary_msg)

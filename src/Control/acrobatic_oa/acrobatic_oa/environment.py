@@ -3,6 +3,7 @@ Wrapper for the AI core environment
 """
 
 import threading
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -27,6 +28,7 @@ RESET_WAIT_TIMEOUT_SECONDS = 1.0
 MAXIMUM_CONSECUTIVE_MISSES_PER_STEP = 2
 MAXIMUM_CONSECUTIVE_MISSES_AT_RESET = 0
 RESET_MAXIMUM_ATTEMPTS = 3
+PIPELINE_CONNECTION_TIMEOUT_SECONDS = 2.0
 
 ACTION_VALUE_COUNT = 8
 
@@ -43,6 +45,18 @@ class TimedMessage:
     message: object
     stamp_nanoseconds: int
 
+
+class WorldServiceFailure(EnvironmentFailure):
+    """A Gazebo world call failed or timed out: Gazebo is down, hung or unreachable."""
+
+class ObservationTimeoutFailure(EnvironmentFailure):
+    """World calls work but the pipeline did not deliver the observation: a pipeline node is down or stuck."""
+
+class ObservationInvalidFailure(EnvironmentFailure):
+    """The observation holds NaN or infinity: the physics most likely diverged. A plain reset fixes it."""
+
+class PipelineNodeMissingFailure(EnvironmentFailure):
+    """A node the episode depends on is not connected, so the episode would silently be wrong."""
 
 class ObservationSnapshot:
     """
@@ -88,7 +102,7 @@ class ObservationSnapshot:
 
         A source that did not arrive in time is a "miss": its previous message is reused, unless it
         has missed more than maximum_consecutive_misses times in a row or has no previous message.
-        Raises EnvironmentFailure in that case.
+        Raises ObservationTimeoutFailure in that case.
 
         Returns the collected messages and the names of the sources that were reused (missed).
         """
@@ -125,7 +139,7 @@ class ObservationSnapshot:
                     collected_messages[source_name] = timed_message
 
             if failure_descriptions:
-                raise EnvironmentFailure("Observation not ready: " + "; ".join(failure_descriptions))
+                raise ObservationTimeoutFailure("Observation not ready: " + "; ".join(failure_descriptions))
 
             return collected_messages, missed_source_names
 
@@ -176,7 +190,7 @@ class GzEnvironment:
     @staticmethod
     def _require(succeeded: bool, description: str) -> None:
         if not succeeded:
-            raise EnvironmentFailure(f"Failed to {description}")
+            raise WorldServiceFailure(f"Failed to {description}")
 
 
     def _collect_step_result(self, timeout_seconds: float, maximum_consecutive_misses: int) -> StepResult:
@@ -214,9 +228,14 @@ class GzEnvironment:
         #: Exact by construction, and unaffected by a tolerated missed message
         simulation_time_us: int = self.expected_stamp_nanoseconds // 1_000
 
+        #: NaN check states
+        state = np.concatenate((velocity_linear_norm, velocity_angular_norm, gravity_norm), dtype=np.float32)
+        if not (np.all(np.isfinite(state)) and np.all(np.isfinite(position))):
+            raise ObservationInvalidFailure(f"Observation is not finite: state={state}, position={position}")
+
         return StepResult(
             Observation(
-                state=np.concatenate((velocity_linear_norm, velocity_angular_norm, gravity_norm), dtype=np.float32),
+                state=state,
                 intent=intent,
                 spatial_coarse=spatial_coarse,
                 spatial_detail=spatial_detail
@@ -246,10 +265,33 @@ class GzEnvironment:
                 )
 
         #TODO later: this is where a Gazebo/pipeline restart can hook in
-        raise EnvironmentFailure(f"Reset failed {RESET_MAXIMUM_ATTEMPTS} times, last failure: {last_failure}") from last_failure
+        self.the_node.get_logger().error(f"Reset failed {RESET_MAXIMUM_ATTEMPTS} times")
+        raise last_failure
+
+
+    def _require_pipeline_connected(self) -> None:
+        """
+        Fail loudly when nobody receives our actions or nobody publishes contacts.
+        Waits a short wall-clock time first, because discovery lags right after a pipeline restart.
+        """
+        deadline = time.monotonic() + PIPELINE_CONNECTION_TIMEOUT_SECONDS
+        while True:
+            if self.the_node.PUB_acrobatic.get_subscription_count() == 0:
+                missing_description = "nobody subscribes to the action topic (finalize_control down?)"
+            elif self.drone_contact.get_publisher_count() == 0:
+                missing_description = "nobody publishes contacts (contact_parser down?)"
+            else:
+                return
+
+            if time.monotonic() >= deadline:
+                raise PipelineNodeMissingFailure(f"Pipeline not connected: {missing_description}")
+            time.sleep(0.05)
 
 
     def _attempt_reset(self, episode_config: EpisodeConfiguration) -> StepResult:
+        #: Ensure the pipeline is running
+        self._require_pipeline_connected()
+
         spawn = episode_config.spawn
 
         #: Reset world
@@ -281,7 +323,7 @@ class GzEnvironment:
         angular_velocity = np.array(spawn.angular_velocity)
         force = Drone.MASS * linear_velocity / Physics.STEP_SIZE
         torque = (inertia @ angular_velocity) / Physics.STEP_SIZE
-        self.world_handling.set_drone_wrench(*force, *torque)
+        self._require(self.world_handling.set_drone_wrench(*force, *torque), "apply the spawn wrench")
 
         #: Difficulty handling
         #TODO later
@@ -294,6 +336,10 @@ class GzEnvironment:
         
 
     def step(self, action: Action) -> StepResult:
+        #: Ensure the pipeline is running
+        self._require_pipeline_connected()
+
+        #: Step action
         self.the_node.publish_action(action.values)
         self._require(self.world_handling.step(), "step the world")
         self.expected_stamp_nanoseconds += CONTROL_STEP_NANOSECONDS

@@ -44,8 +44,6 @@ def generate_launch_description():
         parameters=[reactive_oa_params]
     )
 
-    #DEV Acrobatic brain go here
-
     map_visualizer_node = ComposableNode(
         package='map_visualizer',
         plugin='spatial_container::MapVisualizerNode',
