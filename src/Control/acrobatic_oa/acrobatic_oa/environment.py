@@ -212,8 +212,9 @@ class GzEnvironment:
         velocity_linear_norm = np.asarray(fuse_state.velocity, dtype=np.float32) / Physics.Drone.REF_LINEAR_VELOCITY
         velocity_angular_norm = np.asarray(fuse_state.angular_velocity, dtype=np.float32) / Physics.Drone.REF_ANGULAR_VELOCITY
 
-        spatial_coarse = np.zeros(64, dtype=np.float32)
-        spatial_detail = np.zeros(64, dtype=np.float32)
+        #TODO need actual sampling logic later 
+        spatial_coarse = np.zeros((2, 12, 12, 12), dtype=np.float32)
+        spatial_detail = np.zeros((3, 12, 12, 12), dtype=np.float32)
 
         #: Simulation information from Ground Truth
         position: FloatArray = np.array(

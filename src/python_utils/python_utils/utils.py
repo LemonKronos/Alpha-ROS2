@@ -209,6 +209,18 @@ class Path:
                     lambda: DynamicInfoHelper.updateENV("SIMULATION_SCRIPTS_PATH")
                 )
 
+        class ACROBATIC_OA_AI_CONFIG(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_AI_CONFIG")
+                )
+
+        class ACROBATIC_OA_RESUME_CHECKPOINT(DynamicInfo):
+                    def __init__(self) -> None:
+                        super().__init__(
+                            lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_RESUME_CHECKPOINT")
+                        )
+
 
 #_                                   FUNCTION 
 class Global:

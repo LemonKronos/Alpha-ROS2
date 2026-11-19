@@ -230,7 +230,7 @@ class WorldHandling:
         res = self._blocking_service_call(self.SRV_spawn, req_spawn, "spawn drone")
         ok = bool(res and res.success)
         if ok:
-            self.the_node.get_logger().info(f"{PINK} Spawn the drone {RESET}")
+            self.the_node.get_logger().info(f"{GREEN} Spawn the drone {RESET}")
         return ok
 
     def delete_drone(self) -> bool:
@@ -242,7 +242,7 @@ class WorldHandling:
         response = self._blocking_service_call(self.SRV_delete, delete_request, "delete drone")
         delete_succeeded = bool(response and response.success)
         if delete_succeeded:
-            self.the_node.get_logger().info(f"{PINK} Deleted the drone {RESET}")
+            self.the_node.get_logger().info(f"{RED} Deleted the drone {RESET}")
         return delete_succeeded
 
     def teleport_drone(self, x: float, y: float, z: float, qw: float, qx: float, qy: float, qz: float) -> bool:
@@ -259,7 +259,7 @@ class WorldHandling:
         ok = bool(res and res.success)
         if ok:
             self.the_node.get_logger().info(
-                f"{TEAL} Teleported drone to "
+                f"{GREEN} Teleported drone to "
                 f"xyz= ({x},{y},{z}), "
                 f"wyxz= ({qw}, {qx},{qy},{qz}) {RESET}"
             )
