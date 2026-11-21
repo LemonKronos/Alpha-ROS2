@@ -138,7 +138,7 @@ class RealTrainer:
         checkpoint_directory = PythonPath(os.path.expandvars(resume_checkpoint_path))
         if checkpoint_directory.is_file():
             self.trainer.load_checkpoint(resume_checkpoint_path)
-            the_node.get_logger().info(
+            the_node.get_logger().warn(
                 f"Resumed from {resume_checkpoint_path} at update {self.trainer.update_count}"
             )
 
@@ -156,7 +156,7 @@ class RealTrainer:
             return
 
         if not self.stop_event.is_set():
-            self.the_node.get_logger().info(f"{BLUE} Training finished: {self.trainer.update_count} updates {RESET}")
+            self.the_node.get_logger().warn(f"{GREEN} Training finished: {self.trainer.update_count} updates {RESET}")
             rclpy.try_shutdown()
 
     def _run_training(self) -> None:

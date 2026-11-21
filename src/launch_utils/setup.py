@@ -16,7 +16,8 @@ setup(
             'launch_utils/spatial_container_launch.py',
             'launch_utils/full_launch.py',
             'launch_utils/spatial_observation.py',
-            'launch_utils/acrobatic_training.py'
+            'launch_utils/acrobatic_training_peripheral.py',
+            'launch_utils/acrobatic_oa_node.py',
         ]),
     ],
     install_requires=['setuptools'],

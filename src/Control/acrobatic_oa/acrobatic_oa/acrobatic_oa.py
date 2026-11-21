@@ -28,7 +28,7 @@ class AcrobaticOANode(Node):
         Global.setup_for_simulation(self)
 
         #: Load ROS2 params
-        self.declare_parameter('acrobatic_training', True)
+        self.declare_parameter('acrobatic_training', False)
         self.training = self.get_parameter('acrobatic_training').get_parameter_value().bool_value
 
         #: Publishers

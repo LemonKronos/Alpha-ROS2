@@ -186,6 +186,14 @@ class Name:
                     )
                 )
 
+        class LOG_FILE_FORMAT(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV(
+                        "LOG_FILE_FORMAT"
+                    )
+                )
+
 
 class Path:
     """Dynamic and static path utilities."""
@@ -370,7 +378,7 @@ class TimeAnalyzer:
             summary_msg = "".join(ss)
             
             try:
-                self.node.get_logger().info(summary_msg)
+                self.node.get_logger().error(summary_msg) # Use error to make sure it is printed out
             except Exception:
                 # Fallback if ROS node is already destroyed during shutdown
                 print(summary_msg)
