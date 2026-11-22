@@ -3,6 +3,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch import LaunchDescription
+from launch.actions import SetEnvironmentVariable
+from launch.substitutions import LaunchLogDir
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -16,8 +18,12 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(static_tf_path)),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(spatial_observation_path)),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchLogDir()
+        ),
+        # IncludeLaunchDescription(PythonLaunchDescriptionSource(static_tf_path)),
+        # IncludeLaunchDescription(PythonLaunchDescriptionSource(spatial_observation_path)),
         Node(
             package='finalize_control',
             executable='finalize_control',

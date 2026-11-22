@@ -35,6 +35,8 @@ ACTION_VALUE_COUNT = 8
 SOURCE_FUSE_PERCEPTION = "fuse_perception"
 SOURCE_GROUND_TRUTH = "ground_truth"
 
+MINIMUM_QUATERNION_NORM = 1e-6
+
 
 def stamp_to_nanoseconds(stamp) -> int:
     return stamp.sec * 1_000_000_000 + stamp.nanosec
@@ -206,7 +208,11 @@ class GzEnvironment:
         #: Observation from Fuse Perception
         intent: FloatArray = np.zeros(6, dtype=np.float32) #DEV Hover only
 
-        rotation = Rotation.from_quat(fuse_state.q, scalar_first=True)
+        quaternion = np.asarray(fuse_state.q, dtype=np.float64)
+        if not np.all(np.isfinite(quaternion)) or np.linalg.norm(quaternion) < MINIMUM_QUATERNION_NORM:
+            raise ObservationInvalidFailure(f"Attitude quaternion is not valid yet: {quaternion}")
+        rotation = Rotation.from_quat(quaternion, scalar_first=True)
+        
         gravity_norm = np.asarray(-rotation.as_matrix()[2, :], dtype=np.float32)
 
         velocity_linear_norm = np.asarray(fuse_state.velocity, dtype=np.float32) / Physics.Drone.REF_LINEAR_VELOCITY

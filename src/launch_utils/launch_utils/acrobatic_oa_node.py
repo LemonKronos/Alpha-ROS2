@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import SetEnvironmentVariable
+from launch.substitutions import LaunchLogDir
 from launch_ros.actions import Node
 
 from python_utils.utils import Name
@@ -18,6 +20,10 @@ def generate_launch_description():
     ts = datetime.now().strftime(time_format)
 
     return LaunchDescription([
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchLogDir()
+        ),
         Node(
             package=node_name,
             executable=node_name,

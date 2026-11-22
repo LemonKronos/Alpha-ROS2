@@ -1,24 +1,15 @@
 """
 The real trainer: runs the AI core Trainer (PPO + curriculum) on the Gazebo environment.
 
-This file only connects existing pieces. It adds no learning logic:
-    - GzEnvironment            (acrobatic_oa.environment)        the simulator side
-    - SimulationRecovery       (acrobatic_oa.simulation_recovery) escalating restart ladder, as in ToyTrainer
-    - Trainer / Curriculum / MonolithicPolicy (alpha_ai_core)   the learning side
+This file only connects existing pieces. It adds no learning logic and no recovery logic:
+    - GzEnvironment, SimulationRecovery   (acrobatic_oa)  the simulator side
+    - RecoveringEnvironment               (acrobatic_oa)  heals the simulator, talks to the AI core
+    - Trainer, Curriculum, MonolithicPolicy (alpha_ai_core) the learning side
 
-How failures are handled:
-    The AI core Trainer does not catch EnvironmentFailure, so it escapes from Trainer.train().
-    Therefore training is run ONE PPO update at a time (train(total_updates=1)):
-        - update finished            -> tell SimulationRecovery the simulation is healthy again.
-        - EnvironmentFailure raised  -> SimulationRecovery.handle() runs the cheapest fitting recovery.
-                                        The running episode is abandoned (the Trainer starts a new one) and the
-                                        partly filled rollout is thrown away (the Trainer clears it at the start
-                                        of the next rollout), so no transition of a broken episode is learned from.
-        - recovery exhausted         -> the failure is re-raised, a checkpoint is saved, the node shuts down.
-
-ROS 2 parameters (declared here, on the node):
-    training_configuration_path : path to the TOML file, for example configs/hover.toml (required)
-    resume_checkpoint_path      : path to a checkpoint to continue from, empty means start from scratch
+Simulation problems never reach this file:
+    - The wrapper heals them. A lost episode becomes EpisodeAborted, which the Trainer handles itself.
+    - Only when recovery is exhausted does EnvironmentFailure come out of Trainer.train().
+      Then the progress of this session is saved and the node shuts down (training_loop).
 
 Evaluation is intentionally not run here: load best.pt and evaluate it separately.
 """
@@ -36,66 +27,21 @@ from rclpy.node import Node
 import torch
 
 from alpha_ai_core.configuration import load_configuration
-from alpha_ai_core.interface import Action, EpisodeConfiguration, StepResult
 from alpha_ai_core.models.monolithic import MonolithicPolicy
 from alpha_ai_core.models.spatial_cnn import ZeroSpatialEncoder
 from alpha_ai_core.training.curriculum import Curriculum
-from alpha_ai_core.training.environment import EnvironmentFailure
 from alpha_ai_core.training.trainer import Trainer
-from alpha_ai_core.utils.dashboard import TrainingDashboard
+from alpha_ai_core.utils.dashboard_hook import DashboardHook
 
 from acrobatic_oa.environment import GzEnvironment
+from acrobatic_oa.recovering_environment import RecoveringEnvironment, TrainingStopRequested
 from acrobatic_oa.simulation_recovery import SimulationRecovery
 
 from python_utils.utils import *
 
 
-PARAMETER_CONFIGURATION_PATH = "training_configuration_path"
-PARAMETER_RESUME_CHECKPOINT_PATH = "resume_checkpoint_path"
-
 #: Wall-clock seconds to let ROS discovery settle before the first reset (same as ToyTrainer)
 STARTUP_DELAY_SECONDS = 1.0
-
-
-class TrainingStopRequested(Exception):
-    """
-    Raised from inside the environment when the user asked to stop (Ctrl+C).
-    It is deliberately NOT an EnvironmentFailure, so the recovery ladder never tries to "fix" it.
-    """
-
-
-class StoppableEnvironment:
-    """
-    Thin wrapper around GzEnvironment that implements the AI core Environment protocol.
-
-    It adds two things the Trainer cannot do by itself:
-        - It lets a stop request interrupt training in the middle of a rollout.
-        - It records the wall-clock time of every reset and step.
-    """
-    def __init__(self, gz_environment: GzEnvironment, stop_event: threading.Event, analyzer: TimeAnalyzer):
-        self.gz_environment = gz_environment
-        self.stop_event = stop_event
-        self.analyzer = analyzer
-
-    def _raise_if_stop_requested(self) -> None:
-        if self.stop_event.is_set():
-            raise TrainingStopRequested()
-
-    def reset(self, episode_configuration: EpisodeConfiguration) -> StepResult:
-        self._raise_if_stop_requested()
-
-        self.analyzer.start_segment("Reset")
-        step_result = self.gz_environment.reset(episode_configuration)
-        self.analyzer.stop_segment("Reset")
-        return step_result
-
-    def step(self, action: Action) -> StepResult:
-        self._raise_if_stop_requested()
-
-        self.analyzer.start_segment("Step")
-        step_result = self.gz_environment.step(action)
-        self.analyzer.stop_segment("Step")
-        return step_result
 
 
 class RealTrainer:
@@ -115,7 +61,9 @@ class RealTrainer:
         #: Simulation side
         self.gz_environment = GzEnvironment(the_node)
         self.simulation_recovery = SimulationRecovery(the_node, self.gz_environment.world_handling)
-        self.environment = StoppableEnvironment(self.gz_environment, self.stop_event, self.analyzer)
+        self.environment = RecoveringEnvironment(
+            the_node, self.gz_environment, self.simulation_recovery, self.stop_event, self.analyzer
+        )
 
         #: Learning side. A strict configuration error stops here, before any simulation step.
         self.configuration = load_configuration(configuration_path)
@@ -132,16 +80,17 @@ class RealTrainer:
             curriculum=curriculum,
             configuration=self.configuration,
             spatial_encoder=zero_cnn,
-            dashboard=TrainingDashboard(),
+            dashboard_hook=DashboardHook(),
             log_file_name="acrobatic_oa_trainer")
 
-        checkpoint_directory = PythonPath(os.path.expandvars(resume_checkpoint_path))
-        if checkpoint_directory.is_file():
-            self.trainer.load_checkpoint(resume_checkpoint_path)
-            the_node.get_logger().warn(
-                f"Resumed from {resume_checkpoint_path} at update {self.trainer.update_count}"
-            )
+        the_node.get_logger().info(f"Training device: {self.trainer.device}")
 
+        checkpoint_file = PythonPath(os.path.expandvars(resume_checkpoint_path))
+        if checkpoint_file.is_file():
+            self.trainer.load_checkpoint(checkpoint_file)
+            the_node.get_logger().warn(
+                f"Resumed from {checkpoint_file} at update {self.trainer.update_count}"
+            )
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -162,23 +111,17 @@ class RealTrainer:
     def _run_training(self) -> None:
         time.sleep(STARTUP_DELAY_SECONDS)
 
-        total_updates = self.configuration.trainer.total_updates
         update_count_at_start = self.trainer.update_count
+        remaining_updates = self.configuration.trainer.total_updates - update_count_at_start
+        if remaining_updates <= 0:
+            self.the_node.get_logger().warn(
+                f"The checkpoint already has {update_count_at_start} updates, nothing left to train"
+            )
+            return
 
         try:
-            while self.trainer.update_count < total_updates and not self.stop_event.is_set():
-                try:
-                    self.trainer.train(total_updates=1)
-                except EnvironmentFailure as failure:
-                    self.the_node.get_logger().error(f"{RED} Environment failure: {failure} {RESET}")
-                    if not self.simulation_recovery.handle(failure):
-                        raise
-
-                    #: The episode that was running is broken. Make the Trainer start a fresh one.
-                    self.trainer.pending_inputs = None
-                    continue
-
-                self.simulation_recovery.report_success()
+            #: One call. Simulation problems are handled below this line (see the module docstring).
+            self.trainer.train(total_updates=remaining_updates)
         except TrainingStopRequested:
             self.the_node.get_logger().warn(f"{YELLOW} Stop requested, training interrupted {RESET}")
         finally:
