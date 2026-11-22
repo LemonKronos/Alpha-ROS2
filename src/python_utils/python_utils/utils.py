@@ -224,10 +224,16 @@ class Path:
                 )
 
         class ACROBATIC_OA_RESUME_CHECKPOINT(DynamicInfo):
-                    def __init__(self) -> None:
-                        super().__init__(
-                            lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_RESUME_CHECKPOINT")
-                        )
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_RESUME_CHECKPOINT")
+                )
+
+        class ACROBATIC_OA_EVALUATION_CHECKPOINT(DynamicInfo):
+            def __init__(self) -> None:
+                super().__init__(
+                    lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_EVALUATION_CHECKPOINT")
+                )
 
 
 #_                                   FUNCTION 

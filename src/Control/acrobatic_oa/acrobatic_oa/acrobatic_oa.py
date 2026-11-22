@@ -17,6 +17,7 @@ from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
 from acrobatic_oa.toy_trainer import ToyTrainer
 from acrobatic_oa.real_trainer import RealTrainer
+from acrobatic_oa.evaluator import Evaluator
 from alpha_ai_core.interface import FloatArray
 
 
@@ -43,8 +44,20 @@ class AcrobaticOANode(Node):
         
         if self.training: #_Branch for training 
             self.get_logger().warn(f"{RED} Acrobatic training mode, remember to turn of PX4 {RESET}")
-            # self.trainer = ToyTrainer(self)
-            self.trainer = RealTrainer(self)
+            self.trainer = None
+
+            self.declare_parameter('training_mode', "real_training")
+            self.training_mode = self.get_parameter('training_mode').get_parameter_value().string_value
+            match self.training_mode:
+                case "test_environment":
+                    self.trainer = ToyTrainer(self)
+                    self.get_logger().warn(f"{BLUE} ToyTrainer, testing environment... {RESET}")
+                case "real_training":
+                    self.trainer = RealTrainer(self)
+                    self.get_logger().warn(f"{GREEN} RealTrainer, run training... {RESET}")
+                case "evaluate":
+                    self.trainer = Evaluator(self)
+                    self.get_logger().warn(f"{YELLOW} Evaluator, grading model... {RESET}")
 
             threading.Thread(target=self.trainer.training_loop, daemon=True).start()
         else: #_Branch for running 
@@ -130,7 +143,7 @@ def main(args=None):
         if node.trainer is not None:
             node.trainer.stop()
     finally:
-        if node.training and node.trainer.analyzer is not None:
+        if node.training and getattr(node.trainer, "analyzer", None) is not None:
             node.trainer.analyzer.print_summary()
             
         node.destroy_node()

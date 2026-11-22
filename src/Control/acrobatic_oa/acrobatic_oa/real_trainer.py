@@ -115,8 +115,9 @@ class RealTrainer:
         remaining_updates = self.configuration.trainer.total_updates - update_count_at_start
         if remaining_updates <= 0:
             self.the_node.get_logger().warn(
-                f"The checkpoint already has {update_count_at_start} updates, nothing left to train"
+                f"{PINK} The checkpoint already has {update_count_at_start} updates, nothing left to train {RESET}"
             )
+            print(f"{PINK}The checkpoint already has {update_count_at_start} updates, nothing left to train {RESET}")
             return
 
         try:

@@ -23,6 +23,7 @@ export DRONE_MODEL_SDF_PATH="$HOME/MyCode/Project/Drone/Gazebo/models/alpha_minu
 export SIMULATION_SCRIPTS_PATH="$HOME/MyCode/Project/Drone/ROS2/scripts"
 export ACROBATIC_OA_AI_CONFIG="$HOME/MyCode/Project/Drone/AI_Core/configs/hover.toml"
 export ACROBATIC_OA_RESUME_CHECKPOINT="$HOME/MyCode/Project/Drone/AI_Core/checkpoints/last.pt"
+export ACROBATIC_OA_EVALUATION_CHECKPOINT="$HOME/MyCode/Project/Drone/AI_Core/checkpoints/last.pt"
 
 #: OTHERS
 export LOG_FILE_FORMAT='%Y-%m-%d_%H:%M:%S'

@@ -1,3 +1,4 @@
 /**:
   ros__parameters:
     acrobatic_training: true
+    training_mode: "real_training"

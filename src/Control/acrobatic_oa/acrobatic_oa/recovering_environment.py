@@ -46,7 +46,7 @@ class RecoveringEnvironment:
         gz_environment: GzEnvironment,
         simulation_recovery: SimulationRecovery,
         stop_event: threading.Event,
-        analyzer: TimeAnalyzer
+        analyzer: TimeAnalyzer | None = None
     ):
         self.the_node = the_node
         self.gz_environment = gz_environment
@@ -76,7 +76,9 @@ class RecoveringEnvironment:
         while True:
             self._raise_if_stop_requested()
 
-            self.analyzer.start_segment("Reset")
+            if self.analyzer is not None:
+                self.analyzer.start_segment("Reset")
+
             try:
                 step_result = self.gz_environment.reset(episode_configuration)
             except EnvironmentFailure as failure:
@@ -85,7 +87,9 @@ class RecoveringEnvironment:
                     raise
                 continue
 
-            self.analyzer.stop_segment("Reset")
+            if self.analyzer is not None:
+                self.analyzer.stop_segment("Reset")
+
             return step_result
 
     def step(self, action: Action) -> StepResult:
@@ -95,7 +99,9 @@ class RecoveringEnvironment:
         """
         self._raise_if_stop_requested()
 
-        self.analyzer.start_segment("Step")
+        if self.analyzer is not None:
+            self.analyzer.start_segment("Step")
+
         try:
             step_result = self.gz_environment.step(action)
         except EnvironmentFailure as failure:
@@ -105,7 +111,8 @@ class RecoveringEnvironment:
                 raise
             raise EpisodeAborted(f"The simulation was healed after: {failure}") from failure
 
-        self.analyzer.stop_segment("Step")
+        if self.analyzer is not None:
+            self.analyzer.stop_segment("Step")
 
         self.steps_in_current_episode += 1
         return step_result

@@ -13,11 +13,16 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch_utils/ros_gz_bridge_launch.py',
             'launch_utils/static_tf_launch.py',
-            'launch_utils/spatial_container_launch.py',
+            
             'launch_utils/full_launch.py',
+
+            'launch_utils/spatial_container_launch.py',
             'launch_utils/spatial_observation.py',
-            'launch_utils/acrobatic_training_peripheral.py',
-            'launch_utils/acrobatic_oa_node.py',
+
+            'launch_utils/acrobatic_peripheral.py',
+            'launch_utils/acrobatic_training.py',
+            'launch_utils/acrobatic_evaluating.py',
+            'launch_utils/acrobatic_test_environment.py',
         ]),
     ],
     install_requires=['setuptools'],
