@@ -4,7 +4,7 @@ package_name = 'launch_utils'
 
 setup(
     name=package_name,
-    version='0.1.1',
+    version='0.1.2',
     packages=find_packages(include=[package_name]),
     data_files=[
         ('share/ament_index/resource_index/packages',

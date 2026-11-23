@@ -1,10 +1,6 @@
 # Dev logs
 
 ## Current ⚠️⚠️⚠️
-- The update = 1???
-- Make evaluation script
-- Go update the Trainer to correctly use the `DashboardHook`
-- The current design of contact => no learn is bad, cause it gonna crash a lot, and that mean we just run sim the void the result, not good.
 - Multi threaded Gazebo physics? We got fast CPU physics first
 
 ## Ready the simulation for RL - Acrobatic OA node
@@ -13,4 +9,5 @@
 - Arobatic OA, `WorldHandling` still try to zero drone speed, ready for switch to `reset_all` instead.
 - `ToyTrainer` now able to spam the `Step` and collect `StepResult`.
 - Making the training environment more resilient and auto reset.
+- House keeping on logs and path. Also appiled Fast DDS config for lo multicast-allow Gazebo-ROS2 communication fully offline.
 

@@ -32,7 +32,6 @@ def generate_launch_description():
             arguments=[
                 "--ros-args",
                 "--log-level", "warn",
-                "--disable-stdout-logs",
                 "--log-file-name", f"{node_name}_{ts}",
             ],
         )

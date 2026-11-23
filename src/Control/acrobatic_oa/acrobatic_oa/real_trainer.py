@@ -16,7 +16,6 @@ Evaluation is intentionally not run here: load best.pt and evaluate it separatel
 
 import os
 from pathlib import Path as PythonPath
-import logging
 import threading
 import time
 import traceback
@@ -47,9 +46,6 @@ STARTUP_DELAY_SECONDS = 1.0
 class RealTrainer:
     def __init__(self, the_node: Node):
         self.the_node = the_node
-
-        #: Make the AI core log lines visible (the Trainer logs through the standard logging module)
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
         self.stop_event = threading.Event()
         self.analyzer = TimeAnalyzer(the_node)
@@ -115,9 +111,8 @@ class RealTrainer:
         remaining_updates = self.configuration.trainer.total_updates - update_count_at_start
         if remaining_updates <= 0:
             self.the_node.get_logger().warn(
-                f"{PINK} The checkpoint already has {update_count_at_start} updates, nothing left to train {RESET}"
+                f"{RED} The checkpoint already has {update_count_at_start} updates, nothing left to train {RESET}"
             )
-            print(f"{PINK}The checkpoint already has {update_count_at_start} updates, nothing left to train {RESET}")
             return
 
         try:

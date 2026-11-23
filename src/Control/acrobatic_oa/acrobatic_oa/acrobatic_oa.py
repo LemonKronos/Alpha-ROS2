@@ -12,6 +12,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import rclpy.clock
 from rclpy.clock import Clock
+from rclpy.executors import ExternalShutdownException
 
 from python_utils.utils import *
 from alpha_msgs.msg import ControlInterface, FusePerception, NormalizedMotorsServos, SpatialObservation
@@ -59,7 +60,9 @@ class AcrobaticOANode(Node):
                     self.trainer = Evaluator(self)
                     self.get_logger().warn(f"{YELLOW} Evaluator, grading model... {RESET}")
 
-            threading.Thread(target=self.trainer.training_loop, daemon=True).start()
+            self.training_thread = threading.Thread(target=self.trainer.training_loop, daemon=True)
+            self.training_thread.start()
+
         else: #_Branch for running 
             self.get_logger().info(f"{BLUE} Acrobatic inference mode {RESET}")
 
@@ -139,13 +142,20 @@ def main(args=None):
     
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+        
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+
+    finally:
         if node.trainer is not None:
             node.trainer.stop()
-    finally:
-        if node.training and getattr(node.trainer, "analyzer", None) is not None:
-            node.trainer.analyzer.print_summary()
-            
+            node.training_thread.join(timeout=60.0)
+
+            if node.training_thread.is_alive():
+                node.get_logger().error(f"{RED} Trainer thread unable to join after timeout {RESET}")
+            elif getattr(node.trainer, "analyzer", None) is not None:
+                node.trainer.analyzer.print_summary()
+
         node.destroy_node()
         rclpy.try_shutdown()
 

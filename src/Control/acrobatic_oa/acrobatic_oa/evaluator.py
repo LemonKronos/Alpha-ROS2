@@ -48,10 +48,10 @@ from python_utils.utils import *
 
 # The checkpoint to evaluate, for example best.pt. Environment variables are expanded. Mandatory:
 # a missing path or a missing file is an error.
-EVALUATION_CHECKPOINT_PATH: str | None = Path.Dynamic.ACROBATIC_OA_EVALUATION_CHECKPOINT().get()
+EVALUATION_CHECKPOINT_PATH: str = Path.Dynamic.ACROBATIC_OA_EVALUATION_CHECKPOINT().get()
 
 # Evaluate the untrained baseline before the checkpoint? Set to False to skip it.
-BASELINE_EVALUATION: bool = True
+BASELINE_EVALUATION: bool = False
 
 # Optional override of the difficulty, for example {"spawn": 1.0}. The dimensions that are not listed keep the
 # value the checkpoint had reached. None means: no override, use the checkpoint's difficulty as it is.
@@ -68,9 +68,6 @@ STARTUP_DELAY_SECONDS = 1.0
 class Evaluator:
     def __init__(self, the_node: Node):
         self.the_node = the_node
-
-        # Make the AI core log lines visible (the Trainer logs through the standard logging module)
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
         self.stop_event = threading.Event()
 
