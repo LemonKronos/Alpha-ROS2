@@ -12,12 +12,12 @@ from rclpy.node import Node
 from acrobatic_oa.environment import GzEnvironment
 from acrobatic_oa.simulation_recovery import SimulationRecovery
 
-from alpha_ai_core.training.environment import EnvironmentFailure
 from alpha_ai_core.interface import (
     EpisodeConfiguration,
     SpawnCondition, Action, StepResult,
     TaskType,
-    Observation, SimulationInformation
+    Observation, SimulationInformation,
+    EnvironmentFailure
 )
 
 from python_utils.utils import *

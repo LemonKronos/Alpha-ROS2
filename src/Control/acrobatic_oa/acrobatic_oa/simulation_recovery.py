@@ -13,7 +13,7 @@ from enum import Enum
 
 from rclpy.node import Node
 
-from alpha_ai_core.training.environment import EnvironmentFailure
+from alpha_ai_core.interface import EnvironmentFailure
 from acrobatic_oa.environment import WorldServiceFailure, ObservationInvalidFailure
 from acrobatic_oa.world_handling import WorldHandling
 from python_utils.utils import *

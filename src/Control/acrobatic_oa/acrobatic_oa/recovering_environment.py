@@ -20,7 +20,7 @@ import threading
 from rclpy.node import Node
 
 from alpha_ai_core.interface import Action, EpisodeConfiguration, StepResult
-from alpha_ai_core.training.environment import EnvironmentFailure, EpisodeAborted
+from alpha_ai_core.interface import EnvironmentFailure, EpisodeAborted
 
 from acrobatic_oa.environment import GzEnvironment
 from acrobatic_oa.simulation_recovery import SimulationRecovery

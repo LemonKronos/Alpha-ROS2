@@ -14,8 +14,11 @@ from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from nav_msgs.msg import Odometry
 from alpha_msgs.msg import FusePerception, ContactSensor
 from acrobatic_oa.world_handling import WorldHandling
-from alpha_ai_core.interface import Action, EpisodeConfiguration, StepResult, TaskType, FloatArray, Observation, SimulationInformation
-from alpha_ai_core.training.environment import EnvironmentFailure
+from alpha_ai_core.interface import (
+    Action, EpisodeConfiguration, StepResult,
+    TaskType, FloatArray, Observation, SimulationInformation,
+    EnvironmentFailure
+)
 from python_utils.utils import *
 
 #: Timing

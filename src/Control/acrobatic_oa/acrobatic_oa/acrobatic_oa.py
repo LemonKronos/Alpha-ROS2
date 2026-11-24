@@ -121,7 +121,7 @@ class AcrobaticOANode(Node):
 
         self.PUB_acrobatic.publish(msg)
 
-        self.get_logger().info(f"Published action {action}",throttle_duration_sec=1)
+        self.get_logger().info(f"Published action {action}")
 
     def inference_loop(self):
         """This is the real/evaluation run"""
