@@ -8,6 +8,7 @@ import threading
 import traceback
 from scipy.spatial.transform import Rotation
 
+import rclpy
 from rclpy.node import Node
 from acrobatic_oa.environment import GzEnvironment
 from acrobatic_oa.simulation_recovery import SimulationRecovery
@@ -115,9 +116,8 @@ class ToyTrainer:
         self.analyzer = TimeAnalyzer(the_node)
 
 
-    def __del__(self):
-        """Called automatically when the ToyTrainer instance is destroyed."""
-        self.analyzer.print_summary()
+    def _is_stop_requested(self) -> bool:
+        return self.stop_event.is_set() or not rclpy.ok()
 
 
     def stop(self):
@@ -129,6 +129,9 @@ class ToyTrainer:
         try:
             self._run_episodes()
         except Exception:
+            if self._is_stop_requested():
+                return
+            
             self.the_node.get_logger().fatal(f"{RED} Toy trainer stopped:\n{traceback.format_exc()} {RESET}")
             self.the_node.request_shutdown_after_failure()
 
@@ -136,13 +139,17 @@ class ToyTrainer:
     def _run_episodes(self):
         time.sleep(1)
         rng = np.random.default_rng()
-        while not self.stop_event.is_set():
+        while not self._is_stop_requested():
             try:
                 self._run_one_episode(rng)
             except EnvironmentFailure as failure:
+                if self._is_stop_requested():
+                    return
+                
                 self.the_node.get_logger().error(f"{RED} Environment failure: {failure} {RESET}")
                 if not self.simulation_recovery.handle(failure):
                     raise
+
                 continue
             self.simulation_recovery.report_success()
     
@@ -169,7 +176,7 @@ class ToyTrainer:
         counter = 0.0
         flip = -1
         for _ in range(0, 50):
-            if self.stop_event.is_set():
+            if self._is_stop_requested():
                 return
             
             self.analyzer.start_segment("Step")

@@ -149,6 +149,7 @@ class Evaluator:
             checkpoint_results = self._run_evaluation(self.checkpoint_trainer)
             self._log_results(f"Checkpoint ({self.checkpoint_file.name})", checkpoint_results)
         except TrainingStopRequested:
+            self.stop_event.set()
             self.the_node.get_logger().warn(f"{YELLOW} Stop requested, evaluation interrupted {RESET}")
             return
         except Exception:

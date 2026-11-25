@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from nav_msgs.msg import Odometry
@@ -209,7 +210,8 @@ class GzEnvironment:
         ground_truth: Odometry = timed_messages[SOURCE_GROUND_TRUTH].message
 
         #: Observation from Fuse Perception
-        intent: FloatArray = np.zeros(6, dtype=np.float32) #DEV Hover only
+        #TODO this is for Hover only 
+        intent: FloatArray = np.zeros(6, dtype=np.float32)
 
         quaternion = np.asarray(fuse_state.q, dtype=np.float64)
         if not np.all(np.isfinite(quaternion)) or np.linalg.norm(quaternion) < MINIMUM_QUATERNION_NORM:
@@ -269,12 +271,13 @@ class GzEnvironment:
             try:
                 return self._attempt_reset(episode_config)
             except EnvironmentFailure as failure:
+                if not rclpy.ok():
+                    raise
                 last_failure = failure
                 self.the_node.get_logger().warn(
                     f"{YELLOW} Reset attempt {attempt_number}/{RESET_MAXIMUM_ATTEMPTS} failed: {failure} {RESET}"
                 )
 
-        #TODO later: this is where a Gazebo/pipeline restart can hook in
         self.the_node.get_logger().error(f"Reset failed {RESET_MAXIMUM_ATTEMPTS} times")
         raise last_failure
 

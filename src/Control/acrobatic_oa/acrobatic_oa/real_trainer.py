@@ -119,6 +119,7 @@ class RealTrainer:
             #: One call. Simulation problems are handled below this line (see the module docstring).
             self.trainer.train(total_updates=remaining_updates)
         except TrainingStopRequested:
+            self.stop_event.set()
             self.the_node.get_logger().warn(f"{YELLOW} Stop requested, training interrupted {RESET}")
         finally:
             self._save_progress(update_count_at_start)

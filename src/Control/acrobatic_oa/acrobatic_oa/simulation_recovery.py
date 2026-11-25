@@ -11,6 +11,7 @@ import os
 import subprocess
 from enum import Enum
 
+import rclpy
 from rclpy.node import Node
 
 from alpha_ai_core.interface import EnvironmentFailure
@@ -20,7 +21,7 @@ from python_utils.utils import *
 
 SCRIPT_RESTART_GAZEBO = "restartGazebo.sh"
 SCRIPT_RESTART_PIPELINE = "restartPipeline.sh"
-SCRIPT_LOG_FOLDER = "/tmp"
+SCRIPT_LOG_FOLDER = "/home/mr_lemon/.ros/log"
 
 RESTART_GAZEBO_TIMEOUT_SECONDS = 120.0
 RESTART_PIPELINE_TIMEOUT_SECONDS = 120.0
@@ -67,6 +68,10 @@ class SimulationRecovery:
         Run the cheapest recovery that fits the failure.
         Returns True when the caller should try again, False when recovery is exhausted.
         """
+        if not rclpy.ok():
+            #: Shutting down: a restart script now would only block the exit
+            return False
+        
         level = self._choose_level(failure)
         if level is None:
             self.the_node.get_logger().fatal(f"{RED} Recovery exhausted, last failure: {failure} {RESET}")

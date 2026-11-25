@@ -17,6 +17,7 @@ wall-clock time of every reset and step.
 
 import threading
 
+import rclpy
 from rclpy.node import Node
 
 from alpha_ai_core.interface import Action, EpisodeConfiguration, StepResult
@@ -57,8 +58,14 @@ class RecoveringEnvironment:
         self.steps_in_current_episode = 0
         self.current_episode_was_aborted = False
 
+    def _is_stop_requested(self) -> bool:
+        # rclpy.ok() turns False the moment Ctrl+C shuts the context down, which happens
+        # BEFORE main() reaches trainer.stop(), so stop_event alone is too late.
+        return self.stop_event.is_set() or not rclpy.ok()
+
     def _raise_if_stop_requested(self) -> None:
-        if self.stop_event.is_set():
+        if self._is_stop_requested():
+            self.stop_event.set()
             raise TrainingStopRequested()
 
     def _log_failure(self, failure: EnvironmentFailure) -> None:
@@ -82,6 +89,8 @@ class RecoveringEnvironment:
             try:
                 step_result = self.gz_environment.reset(episode_configuration)
             except EnvironmentFailure as failure:
+                # A failure caused by shutdown is not a simulation problem: do not heal it
+                self._raise_if_stop_requested()
                 self._log_failure(failure)
                 if not self.simulation_recovery.handle(failure):
                     raise
@@ -105,6 +114,8 @@ class RecoveringEnvironment:
         try:
             step_result = self.gz_environment.step(action)
         except EnvironmentFailure as failure:
+            # A failure caused by shutdown is not a simulation problem: do not heal it
+            self._raise_if_stop_requested()
             self.current_episode_was_aborted = True
             self._log_failure(failure)
             if not self.simulation_recovery.handle(failure):

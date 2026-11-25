@@ -11,6 +11,7 @@ reset_all() therefore additionally waits until the reset is observed in WorldSta
 import threading
 import time
 
+import rclpy
 from rclpy.node import Node
 
 from ros_gz_interfaces.msg import (
@@ -33,6 +34,7 @@ from python_utils.utils import *
 
 
 GOAL_RADIUS = 0.5 #TODO sync this with training module config 
+SERVICE_WAIT_SLICE_SECONDS = 0.05
 
 
 class WorldHandling:
@@ -106,22 +108,32 @@ class WorldHandling:
         timeout = Threshold.SERVICE_TIMEOUT if timeout is None else timeout
         logger = self.the_node.get_logger()
 
+        if not rclpy.ok():
+            return None
+
         if not client.wait_for_service(timeout_sec=timeout):
-            logger.error(f"{desc}: service not available after {timeout}s")
+            if rclpy.ok():
+                logger.error(f"{desc}: service not available after {timeout}s")
             return None
 
         done = threading.Event()
         future = client.call_async(req)
         future.add_done_callback(lambda _: done.set())
 
-        if not done.wait(timeout):
-            future.cancel()
-            # Avoid leaking the pending request (available in recent rclpy versions)
-            remove = getattr(client, "remove_pending_request", None)
-            if remove is not None:
-                remove(future)
-            logger.error(f"{desc}: no ACK within {timeout}s")
-            return None
+        # Wait in short slices, so a shutdown ends the wait immediately instead of after the full timeout
+        deadline = time.monotonic() + timeout
+        while not done.wait(SERVICE_WAIT_SLICE_SECONDS):
+            context_is_shut_down = not rclpy.ok()
+            timed_out = time.monotonic() >= deadline
+            if context_is_shut_down or timed_out:
+                future.cancel()
+                # Avoid leaking the pending request (available in recent rclpy versions)
+                remove = getattr(client, "remove_pending_request", None)
+                if remove is not None:
+                    remove(future)
+                if timed_out and not context_is_shut_down:
+                    logger.error(f"{desc}: no ACK within {timeout}s")
+                return None
 
         if future.exception() is not None:
             logger.error(f"{desc}: service call failed: {future.exception()}")

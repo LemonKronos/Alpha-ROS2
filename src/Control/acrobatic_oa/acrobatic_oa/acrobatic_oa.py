@@ -149,7 +149,7 @@ def main(args=None):
     finally:
         if node.trainer is not None:
             node.trainer.stop()
-            node.training_thread.join(timeout=60.0)
+            node.training_thread.join(timeout=5.0)
 
             if node.training_thread.is_alive():
                 node.get_logger().error(f"{RED} Trainer thread unable to join after timeout {RESET}")
