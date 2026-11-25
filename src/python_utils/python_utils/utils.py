@@ -47,73 +47,10 @@ class Threshold:
 
     ALLOW_MISSED_NORMAL_TO_FAST_TOPIC = ALLOW_MISSED_TOPIC * ALLOW_MISSED_FAST_TOPIC
 
-
-class Topic:
-    RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
-    OVERVIEW_CAM = "/sensor/overview_cam/camera/image"
-
-    CONTROL_INPUT = "/internal/drone_control/input/control"
-    CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"
-    CONTROL_REACTIVE = "/internal/drone_control/reactive/control"
-    FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
-
-    LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
-
-    CONTACT_PARSER = "/internal/sensor/contacts"
-
-    SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
-
-    WORLD_STATS = "/world/stats"
-    WORLD_WRENCH = "/world/wrench"
-
-    DRONE_ODOMETRY = "/drone/odometry"
-    
-    class PX4:
-        VEHICLE_COMMAND = "/fmu/in/vehicle_command"
-
-class Service:
-    WORLD_CONTROL = "/world/control"
-    WORLD_SPAWN = "/world/create"
-    WORLD_KILL = "/world/remove"
-    WORLD_SET_POSE = "/world/set_pose"
+    SERVICE_TIMEOUT = 3.0 # Blocking service call timeout, in WALL-CLOCK seconds
 
 
-class Drone:
-    WIDTH = 2.15
-    LENGTH = 0.93
-    HEIGHT = 0.31
-    MASS = 5.12000002
-    INERTIA = np.diag([0.53, 0.39, 0.87])
-
-    SPEED_MAX_FORWARD = 10.0
-    SPEED_MAX_BACKWARD = 6.0
-    SPEED_MAX_STRAFE = 10.0
-    SPEED_MAX_ANGLE = math.pi/2
-    SPEED_MAX_UP = 8.0
-    SPEED_MAX_DOWN = 6.0
-    THRUST_SAFE_LIMIT = 1.0
-    HOVER_THRUST = 0.51
-
-    # Safety
-    RADIUS = 1.2
-    SAFE_BUFFER = 0.1
-    HAZARD_DISTANCE = RADIUS + SAFE_BUFFER
-
-
-class Sensor:
-    SPATIAL_BOX_DIM = 12
-
-
-class Physics:
-    STEP_SIZE = 0.001
-    ONE_STEP_FAST = Clock.LOOP_CYCLE_FAST / STEP_SIZE
-
-    class Drone:
-        REF_ANGULAR_VELOCITY = 10.0 # rad/s
-        REF_LINEAR_VELOCITY = 30.0  # m/s
-
-
-#_                                   DYNAMIC NAME
+#_                                   DYNAMIC NAME 
 class DynamicInfo:
     """Base class for information resolved dynamically from external sources."""
 
@@ -234,6 +171,74 @@ class Path:
                 super().__init__(
                     lambda: DynamicInfoHelper.updateENV("ACROBATIC_OA_EVALUATION_CHECKPOINT")
                 )
+
+
+#_                                   STATIC INFO 
+class Topic:
+    RGB_CAM_FRONT = "/sensor/rgb_cam/camera/image"
+    OVERVIEW_CAM = "/sensor/overview_cam/camera/image"
+
+    CONTROL_INPUT = "/internal/drone_control/input/control"
+    CONTROL_ACROBATIC = "/internal/drone_control/acrobatic/floats"
+    CONTROL_REACTIVE = "/internal/drone_control/reactive/control"
+    FUSE_PERCEPTION = "/internal/sensor/fuse_perception"
+
+    LOGGER_RECORD = "/internal/logger/record_control" # Actually use to pause world
+
+    CONTACT_PARSER = "/internal/sensor/contacts"
+
+    SPATIAL_OBSERVATION = "/internal/sensor/observation_boxes"
+
+    WORLD_STATS = "/world/stats"
+    WORLD_WRENCH = "/world/wrench"
+
+    DRONE_ODOMETRY = "/drone/odometry"
+
+    WORLD_WIND = f"/world/{Name.Dynamic.WORLD().get()}/wind"
+    
+    class PX4:
+        VEHICLE_COMMAND = "/fmu/in/vehicle_command"
+
+class Service:
+    WORLD_CONTROL = "/world/control"
+    WORLD_SPAWN = "/world/create"
+    WORLD_KILL = "/world/remove"
+    WORLD_SET_POSE = "/world/set_pose"
+
+
+class Drone:
+    WIDTH = 2.15
+    LENGTH = 0.93
+    HEIGHT = 0.31
+    MASS = 5.12000002
+    INERTIA = np.diag([0.53, 0.39, 0.87])
+
+    SPEED_MAX_FORWARD = 10.0
+    SPEED_MAX_BACKWARD = 6.0
+    SPEED_MAX_STRAFE = 10.0
+    SPEED_MAX_ANGLE = math.pi/2
+    SPEED_MAX_UP = 8.0
+    SPEED_MAX_DOWN = 6.0
+    THRUST_SAFE_LIMIT = 1.0
+    HOVER_THRUST = 0.51
+
+    # Safety
+    RADIUS = 1.2
+    SAFE_BUFFER = 0.1
+    HAZARD_DISTANCE = RADIUS + SAFE_BUFFER
+
+
+class Sensor:
+    SPATIAL_BOX_DIM = 12
+
+
+class Physics:
+    STEP_SIZE = 0.001
+    ONE_STEP_FAST = Clock.LOOP_CYCLE_FAST / STEP_SIZE
+
+    class Drone:
+        REF_ANGULAR_VELOCITY = 10.0 # rad/s
+        REF_LINEAR_VELOCITY = 30.0  # m/s
 
 
 #_                                   FUNCTION 

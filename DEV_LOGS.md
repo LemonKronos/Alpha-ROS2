@@ -1,6 +1,7 @@
 # Dev logs
 
 ## Current ⚠️⚠️⚠️
+- Fix the auto training error: the problem is `self.gz_node = GZNode()` keep making new TCP and not clean up, thus caught `strerror: Too many open files`. Not fix yet.
 - Multi threaded Gazebo physics? We got fast CPU physics first
 
 ## Ready the simulation for RL - Acrobatic OA node

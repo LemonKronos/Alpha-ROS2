@@ -32,9 +32,7 @@ from geometry_msgs.msg import (
 from python_utils.utils import *
 
 
-
 GOAL_RADIUS = 0.5 #TODO sync this with training module config 
-SERVICE_TIMEOUT = 3.0 # Blocking service call timeout, in WALL-CLOCK seconds
 
 
 class WorldHandling:
@@ -105,7 +103,7 @@ class WorldHandling:
         Returns the response, or None on service unavailable / timeout / exception.
         The node must be spinning in another thread to deliver the response.
         """
-        timeout = SERVICE_TIMEOUT if timeout is None else timeout
+        timeout = Threshold.SERVICE_TIMEOUT if timeout is None else timeout
         logger = self.the_node.get_logger()
 
         if not client.wait_for_service(timeout_sec=timeout):
@@ -144,7 +142,7 @@ class WorldHandling:
         NOTE: assumes WorldStatistics.sim_time is builtin_interfaces/Time.
         Check with: ros2 interface show ros_gz_interfaces/msg/WorldStatistics
         """
-        timeout = SERVICE_TIMEOUT if timeout is None else timeout
+        timeout = Threshold.SERVICE_TIMEOUT if timeout is None else timeout
 
         with self._stats_cond:
             start = self._stats_count
