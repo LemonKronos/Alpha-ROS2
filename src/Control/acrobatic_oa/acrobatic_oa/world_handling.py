@@ -30,6 +30,9 @@ from geometry_msgs.msg import (
     Pose
 )
 
+from gz.transport13 import Node as GzNode
+from gz.msgs10.wind_pb2 import Wind
+
 from python_utils.utils import *
 
 
@@ -41,6 +44,7 @@ class WorldHandling:
     def __init__(self, the_node: Node):
 
         self.the_node = the_node
+        self.gz_node = GzNode()
 
         #: Services client
         self.SRV_control_world = self.the_node.create_client(
@@ -70,6 +74,10 @@ class WorldHandling:
             self.stats_callback,
             2
         )
+
+        self.PUB_wind = self.gz_node.advertise(Topic.WORLD_WIND, Wind)
+        if not self.PUB_wind:
+            raise RuntimeError("Unable to create Wind publisher")
 
         #: Publishers
         self.PUB_world_wrench = self.the_node.create_publisher(
@@ -295,6 +303,18 @@ class WorldHandling:
         msg.header.stamp = self.the_node.get_clock().now().to_msg()
 
         self.PUB_world_wrench.publish(msg)
+        return True
+
+    def set_wind(self, x: float, y: float, z: float) -> bool:
+        msg = Wind()
+        msg.enable_wind = True
+        msg.linear_velocity.x = x
+        msg.linear_velocity.y = y
+        msg.linear_velocity.z = z
+
+        if not self.PUB_wind.publish(msg):
+            return False
+        
         return True
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose) -> bool:
