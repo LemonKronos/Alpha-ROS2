@@ -21,7 +21,7 @@ from python_utils.utils import *
 
 SCRIPT_RESTART_GAZEBO = "restartGazebo.sh"
 SCRIPT_RESTART_PIPELINE = "restartPipeline.sh"
-SCRIPT_LOG_FOLDER = "/home/mr_lemon/.ros/log"
+SCRIPT_LOG_FOLDER = "/home/mr_lemon/.ros/log/latest"
 
 RESTART_GAZEBO_TIMEOUT_SECONDS = 120.0
 RESTART_PIPELINE_TIMEOUT_SECONDS = 120.0
