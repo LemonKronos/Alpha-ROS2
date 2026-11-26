@@ -9,7 +9,6 @@ else
     echo '[Missing Global ENV setup]'
 fi
 
-export FAST_DDS_SETUP="$HOME/MyCode/Project/Drone/ROS2/config/FastDDS/fast_dds_setup.sh"
 export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
 
 #_ GAZEBO SERVER
@@ -44,7 +43,7 @@ start_gazebo_gui() {
 #_ MICRO XRCE AGENT
 start_micro_xrce_agent() {
   zsh -c '
-    source "$FAST_DDS_SETUP"
+    source "$GLOBAL_ENV"
     
     cd ~/MyCode/Project/Drone/Micro-XRCE-DDS-Agent
     export PATH=$PATH:$HOME/MyCode/Project/Drone/Micro-XRCE-DDS-Agent/build
@@ -135,8 +134,6 @@ start_rviz2() {
 main() {
   # Clear previous PIDs just in case
   > /tmp/sim_pids.txt
-
-  source "$FAST_DDS_SETUP"
 
   start_gazebo
   start_micro_xrce_agent

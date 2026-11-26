@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#: Communication
+export GZ_IP=127.0.0.1
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export FASTDDS_BUILTIN_TRANSPORTS=SHM,UDPv4
+
 #: ROS2
 export RCUTILS_COLORIZED_OUTPUT=1
 export RCUTILS_CONSOLE_OUTPUT_FORMAT="{date_time_with_ms} [{severity}]—"$'\033[30;47m'"{name}"$'\033[0m'":\n{message}\n"
