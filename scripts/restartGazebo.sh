@@ -10,7 +10,11 @@ STOP_TIMEOUT_SECONDS=10
 OLD_CLOCK_TIMEOUT_SECONDS=15
 NEW_CLOCK_TIMEOUT_SECONDS=60
 
-#_ Stop the old server: SIGINT first, SIGKILL if it hangs
+#: Do not reset if stop have been called
+if ! pgrep -x MicroXRCEAgent > /dev/null; then
+  exit 1
+
+#: Stop the old server: SIGINT first, SIGKILL if it hangs
 echo "[RESTART GZ] Stopping the Gazebo server..."
 pkill -INT -f "$SERVER_PATTERN"
 for ((second = 0; second < STOP_TIMEOUT_SECONDS; second++)); do
@@ -23,13 +27,13 @@ if pgrep -f "$SERVER_PATTERN" >/dev/null; then
   sleep 1
 fi
 
-#_ Wait until the old /clock is gone, so we do not mistake it for the new server
+#: Wait until the old /clock is gone, so we do not mistake it for the new server
 for ((second = 0; second < OLD_CLOCK_TIMEOUT_SECONDS; second++)); do
   gz topic -l 2>/dev/null | grep -q "/clock" || break
   sleep 1
 done
 
-#_ Start the new server and wait for its /clock
+#: Start the new server and wait for its /clock
 start_gazebo
 for ((second = 0; second < NEW_CLOCK_TIMEOUT_SECONDS; second++)); do
   if gz topic -l 2>/dev/null | grep -q "/clock"; then

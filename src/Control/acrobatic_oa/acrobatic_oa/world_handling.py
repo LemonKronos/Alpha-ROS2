@@ -10,6 +10,7 @@ reset_all() therefore additionally waits until the reset is observed in WorldSta
 """
 import threading
 import time
+import subprocess
 
 import rclpy
 from rclpy.node import Node
@@ -35,7 +36,7 @@ from python_utils.utils import *
 
 GOAL_RADIUS = 0.5 #TODO sync this with training module config 
 SERVICE_WAIT_SLICE_SECONDS = 0.05
-
+WORLD_NAME: str = Name.Dynamic.WORLD().get()
 
 class WorldHandling:
     def __init__(self, the_node: Node):
@@ -296,6 +297,18 @@ class WorldHandling:
 
         self.PUB_world_wrench.publish(msg)
         return True
+
+    def set_wind(self, x: float, y: float, z: float) -> bool:
+        cmd = [
+            "gz", "topic",
+            "-t",
+            f"/world/{WORLD_NAME}/wind",
+            "-m", "gz.msgs.Wind",
+            "-p",
+            f"enable_wind: true, linear_velocity: {{x: {x}, y: {y}, z: {z}}}"
+        ]
+
+        return subprocess.run(cmd, check=False).returncode == 0
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose) -> bool:
         req = SpawnEntity.Request()

@@ -12,12 +12,13 @@ fi
 export SETUP_ROS2="$HOME/MyCode/Project/Drone/ROS2/scripts/setupROS2Terminal.sh"
 
 #_ GAZEBO SERVER
+GAZEBO_LOG="$HOME/.ros/log/gazebo_$(date +%Y-%m-%d_%H:%M:%S).log"
 start_gazebo() {
   (
     cd "$HOME/MyCode/Project/Drone/Gazebo" || exit 1
     exec rNvidia python3 simulation-gazebo \
       --world "$WORLD_NAME" --headless
-  ) >/dev/null 2>&1 &
+  ) >$GAZEBO_LOG 2>&1 &
 
   echo $! >> /tmp/sim_pids.txt
   printf "\033[92m[GZ SERVER] Running...\033[0m\n"
@@ -106,6 +107,7 @@ start_ros2_terminal() {
 }
 
 #_ ROS GZ BRIDGE
+BRIDGE_LOG="$HOME/.ros/log/ros_gz_bridge_$(date +%Y-%m-%d_%H:%M:%S).log"
 start_gz_ros_bridge() {
   zsh -c '
     source "$SETUP_ROS2"
@@ -114,7 +116,7 @@ start_gz_ros_bridge() {
     until gz topic -l | grep -q "/clock"; do sleep 1; done
 
     ros2 launch launch_utils ros_gz_bridge_launch.py
-  ' >/dev/null 2>&1 &
+  ' >$BRIDGE_LOG 2>&1 &
   echo $! >> /tmp/sim_pids.txt
   printf "\033[92m[GZ_ROS_BRIDGE] Running...\033[0m\n"
 }
@@ -142,7 +144,6 @@ main() {
   start_ros2_terminal
   start_gz_ros_bridge
   
-  sleep 1
   start_gazebo_gui
   # start_rviz2
 
