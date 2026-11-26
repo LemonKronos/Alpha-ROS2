@@ -10,6 +10,7 @@ reset_all() therefore additionally waits until the reset is observed in WorldSta
 """
 import threading
 import time
+import subprocess
 
 import rclpy
 from rclpy.node import Node
@@ -30,21 +31,17 @@ from geometry_msgs.msg import (
     Pose
 )
 
-from gz.transport13 import Node as GzNode
-from gz.msgs10.wind_pb2 import Wind
-
 from python_utils.utils import *
 
 
 GOAL_RADIUS = 0.5 #TODO sync this with training module config 
 SERVICE_WAIT_SLICE_SECONDS = 0.05
-
+WORLD_NAME: str = Name.Dynamic.WORLD().get()
 
 class WorldHandling:
     def __init__(self, the_node: Node):
 
         self.the_node = the_node
-        self.gz_node = GzNode()
 
         #: Services client
         self.SRV_control_world = self.the_node.create_client(
@@ -74,10 +71,6 @@ class WorldHandling:
             self.stats_callback,
             2
         )
-
-        self.PUB_wind = self.gz_node.advertise(Topic.WORLD_WIND, Wind)
-        if not self.PUB_wind:
-            raise RuntimeError("Unable to create Wind publisher")
 
         #: Publishers
         self.PUB_world_wrench = self.the_node.create_publisher(
@@ -306,16 +299,16 @@ class WorldHandling:
         return True
 
     def set_wind(self, x: float, y: float, z: float) -> bool:
-        msg = Wind()
-        msg.enable_wind = True
-        msg.linear_velocity.x = x
-        msg.linear_velocity.y = y
-        msg.linear_velocity.z = z
+        cmd = [
+            "gz", "topic",
+            "-t",
+            f"/world/{WORLD_NAME}/wind",
+            "-m", "gz.msgs.Wind",
+            "-p",
+            f"enable_wind: true, linear_velocity: {{x: {x}, y: {y}, z: {z}}}"
+        ]
 
-        if not self.PUB_wind.publish(msg):
-            return False
-        
-        return True
+        return subprocess.run(cmd, check=False).returncode == 0
 
     def spawn_entity_from_sdf(self, name: str, sdf: str, pose: Pose) -> bool:
         req = SpawnEntity.Request()

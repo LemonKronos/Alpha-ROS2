@@ -62,11 +62,16 @@ stop_processes() {
   done
 }
 
-#_ Read the old launch's process list BEFORE the log is overwritten
+#_MAIN 
+#: Do not reset if stop have been called
+if ! pgrep -x MicroXRCEAgent > /dev/null; then
+  exit 1
+
+#: Read the old launch's process list BEFORE the log is overwritten
 echo "[RESTART PIPELINE] Stopping the launch file..."
 old_process_ids=$(read_launch_log_process_ids)
 
-#_ SIGINT the launch (like Ctrl-C) so it shuts its nodes down cleanly
+#: SIGINT the launch (like Ctrl-C) so it shuts its nodes down cleanly
 old_launch_process_ids=$(pgrep -f "$LAUNCH_PATTERN")
 for launch_process_id in $old_launch_process_ids; do
   kill -INT "$launch_process_id"
@@ -82,7 +87,7 @@ if pgrep -f "$LAUNCH_PATTERN" >/dev/null; then
   kill -KILL $(pgrep -f "$LAUNCH_PATTERN")
 fi
 
-#_ Clean up whatever survived of the old nodes: first the PIDs from the log, then a name sweep as a safety net
+#: Clean up whatever survived of the old nodes: first the PIDs from the log, then a name sweep as a safety net
 survivor_process_ids=""
 for process_id in $old_process_ids; do
   is_pipeline_process "$process_id" && survivor_process_ids="$survivor_process_ids $process_id"
@@ -90,18 +95,18 @@ done
 stop_processes "$survivor_process_ids"
 pkill -KILL -f "$PIPELINE_PROCESS_PATTERN"
 
-#_ Wait until the old nodes are gone from the ROS graph
+#: Wait until the old nodes are gone from the ROS graph
 for ((second = 0; second < GONE_TIMEOUT_SECONDS; second++)); do
   [[ "$(visible_required_node_count)" == "0" ]] && break
   sleep 1
 done
 
-#_ Start the launch file again, detached from the trainer. $$ is the PID that exec keeps for ros2 launch.
+#: Start the launch file again, detached from the trainer. $$ is the PID that exec keeps for ros2 launch.
 echo "[RESTART PIPELINE] Starting the launch file..."
 setsid zsh -c 'echo $$ >> "$KILL_LIST"; source "$SETUP_ROS2"; exec ros2 launch launch_utils acrobatic_training.py' \
   > "$LAUNCH_LOG" 2>&1 < /dev/null &
 
-#_ Give the launch time to start its processes, then put every PID it reported on the kill list
+#: Give the launch time to start its processes, then put every PID it reported on the kill list
 sleep "$LAUNCH_SETTLE_SECONDS"
 new_process_ids=$(read_launch_log_process_ids)
 

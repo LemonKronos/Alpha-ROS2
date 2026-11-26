@@ -12,4 +12,5 @@
 - Making the training environment more resilient and auto reset.
 - House keeping on logs and path. Also appiled Fast DDS config for lo multicast-allow Gazebo-ROS2 communication fully offline.
 - Make the setup fully local host and not depend on network (it just a simple `GZ_IP` set).
+- Cannot implement wind handling with a `gz.transport13.Node`, it will create a new TCP and not close them after itself, for every time Gazebo reset. Have to call CLI commands.
 
