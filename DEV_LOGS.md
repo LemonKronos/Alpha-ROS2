@@ -11,4 +11,5 @@
 - `ToyTrainer` now able to spam the `Step` and collect `StepResult`.
 - Making the training environment more resilient and auto reset.
 - House keeping on logs and path. Also appiled Fast DDS config for lo multicast-allow Gazebo-ROS2 communication fully offline.
+- Make the setup fully local host and not depend on network (it just a simple `GZ_IP` set).
 

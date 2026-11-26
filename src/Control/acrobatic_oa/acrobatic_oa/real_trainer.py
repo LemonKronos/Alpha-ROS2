@@ -26,7 +26,7 @@ from rclpy.node import Node
 import torch
 
 from alpha_ai_core.configuration import load_configuration
-from alpha_ai_core.models.monolithic import MonolithicPolicy
+from alpha_ai_core.utils.factory import build_policy
 from alpha_ai_core.models.spatial_cnn import ZeroSpatialEncoder
 from alpha_ai_core.training.curriculum import Curriculum
 from alpha_ai_core.training.trainer import Trainer
@@ -66,7 +66,7 @@ class RealTrainer:
 
         #: Seed BEFORE creating the policy, so the network initialization is repeatable
         torch.manual_seed(self.configuration.trainer.seed)
-        policy = MonolithicPolicy(self.configuration.policy_network, self.configuration.observation)
+        policy = build_policy(self.configuration)
         zero_cnn = ZeroSpatialEncoder(self.configuration.observation.spatial_feature_size)
         curriculum = Curriculum(self.configuration.curriculum, seed=self.configuration.trainer.seed)
 
